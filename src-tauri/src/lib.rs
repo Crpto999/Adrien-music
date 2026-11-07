@@ -28,10 +28,13 @@ mod appid;
 mod discord;
 #[cfg(target_os = "linux")]
 mod linux_graphics;
+mod logging;
 mod media;
 mod progressive;
+mod proxy;
 #[cfg(target_os = "linux")]
 mod mpris;
+mod session;
 // Taskbar thumbnail toolbar (prev / play-pause / next under the taskbar
 // preview). Windows-only shell surface; see src/thumbbar.rs.
 #[cfg(windows)]
@@ -249,7 +252,7 @@ mod secure_store {
             Err(e) => {
                 // No unlocked Secret Service — degrade to plaintext so the
                 // user can still sign in. Marked so reads don't guess.
-                eprintln!(
+                log!(
                     "[auth] secret service unavailable ({e}); storing cookies unencrypted"
                 );
                 return Ok(wrap(SCHEME_PLAINTEXT, plain));
@@ -412,14 +415,14 @@ async fn read_index(app: &tauri::AppHandle) -> AccountsIndex {
         Ok(b) => b,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return AccountsIndex::default(),
         Err(e) => {
-            eprintln!("[accounts] read accounts.json failed: {e}; treating as signed out");
+            log!("[accounts] read accounts.json failed: {e}; treating as signed out");
             return AccountsIndex::default();
         }
     };
     match serde_json::from_slice(&bytes) {
         Ok(idx) => idx,
         Err(e) => {
-            eprintln!(
+            log!(
                 "[accounts] accounts.json is unparseable ({} bytes): {e}; treating as signed out",
                 bytes.len()
             );
@@ -467,13 +470,13 @@ async fn migrate_plaintext_cookies(app: &tauri::AppHandle) {
     match secure_store::encrypt(&plain) {
         Ok(enc) => {
             if let Err(e) = tokio::fs::write(&enc_path, enc).await {
-                eprintln!("[auth] migration write failed: {e}");
+                log!("[auth] migration write failed: {e}");
                 return;
             }
             let _ = tokio::fs::remove_file(&old_path).await;
-            eprintln!("[auth] migrated plaintext cookies.txt to encrypted cookies.enc");
+            log!("[auth] migrated plaintext cookies.txt to encrypted cookies.enc");
         }
-        Err(e) => eprintln!("[auth] migration encrypt failed: {e}"),
+        Err(e) => log!("[auth] migration encrypt failed: {e}"),
     }
 }
 
@@ -496,12 +499,12 @@ async fn migrate_to_accounts_layout(app: &tauri::AppHandle) {
     let new_path = account_cookies_path(app, &new_id);
     if let Some(dir) = new_path.parent() {
         if let Err(e) = tokio::fs::create_dir_all(dir).await {
-            eprintln!("[auth] migrate accounts: mkdir failed: {e}");
+            log!("[auth] migrate accounts: mkdir failed: {e}");
             return;
         }
     }
     if let Err(e) = tokio::fs::rename(&legacy, &new_path).await {
-        eprintln!("[auth] migrate accounts: rename failed: {e}");
+        log!("[auth] migrate accounts: rename failed: {e}");
         return;
     }
     let now_s = time::OffsetDateTime::now_utc().unix_timestamp();
@@ -514,10 +517,10 @@ async fn migrate_to_accounts_layout(app: &tauri::AppHandle) {
         }],
     };
     if let Err(e) = write_index(app, &idx).await {
-        eprintln!("[auth] migrate accounts: write index failed: {e}");
+        log!("[auth] migrate accounts: write index failed: {e}");
         return;
     }
-    eprintln!("[auth] migrated single cookies.enc into accounts/{new_id}/");
+    log!("[auth] migrated single cookies.enc into accounts/{new_id}/");
 }
 
 fn generate_account_id() -> String {
@@ -549,11 +552,11 @@ async fn read_jar_at(path: &std::path::Path) -> Option<String> {
     let encrypted = match tokio::fs::read(path).await {
         Ok(b) => b,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            eprintln!("[auth] no cookie jar at {}", path.display());
+            log!("[auth] no cookie jar at {}", path.display());
             return None;
         }
         Err(e) => {
-            eprintln!("[auth] read cookie jar failed: {e}");
+            log!("[auth] read cookie jar failed: {e}");
             return None;
         }
     };
@@ -561,18 +564,18 @@ async fn read_jar_at(path: &std::path::Path) -> Option<String> {
     let plain = match tokio::task::spawn_blocking(move || secure_store::decrypt(&encrypted)).await {
         Ok(Ok(p)) => p,
         Ok(Err(e)) => {
-            eprintln!("[auth] decrypt cookie jar failed ({len} bytes): {e}");
+            log!("[auth] decrypt cookie jar failed ({len} bytes): {e}");
             return None;
         }
         Err(e) => {
-            eprintln!("[auth] decrypt join failed: {e}");
+            log!("[auth] decrypt join failed: {e}");
             return None;
         }
     };
     match String::from_utf8(plain) {
         Ok(s) => Some(s),
         Err(e) => {
-            eprintln!("[auth] cookie jar is not valid UTF-8: {e}");
+            log!("[auth] cookie jar is not valid UTF-8: {e}");
             None
         }
     }
@@ -944,13 +947,13 @@ async fn dedup_accounts_by_identity(app: &tauri::AppHandle) {
     // boot the app signed out.
     let removed = remap.len();
     if let Err(e) = write_index(app, &idx).await {
-        eprintln!("[accounts] dedup write index: {e}");
+        log!("[accounts] dedup write index: {e}");
         return;
     }
     for rid in remap.keys() {
         let _ = tokio::fs::remove_dir_all(accounts_dir(app).join(rid)).await;
     }
-    eprintln!("[accounts] collapsed {removed} duplicate account row(s) by identity");
+    log!("[accounts] collapsed {removed} duplicate account row(s) by identity");
 }
 
 /// Best-effort cleanup of transient login artifacts, run once per boot:
@@ -1002,6 +1005,48 @@ async fn cleanup_login_artifacts(app: &tauri::AppHandle) {
 /// "double-reset on dedup" UX bug.
 #[tauri::command]
 async fn start_login(app: tauri::AppHandle) -> Result<(), String> {
+    login_flow(app, None).await
+}
+
+/// Sign a STORED account back in, without adding a second row for the
+/// same person.
+///
+/// The sidebar shows this button when Google has expired a session
+/// that is still sitting in our account list. A plain `start_login`
+/// there would append a NEW account row, and the identity dedup in
+/// `update_account_meta` would then merge the two — but only after a
+/// second round trip, and only if `/account_menu` reports an identity
+/// we can match on (accounts without an email are matched by avatar,
+/// which changes when the user picks a different profile picture).
+///
+/// Re-linking directly is both cheaper and more predictable: the
+/// freshly-captured cookies land in the EXISTING account's jar, the
+/// account keeps its id, its stored name/email/avatar and its place
+/// in the list, and it becomes the active account.
+///
+/// The user-visible flow is identical to `start_login` — an isolated
+/// Google sign-in window — because Google may still ask for a
+/// password or a passkey when it has expired the session. Emits
+/// `login-success` (payload: the account id) and `session-relinked`
+/// so the frontend can drop its cached anonymous data.
+#[tauri::command]
+async fn relink_account(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    // The id comes from the frontend, so it has to be checked against
+    // the index before we use it as a path segment.
+    let idx = read_index(&app).await;
+    if !idx.accounts.iter().any(|a| a.id == id) {
+        return Err(format!("no such account: {id}"));
+    }
+    login_flow(app, Some(id)).await
+}
+
+/// The shared sign-in window flow behind `start_login` and
+/// `relink_account`.
+///
+/// `relink` names the account whose jar the captured cookies replace.
+/// `None` means "this is a new account": a fresh row is appended and
+/// becomes active.
+async fn login_flow(app: tauri::AppHandle, relink: Option<String>) -> Result<(), String> {
     if let Some(existing) = app.get_webview_window("login") {
         let _ = existing.show();
         let _ = existing.set_focus();
@@ -1019,7 +1064,7 @@ async fn start_login(app: tauri::AppHandle) -> Result<(), String> {
         .join("login-sessions")
         .join(&session_id);
     if let Err(e) = tokio::fs::create_dir_all(&webview_data).await {
-        eprintln!("[login] mkdir webview-data: {e}");
+        log!("[login] mkdir webview-data: {e}");
     }
 
     const SERVICE_LOGIN_URL: &str = "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F";
@@ -1068,7 +1113,7 @@ async fn start_login(app: tauri::AppHandle) -> Result<(), String> {
             let cookies = match win.cookies() {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("[login] cookies error: {e}");
+                    log!("[login] cookies error: {e}");
                     continue;
                 }
             };
@@ -1133,10 +1178,10 @@ async fn start_login(app: tauri::AppHandle) -> Result<(), String> {
                         if parked {
                             if let Ok(url) = SERVICE_LOGIN_URL.parse::<tauri::Url>() {
                                 match win.navigate(url) {
-                                    Ok(()) => eprintln!(
+                                    Ok(()) => log!(
                                         "[login] google-auth detected on parked page; replayed ServiceLogin so Google bridges the youtube.com cookies itself"
                                     ),
-                                    Err(e) => eprintln!(
+                                    Err(e) => log!(
                                         "[login] failed to redirect to YT: {e}"
                                     ),
                                 }
@@ -1165,8 +1210,15 @@ async fn start_login(app: tauri::AppHandle) -> Result<(), String> {
                 continue;
             }
 
-            let new_id = generate_account_id();
-            let cookies_path = account_cookies_path(&app_poll, &new_id);
+            // A re-link replaces the jar of an EXISTING account; a fresh
+            // login creates a new one. The id is decided here rather
+            // than at the top of the flow because the account id is
+            // also the path of the jar we write.
+            let target_id = match &relink {
+                Some(id) => id.clone(),
+                None => generate_account_id(),
+            };
+            let cookies_path = account_cookies_path(&app_poll, &target_id);
             if let Some(dir) = cookies_path.parent() {
                 let _ = tokio::fs::create_dir_all(dir).await;
             }
@@ -1178,20 +1230,20 @@ async fn start_login(app: tauri::AppHandle) -> Result<(), String> {
             {
                 Ok(Ok(e)) => e,
                 Ok(Err(e)) => {
-                    eprintln!("[login] encrypt cookies: {e}");
+                    log!("[login] encrypt cookies: {e}");
                     let _ = win.close();
                     let _ = tokio::fs::remove_dir_all(&cleanup_dir).await;
                     return;
                 }
                 Err(e) => {
-                    eprintln!("[login] encrypt join: {e}");
+                    log!("[login] encrypt join: {e}");
                     let _ = win.close();
                     let _ = tokio::fs::remove_dir_all(&cleanup_dir).await;
                     return;
                 }
             };
             if let Err(e) = write_atomic(&cookies_path, &encrypted).await {
-                eprintln!("[login] write account cookies: {e}");
+                log!("[login] write account cookies: {e}");
                 let _ = win.close();
                 let _ = tokio::fs::remove_dir_all(&cleanup_dir).await;
                 return;
@@ -1199,20 +1251,22 @@ async fn start_login(app: tauri::AppHandle) -> Result<(), String> {
 
             let mut idx = read_index(&app_poll).await;
             let now_s = time::OffsetDateTime::now_utc().unix_timestamp();
-            idx.accounts.push(Account {
-                id: new_id.clone(),
-                added_at: now_s,
-                ..Default::default()
-            });
-            idx.active = Some(new_id.clone());
+            if relink.is_none() {
+                idx.accounts.push(Account {
+                    id: target_id.clone(),
+                    added_at: now_s,
+                    ..Default::default()
+                });
+            }
+            idx.active = Some(target_id.clone());
             if let Err(e) = write_index(&app_poll, &idx).await {
                 // We've already written the cookies file; not fatal but
                 // visible to the user as "account didn't appear in
                 // list". Surface it through the cancel event so the
                 // frontend at least flips out of the spinning state.
-                eprintln!("[login] write index: {e}");
+                log!("[login] write index: {e}");
                 let _ = app_poll.emit("login-cancelled", ());
-                let _ = tokio::fs::remove_dir_all(&account_cookies_path(&app_poll, &new_id)
+                let _ = tokio::fs::remove_dir_all(&account_cookies_path(&app_poll, &target_id)
                     .parent()
                     .map(|p| p.to_path_buf())
                     .unwrap_or_default()).await;
@@ -1227,7 +1281,14 @@ async fn start_login(app: tauri::AppHandle) -> Result<(), String> {
             // dedup happens (by identity, email or avatar) and where
             // `accounts-changed` fires, so we never run the full reset
             // twice for one login flow.
-            let _ = app_poll.emit("login-success", &new_id);
+            let _ = app_poll.emit("login-success", &target_id);
+            // A re-link does NOT go through `session-refreshed`, so the
+            // frontend would keep the anonymous data it fetched while
+            // the session was dead. This event tells it to drop that
+            // and re-fetch everything against the fresh jar.
+            if relink.is_some() {
+                let _ = app_poll.emit("session-relinked", &target_id);
+            }
             let _ = win.close();
             let _ = tokio::fs::remove_dir_all(&cleanup_dir).await;
             return;
@@ -1275,6 +1336,21 @@ async fn get_cookie_header(
     Ok(read_cookie_header(&app, &host).await)
 }
 
+/// The session verdict the frontend asks for at launch and whenever it
+/// wants to know whether the stored account is still usable.
+///
+/// Returns `renewing` (never `true` in this fork — see `session.rs`)
+/// and `needsRelink`: the id of an account whose stored jar can no
+/// longer authenticate, or `null` when nothing is provably broken.
+///
+/// The frontend uses this to decide between the two sign-in paths:
+/// re-linking a stored account (`relink_account`) versus adding a new
+/// one (`start_login`).
+#[tauri::command]
+async fn get_session_state(app: tauri::AppHandle) -> Result<session::SessionSnapshot, String> {
+    Ok(session::snapshot(&app).await)
+}
+
 /// Does this `Cookie:` header carry what an authenticated InnerTube
 /// call actually needs: an APISID to build the SAPISIDHASH with, and a
 /// session id to identify the account.
@@ -1318,10 +1394,10 @@ async fn probe_session_alive(app: &tauri::AppHandle) -> Result<bool, String> {
     if !header_has_auth_cookie(&cookie) {
         return Ok(false);
     }
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .build()
-        .map_err(|e| format!("build probe client: {e}"))?;
+    let client = proxy::build_client(
+        reqwest::Client::builder().timeout(Duration::from_secs(20)),
+    )
+    .map_err(|e| format!("build probe client: {e}"))?;
     let res = client
         .get("https://music.youtube.com/")
         .header("Cookie", cookie)
@@ -1341,7 +1417,7 @@ async fn probe_session_alive(app: &tauri::AppHandle) -> Result<bool, String> {
 #[tauri::command]
 async fn probe_session(app: tauri::AppHandle) -> Result<bool, String> {
     let alive = probe_session_alive(&app).await?;
-    eprintln!("[probe] session alive: {alive}");
+    log!("[probe] session alive: {alive}");
     Ok(alive)
 }
 
@@ -1351,6 +1427,16 @@ async fn probe_session(app: tauri::AppHandle) -> Result<bool, String> {
 #[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
+}
+
+/// Where the log file lives, so the user can be told where to look.
+///
+/// A packaged build has no console, so the file is the only record of
+/// what the backend did. The frontend shows this path in Settings so
+/// a bug report can come with the log attached.
+#[tauri::command]
+fn get_log_path() -> Option<String> {
+    logging::file_path()
 }
 
 /// What the title-bar ✕ does, mirrored from the frontend settings store
@@ -1370,6 +1456,27 @@ fn set_close_behavior(
     quit_on_close: bool,
 ) {
     state.quit_on_close.store(quit_on_close, Ordering::Relaxed);
+}
+
+/// The proxy URL currently in effect, or an empty string when the
+/// proxy is disabled. The frontend keeps the authoritative value in
+/// its own store; this command is for diagnostics.
+#[tauri::command]
+fn get_proxy() -> String {
+    proxy::url().unwrap_or_default()
+}
+
+/// Set (or clear) the proxy.
+///
+/// An empty string disables the proxy — every network path falls back to
+/// a direct connection. A non-empty value must be a URL with a
+/// supported scheme (`http`, `https`, `socks4`, `socks4a`, `socks5`,
+/// `socks5h`); anything else is rejected with a message the settings
+/// row shows inline.
+#[tauri::command]
+fn set_proxy(url: String) -> Result<(), String> {
+    let normalized = proxy::normalize(&url)?;
+    proxy::set(normalized)
 }
 
 /// Register / unregister the app for launch at OS startup. Uses the
@@ -1700,7 +1807,7 @@ async fn update_account_meta(
         }
         if let Ok(bytes) = tokio::fs::read(&this_cookies).await {
             if let Err(e) = tokio::fs::write(&other_cookies, bytes).await {
-                eprintln!("[accounts] copy cookies on dedup: {e}");
+                log!("[accounts] copy cookies on dedup: {e}");
             }
         }
         let _ = tokio::fs::remove_dir_all(accounts_dir(&app).join(&id)).await;
@@ -1887,7 +1994,7 @@ async fn merge_response_cookies(
     // account signed out. Surface it to the frontend so it re-checks
     // the live session; if it is really gone, the check reports that.
     if !merged.blocked_deletions.is_empty() {
-        eprintln!(
+        log!(
             "[auth] refused server expiry of identity cookie(s) {:?} from {host}",
             merged.blocked_deletions
         );
@@ -1898,7 +2005,7 @@ async fn merge_response_cookies(
     // is correct browser behavior. It has never been logged, so we
     // have no idea how often it fires in the field. Report it.
     for gone in jar_cookie_keys(&jar).difference(&jar_cookie_keys(&merged.jar)) {
-        eprintln!("[auth] server expired cookie {gone} (response host {host})");
+        log!("[auth] server expired cookie {gone} (response host {host})");
     }
 
     if !merged.needs_write {
@@ -1916,7 +2023,7 @@ async fn merge_response_cookies(
         .await
         .map_err(|e| format!("write jar: {e}"))?;
     if value_changed {
-        eprintln!("[auth] echoed rotated session cookie(s) into the active jar");
+        log!("[auth] echoed rotated session cookie(s) into the active jar");
         // The fork's snapshot-renewal path. The keeper that upstream
         // emits `session-refreshed` from does not exist here; the
         // rotation echo is what keeps the jar fresh instead, so it is
@@ -2160,7 +2267,7 @@ async fn enforce_cache_limit(dir: PathBuf, limit: u64, extensions: &[&str]) {
         }
         if tokio::fs::remove_file(&path).await.is_ok() {
             total = total.saturating_sub(size);
-            eprintln!("[cache] evicted {path:?} ({size} bytes) to honor {limit}-byte limit");
+            log!("[cache] evicted {path:?} ({size} bytes) to honor {limit}-byte limit");
         }
     }
 }
@@ -2322,6 +2429,10 @@ fn resolve_stream_ytdlp(app: tauri::AppHandle, video_id: String) -> Result<Strin
         "--no-warnings",
         &url,
     ]);
+    // Route yt-dlp's own traffic through the user's proxy.
+    for arg in proxy::ytdlp_proxy_args() {
+        command.arg(arg);
+    }
     // Windows: a console-less GUI process spawning the console-subsystem
     // yt-dlp.exe with default flags makes Windows flash a console window
     // on every resolve. CREATE_NO_WINDOW suppresses it.
@@ -2420,8 +2531,6 @@ struct StreamServer {
     /// `StreamServerState` so the `set_cache_limit` command updates it
     /// live without restarting the server.
     cache_limit: Arc<AtomicU64>,
-    /// Client for ranged fetches from googlevideo (progressive path).
-    http: reqwest::Client,
     /// Consecutive lookups where `progressive::FAST_CLIENT` failed. At
     /// `FAST_CLIENT_MAX_FAILURES` it's skipped for the rest of the session
     /// so a YouTube-side block doesn't add a wasted lookup to every track.
@@ -2498,13 +2607,14 @@ fn check_cover_url(url: &str) -> Result<(), String> {
 /// and the user-facing "Download cover" action.
 async fn fetch_cover_bytes(url: &str) -> Result<Vec<u8>, String> {
     check_cover_url(url)?;
-    let resp = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| format!("client: {e}"))?
-        .get(url)
-        .send()
+    let resp = proxy::build_client(
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .redirect(reqwest::redirect::Policy::none()),
+    )
+    .map_err(|e| format!("client: {e}"))?
+    .get(url)
+    .send()
         .await
         .map_err(|e| format!("fetch: {e}"))?;
     if !resp.status().is_success() {
@@ -2846,6 +2956,10 @@ async fn download_attempt(
     if let Some(c) = cookies {
         cmd.arg("--cookies").arg(c);
     }
+    // Route yt-dlp's own traffic through the user's proxy.
+    for arg in proxy::ytdlp_proxy_args() {
+        cmd.arg(arg);
+    }
     cmd.args(["-o", "-"]);
     cmd.arg(url);
     // Windows: suppress the console window for the child yt-dlp.exe.
@@ -2857,7 +2971,7 @@ async fn download_attempt(
     let mut child = match cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[stream] spawn yt-dlp: {e}");
+            log!("[stream] spawn yt-dlp: {e}");
             return AttemptOutcome {
                 ok: false,
                 age_gated: false,
@@ -2886,7 +3000,7 @@ async fn download_attempt(
     loop {
         match tokio::time::timeout(READ_TIMEOUT, stdout.read(&mut read_buf)).await {
             Err(_) => {
-                eprintln!("[stream] read timeout; killing yt-dlp");
+                log!("[stream] read timeout; killing yt-dlp");
                 let _ = child.start_kill();
                 ok = false;
                 break;
@@ -2896,7 +3010,7 @@ async fn download_attempt(
                 let chunk = &read_buf[..n];
                 if let Some(ref mut f) = file {
                     if let Err(e) = f.write_all(chunk).await {
-                        eprintln!("[stream] write .part: {e}");
+                        log!("[stream] write .part: {e}");
                         file = None;
                         // A truncated prefix must NOT be renamed to .webm
                         // and cached — mark the whole download failed.
@@ -2906,7 +3020,7 @@ async fn download_attempt(
                 state.notify.notify_waiters();
             }
             Ok(Err(e)) => {
-                eprintln!("[stream] read stdout: {e}");
+                log!("[stream] read stdout: {e}");
                 ok = false;
                 break;
             }
@@ -2978,7 +3092,7 @@ fn spawn_downloader(
                 Err(e) if e.age_gated => age_gated = true,
                 Err(_) => {
                     let n = srv.fast_client_failures.fetch_add(1, Ordering::Relaxed) + 1;
-                    eprintln!(
+                    log!(
                         "[stream] {video_id}: {} client failed ({n} in a row); trying defaults",
                         progressive::FAST_CLIENT
                     );
@@ -2993,7 +3107,7 @@ fn spawn_downloader(
         }
         if resolved.is_none() && age_gated {
             if let Some(cookies) = write_temp_cookies(&srv.app).await {
-                eprintln!("[stream] {video_id} is age-restricted; resolving with account cookies");
+                log!("[stream] {video_id} is age-restricted; resolving with account cookies");
                 resolved = progressive::resolve_audio(&program, &url, Some(cookies.path()), None)
                     .await
                     .ok();
@@ -3005,7 +3119,7 @@ fn spawn_downloader(
         };
 
         let success = if let (Some(r), Some(file)) = (resolved, part_file) {
-            eprintln!(
+            log!(
                 "[stream] {video_id}: resolved {} bytes {} — streaming",
                 r.size, r.mime
             );
@@ -3013,7 +3127,8 @@ fn spawn_downloader(
             // handler that sees it can always open the file.
             let _ = state.resolved.set(r.clone());
             state.notify.notify_waiters();
-            progressive::fill(&srv.http, &r, file, &state).await
+            let http = proxy::media_client();
+            progressive::fill(&http, &r, file, &state).await
                 && state.downloaded.load(Ordering::Acquire) == r.size
         } else {
             // Fallback when no direct URL with a known size came back:
@@ -3039,7 +3154,7 @@ fn spawn_downloader(
             if !attempt.ok && attempt.age_gated {
                 match write_temp_cookies(&srv.app).await {
                     Some(cookies) => {
-                        eprintln!(
+                        log!(
                             "[stream] {video_id} is age-restricted; retrying with account cookies"
                         );
                         attempt = download_attempt(
@@ -3054,7 +3169,7 @@ fn spawn_downloader(
                         // `cookies` (temp jar) is removed here on drop.
                     }
                     None => {
-                        eprintln!(
+                        log!(
                             "[stream] {video_id} is age-restricted but no account is signed in — cannot play"
                         );
                     }
@@ -3081,18 +3196,18 @@ fn spawn_downloader(
             .unwrap_or(0);
         if success && part_size >= MIN_AUDIO_BYTES {
             if let Err(e) = tokio::fs::rename(&part_path, &final_path).await {
-                eprintln!("[stream] rename: {e}");
+                log!("[stream] rename: {e}");
                 let _ = tokio::fs::remove_file(&part_path).await;
             } else {
-                eprintln!("[stream] cached {video_id} ({part_size} bytes)");
+                log!("[stream] cached {video_id} ({part_size} bytes)");
             }
         } else {
             if success {
-                eprintln!(
+                log!(
                     "[stream] download too small for {video_id}: {part_size} bytes (min {MIN_AUDIO_BYTES})"
                 );
             } else {
-                eprintln!("[stream] download failed {video_id}");
+                log!("[stream] download failed {video_id}");
             }
             let _ = tokio::fs::remove_file(&part_path).await;
         }
@@ -3187,7 +3302,7 @@ async fn stream_handler(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
-    eprintln!(
+    log!(
         "[stream] GET /stream/{video_id} range={range_hdr:?} cached={} ephemeral={ephemeral}",
         final_path.exists()
     );
@@ -3224,7 +3339,7 @@ async fn stream_handler(
                 break;
             }
             if tokio::time::Instant::now() >= deadline {
-                eprintln!("[stream] {video_id}: TIMEOUT after 120s");
+                log!("[stream] {video_id}: TIMEOUT after 120s");
                 return (StatusCode::GATEWAY_TIMEOUT, "download timeout")
                     .into_response();
             }
@@ -3233,7 +3348,7 @@ async fn stream_handler(
 
         if !final_path.exists() {
             let Some(resolved) = state.resolved.get() else {
-                eprintln!(
+                log!(
                     "[stream] {video_id}: BAD_GATEWAY — complete but no .webm (elapsed {:.2}s)",
                     t0.elapsed().as_secs_f32()
                 );
@@ -3244,7 +3359,7 @@ async fn stream_handler(
             // A failed open right as the download finishes means the file
             // was just renamed: serve the cached copy below instead.
             if part.is_some() || !final_path.exists() {
-                eprintln!(
+                log!(
                     "[stream] {video_id}: streaming {range_hdr:?} after {:.2}s ({} of {} bytes on disk)",
                     t0.elapsed().as_secs_f32(),
                     state.downloaded.load(Ordering::Acquire),
@@ -3256,11 +3371,11 @@ async fn stream_handler(
                     resolved,
                     state.clone(),
                     part,
-                    srv.http.clone(),
+                    proxy::media_client(),
                 );
             }
         }
-        eprintln!(
+        log!(
             "[stream] {video_id}: download finished in {:.2}s",
             t0.elapsed().as_secs_f32()
         );
@@ -3286,7 +3401,7 @@ async fn stream_handler(
             axum::http::HeaderValue::from_static(sniffed_ct),
         );
     }
-    eprintln!(
+    log!(
         "[stream] {video_id}: responding {} ({:.2}s total) ct={:?} len={:?}",
         resp.status(),
         t0.elapsed().as_secs_f32(),
@@ -3434,14 +3549,14 @@ fn spawn_video_downloader(
             .unwrap_or(0);
         if success && part_size >= MIN_VIDEO_BYTES {
             if let Err(e) = tokio::fs::rename(&part_path, &final_path).await {
-                eprintln!("[video] rename: {e}");
+                log!("[video] rename: {e}");
                 let _ = tokio::fs::remove_file(&part_path).await;
             } else {
-                eprintln!("[video] cached {video_id} ({part_size} bytes)");
+                log!("[video] cached {video_id} ({part_size} bytes)");
                 prune_video_cache(&target_dir, VIDEO_CACHE_KEEP).await;
             }
         } else {
-            eprintln!("[video] download failed or too small for {video_id} ({part_size} bytes)");
+            log!("[video] download failed or too small for {video_id} ({part_size} bytes)");
             let _ = tokio::fs::remove_file(&part_path).await;
         }
 
@@ -3504,7 +3619,7 @@ async fn video_handler(
         let deadline = tokio::time::Instant::now() + Duration::from_secs(300);
         while !state.complete.load(Ordering::Acquire) {
             if tokio::time::Instant::now() >= deadline {
-                eprintln!("[video] {video_id}: TIMEOUT after 300s");
+                log!("[video] {video_id}: TIMEOUT after 300s");
                 return (StatusCode::GATEWAY_TIMEOUT, "download timeout").into_response();
             }
             let notified = state.notify.notified();
@@ -3647,13 +3762,13 @@ async fn start_stream_server(
     cache_limit: Arc<AtomicU64>,
 ) {
     if let Err(e) = tokio::fs::create_dir_all(&cache_dir).await {
-        eprintln!("[stream-server] mkdir {cache_dir:?}: {e}");
+        log!("[stream-server] mkdir {cache_dir:?}: {e}");
     }
     if let Err(e) = tokio::fs::create_dir_all(&ephemeral_dir).await {
-        eprintln!("[stream-server] mkdir {ephemeral_dir:?}: {e}");
+        log!("[stream-server] mkdir {ephemeral_dir:?}: {e}");
     }
     if let Err(e) = tokio::fs::create_dir_all(&cover_dir).await {
-        eprintln!("[stream-server] mkdir {cover_dir:?}: {e}");
+        log!("[stream-server] mkdir {cover_dir:?}: {e}");
     }
 
     // Wipe the legacy ephemeral pool. All users now cache persistently
@@ -3671,7 +3786,7 @@ async fn start_stream_server(
             }
         }
         if wiped > 0 {
-            eprintln!("[stream-server] wiped {wiped} bytes from ephemeral dir");
+            log!("[stream-server] wiped {wiped} bytes from ephemeral dir");
         }
     }
 
@@ -3703,11 +3818,6 @@ async fn start_stream_server(
         downloads: Arc::new(Mutex::new(HashMap::new())),
         ytdlp_bin,
         cache_limit,
-        http: reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(15))
-            .read_timeout(Duration::from_secs(20))
-            .build()
-            .unwrap_or_default(),
         fast_client_failures: Arc::new(AtomicU64::new(0)),
     };
 
@@ -3732,22 +3842,22 @@ async fn start_stream_server(
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("[stream-server] bind failed: {e}");
+            log!("[stream-server] bind failed: {e}");
             return;
         }
     };
     let port = match listener.local_addr() {
         Ok(a) => a.port(),
         Err(e) => {
-            eprintln!("[stream-server] local_addr failed: {e}");
+            log!("[stream-server] local_addr failed: {e}");
             return;
         }
     };
     *port_state.lock().await = Some(port);
-    eprintln!("[stream-server] listening on 127.0.0.1:{port}");
+    log!("[stream-server] listening on 127.0.0.1:{port}");
 
     if let Err(e) = axum::serve(listener, app).await {
-        eprintln!("[stream-server] serve error: {e}");
+        log!("[stream-server] serve error: {e}");
     }
 }
 
@@ -3892,6 +4002,8 @@ pub fn run() {
             resolve_stream_ytdlp,
             get_stream_base_url,
             start_login,
+            relink_account,
+            get_session_state,
             get_cookie_header,
             get_auth_context,
             merge_response_cookies,
@@ -3913,9 +4025,12 @@ pub fn run() {
             cover_cache_stats,
             clear_cover_cache,
             quit_app,
+            get_log_path,
             set_close_behavior,
             autostart_set,
             autostart_is_enabled,
+            get_proxy,
+            set_proxy,
             notify_track,
             get_cache_dir,
             set_cache_dir,
@@ -3963,6 +4078,23 @@ pub fn run() {
         .setup(move |app| {
             let port = port_handle.clone();
             let token = token_handle.clone();
+            // Start the file log FIRST, so everything below this line
+            // lands in it. A packaged Windows build has no console, so
+            // stderr goes nowhere — the file is the only record.
+            //
+            // `app_log_dir()` already points at a `logs` directory on
+            // every platform Tauri supports (on Windows it is
+            // `%LOCALAPPDATA%\<identifier>\logs`), so the file lands
+            // right next to the app's other data.
+            let log_dir = app
+                .path()
+                .app_log_dir()
+                .unwrap_or_else(|_| std::env::temp_dir());
+            logging::init(&log_dir);
+            log!(
+                "[app] starting up; log file at {:?}",
+                log_dir.join("ytubic.log")
+            );
             // User-chosen cache root (Settings → Storage) or the OS
             // default. Captured once and exposed as managed state so
             // every cache-path computation matches the directories the
@@ -3975,9 +4107,9 @@ pub fn run() {
             let ephemeral_dir = cache_root.join("stream-ephemeral");
             let cover_dir = cache_root.join("covers");
             let handle = app.handle().clone();
-            eprintln!("[stream-server] cache dir: {cache_dir:?}");
-            eprintln!("[stream-server] ephemeral dir: {ephemeral_dir:?}");
-            eprintln!("[stream-server] cover dir: {cover_dir:?}");
+            log!("[stream-server] cache dir: {cache_dir:?}");
+            log!("[stream-server] ephemeral dir: {ephemeral_dir:?}");
+            log!("[stream-server] cover dir: {cover_dir:?}");
             let ytdlp_bin = ytdlp::managed_path(&handle);
             let cache_limit = cache_limit_handle.clone();
             tauri::async_runtime::spawn(async move {
@@ -4021,11 +4153,11 @@ pub fn run() {
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 if let Err(e) = app.deep_link().register_all() {
-                    eprintln!("[deep-link] register failed: {e}");
+                    log!("[deep-link] register failed: {e}");
                 }
             }
             if let Err(e) = build_tray(app.handle()) {
-                eprintln!("[tray] build failed: {e}");
+                log!("[tray] build failed: {e}");
             }
 
             // WebKitGTK ships with smooth (kinetic) scrolling OFF by default,

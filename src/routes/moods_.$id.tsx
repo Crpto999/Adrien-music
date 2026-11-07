@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FeedView } from "@/components/shared/feed-view";
 import { fetchMoodCategoryFeedPage } from "@/lib/innertube/explore";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/moods_/$id")({
   component: MoodsCategoryPage,
@@ -16,8 +17,9 @@ export const Route = createFileRoute("/moods_/$id")({
 });
 
 function MoodsCategoryPage() {
+  const t = useT();
   const { id } = Route.useParams();
-  const { p, t } = Route.useSearch();
+  const { p, t: title } = Route.useSearch();
 
   const fetcher = useCallback(
     (cursor?: string) => fetchMoodCategoryFeedPage(id, p, cursor),
@@ -26,10 +28,10 @@ function MoodsCategoryPage() {
 
   return (
     <FeedView
-      title={t || "Category"}
+      title={title || t("nav.category")}
       queryKey={["mood-category", id, p]}
       fetcher={fetcher}
-      errorLabel="Couldn't load category"
+      errorLabel={t("explore.couldNotLoadCategory")}
     />
   );
 }

@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EntityHeaderConfig } from "@/lib/store/entity-header";
+import { useLocaleStore } from "@/lib/store/locale";
 import { EntityPageHeader } from "./entity-page-header";
 
 const state = vi.hoisted(() => ({
@@ -22,6 +23,9 @@ function renderHeader() {
 
 describe("entity hero artwork enlargement", () => {
   beforeEach(() => {
+    // The app ships with Simplified Chinese as its default locale, but
+    // this test asserts on English strings — pin the locale.
+    useLocaleStore.setState({ locale: "en" });
     state.config = {
       title: "Album title",
       thumbnails: [{ url: "https://example.com/cover.jpg", width: 512 }],

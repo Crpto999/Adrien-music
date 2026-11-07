@@ -46,6 +46,7 @@ import {
 } from "@/components/layout/player-bar";
 import { PlayerMoreMenu } from "@/components/layout/player-more-menu";
 import { PlayerCoverMenu } from "@/components/layout/player-cover-menu";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { playerIconButton } from "@/components/layout/player-chrome";
 import { usePlayerCoverDrag } from "@/lib/player-drag";
@@ -64,6 +65,7 @@ import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
  * both use `flex-1`.
  */
 export function PlayerBarBottom() {
+  const t = useT();
   const { playing, status, error, duration, shuffle, repeat } =
     usePlaybackStore(
       useShallow((s) => ({
@@ -162,7 +164,7 @@ export function PlayerBarBottom() {
           </PlayerCoverMenu>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="truncate text-base font-semibold leading-tight">
-              {track?.title ?? "Nothing playing"}
+              {track?.title ?? t("player.nothingPlaying")}
             </span>
             {track ? (
               <ArtistLinks
@@ -172,7 +174,7 @@ export function PlayerBarBottom() {
               />
             ) : (
               <span className="truncate text-sm text-muted-foreground leading-tight">
-                Pick a track to start
+                {t("player.pickATrack")}
               </span>
             )}
             {track?.album ? (
@@ -191,7 +193,7 @@ export function PlayerBarBottom() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Shuffle"
+            aria-label={t("action.shuffle")}
             aria-pressed={shuffle}
             onClick={() => setShuffle(!shuffle)}
             className={cn(shuffle && "text-brand")}
@@ -201,7 +203,7 @@ export function PlayerBarBottom() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Previous"
+            aria-label={t("action.previous")}
             onClick={prev}
             disabled={!hasTrack}
           >
@@ -209,7 +211,7 @@ export function PlayerBarBottom() {
           </Button>
           <Button
             size="icon"
-            aria-label={playing ? "Pause" : "Play"}
+            aria-label={playing ? t("action.pause") : t("action.play")}
             onClick={toggle}
             disabled={!hasTrack}
             className="size-12 rounded-full bg-brand text-white hover:bg-brand/90"
@@ -225,7 +227,7 @@ export function PlayerBarBottom() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Next"
+            aria-label={t("action.next")}
             onClick={next}
             disabled={!hasTrack}
           >
@@ -236,7 +238,7 @@ export function PlayerBarBottom() {
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label={repeatLabel(repeat)}
+                aria-label={repeatLabel(repeat, t)}
                 aria-pressed={repeat !== "off"}
                 onClick={cycleRepeat}
                 className={cn(repeat !== "off" && "text-brand")}
@@ -244,7 +246,7 @@ export function PlayerBarBottom() {
                 {repeat === "one" ? <IconRepeatOnce /> : <IconRepeat />}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{repeatLabel(repeat)}</TooltipContent>
+            <TooltipContent>{repeatLabel(repeat, t)}</TooltipContent>
           </Tooltip>
         </div>
 
@@ -294,13 +296,14 @@ function LyricsPopover({
 }: {
   state: ReturnType<typeof useLyricsView>;
 }) {
+  const t = useT();
   if (!state.hasTrack) {
     return (
       <Button
         variant="ghost"
         size="icon"
         disabled
-        aria-label="Lyrics"
+        aria-label={t("action.lyrics")}
         className={playerIconButton}
       >
         <IconMicrophoneFilled />
@@ -315,14 +318,14 @@ function LyricsPopover({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Lyrics"
+              aria-label={t("action.lyrics")}
               className={playerIconButton}
             >
               <IconMicrophoneFilled />
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent>Lyrics</TooltipContent>
+        <TooltipContent>{t("action.lyrics")}</TooltipContent>
       </Tooltip>
       <PopoverContent
         align="end"
@@ -331,7 +334,7 @@ function LyricsPopover({
         className="flex h-[28rem] w-[24rem] flex-col gap-2 p-0"
       >
         <header className="flex shrink-0 items-center justify-between border-b border-hairline px-3 py-2">
-          <span className="text-sm font-medium">Lyrics</span>
+          <span className="text-sm font-medium">{t("action.lyrics")}</span>
           <LyricsSourceButton state={state} />
         </header>
         <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3">

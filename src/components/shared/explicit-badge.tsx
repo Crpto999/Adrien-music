@@ -9,11 +9,14 @@
  * glass. The label rides `--t4`, which is dark on the light fill and
  * light on the dark one, so one token covers both.
  */
+import { useT } from "@/lib/i18n";
+
 export function ExplicitBadge() {
+  const t = useT();
   return (
     <span
-      title="Explicit"
-      aria-label="Explicit"
+      title={t("entity.explicit")}
+      aria-label={t("entity.explicit")}
       className="inline-flex size-[17px] shrink-0 items-center justify-center rounded-sm bg-black/12 text-[10.5px] font-bold leading-none text-t4 outline outline-1 -outline-offset-1 outline-w060 dark:bg-black/25 dark:outline-w120"
     >
       E

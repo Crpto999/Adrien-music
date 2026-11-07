@@ -57,6 +57,7 @@ import { useLayoutStore, type LayoutMode } from "@/lib/store/layout";
 import { IS_MAC } from "@/lib/platform";
 import { openSettings } from "@/lib/store/settings-dialog";
 import { AboutDialog } from "@/components/layout/about-dialog";
+import { useT } from "@/lib/i18n";
 
 // Caption-bar nav buttons get just an icon-color shift on hover —
 // the default ghost-button square highlight competes visually with
@@ -84,6 +85,7 @@ const IS_TAURI =
  * terminates the process regardless of that setting.
  */
 export function TopBar() {
+  const t = useT();
   const router = useRouter();
   const fullscreen = useFullscreenStore((s) => s.open);
   const [maximized, setMaximized] = useState(false);
@@ -143,7 +145,7 @@ export function TopBar() {
                 variant="ghost"
                 size="icon"
                 className={NAV_BTN_CLS}
-                aria-label="More"
+                aria-label={t("common.more")}
               >
                 <IconDots />
               </Button>
@@ -151,7 +153,7 @@ export function TopBar() {
             <DropdownMenuContent align="start" className="w-56">
               <DropdownMenuItem onSelect={() => openSettings()}>
                 <IconSettingsFilled />
-                Settings
+                {t("menu.settings")}
               </DropdownMenuItem>
               <LayoutSubMenu />
               <ThemeSubMenu />
@@ -160,11 +162,11 @@ export function TopBar() {
 
               <DropdownMenuItem onSelect={() => setReportOpen(true)}>
                 <IconBugFilled />
-                Report an issue
+                {t("menu.reportIssue")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setAboutOpen(true)}>
                 <IconInfoCircleFilled />
-                About
+                {t("menu.about")}
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />
@@ -176,7 +178,7 @@ export function TopBar() {
                 }}
               >
                 <IconPowerFilled />
-                Quit
+                {t("menu.quit")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -191,7 +193,7 @@ export function TopBar() {
                 size="icon"
                 className={NAV_BTN_CLS}
                 onClick={() => router.history.back()}
-                aria-label="Back"
+                aria-label={t("common.back")}
               >
                 <IconArrowLeft />
               </Button>
@@ -200,7 +202,7 @@ export function TopBar() {
                 size="icon"
                 className={NAV_BTN_CLS}
                 onClick={() => router.history.forward()}
-                aria-label="Forward"
+                aria-label={t("common.forward")}
               >
                 <IconArrowRight />
               </Button>
@@ -250,7 +252,7 @@ export function TopBar() {
           <button
             type="button"
             onClick={() => win().minimize()}
-            aria-label="Minimize"
+            aria-label={t("menu.minimize")}
             className="flex h-full w-11 items-center justify-center text-foreground/85 transition-colors hover:bg-titlebar-hover"
           >
             <MinimizeGlyph />
@@ -258,7 +260,7 @@ export function TopBar() {
           <button
             type="button"
             onClick={() => win().toggleMaximize()}
-            aria-label={maximized ? "Restore" : "Maximize"}
+            aria-label={maximized ? t("menu.restore") : t("menu.maximize")}
             className="flex h-full w-11 items-center justify-center text-foreground/85 transition-colors hover:bg-titlebar-hover"
           >
             {maximized ? <RestoreGlyph /> : <MaximizeGlyph />}
@@ -266,7 +268,7 @@ export function TopBar() {
           <button
             type="button"
             onClick={() => win().close()}
-            aria-label="Close"
+            aria-label={t("common.close")}
             className="flex h-full w-11 items-center justify-center text-foreground/85 transition-colors hover:bg-[#c42b1c] hover:text-white"
           >
             <CloseGlyph />
@@ -281,13 +283,14 @@ export function TopBar() {
 }
 
 function LayoutSubMenu() {
+  const t = useT();
   const mode = useLayoutStore((s) => s.mode);
   const setMode = useLayoutStore((s) => s.setMode);
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
         <IconLayoutFilled />
-        Layout
+        {t("menu.layout")}
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent>
         <DropdownMenuRadioGroup
@@ -296,15 +299,15 @@ function LayoutSubMenu() {
         >
           <DropdownMenuRadioItem value="right">
             <IconLayoutSidebarRightFilled className="size-4" />
-            Side card
+            {t("player.sideCard")}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="bottom">
             <IconLayoutBottombarFilled className="size-4" />
-            Bottom bar
+            {t("player.bottomBar")}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="floating">
             <IconExternalLink className="size-4" />
-            Floating window
+            {t("player.floatingWindow")}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuSubContent>
@@ -313,6 +316,7 @@ function LayoutSubMenu() {
 }
 
 function ThemeSubMenu() {
+  const t = useT();
   const { theme, setTheme } = useTheme();
   // `theme` is undefined during the very first client render (next-themes
   // resolves it on mount). Fall back to "system" so the radio group has
@@ -322,7 +326,7 @@ function ThemeSubMenu() {
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
         <IconPaletteFilled />
-        Theme
+        {t("menu.theme")}
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent>
         <DropdownMenuRadioGroup
@@ -331,15 +335,15 @@ function ThemeSubMenu() {
         >
           <DropdownMenuRadioItem value="light">
             <IconSunFilled className="size-4" />
-            Light
+            {t("theme.light")}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="dark">
             <IconMoonFilled className="size-4" />
-            Dark
+            {t("theme.dark")}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="system">
             <IconDeviceDesktopFilled className="size-4" />
-            System
+            {t("theme.system")}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuSubContent>
@@ -362,6 +366,7 @@ function ReportIssueDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
+  const t = useT();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
 
@@ -391,10 +396,12 @@ function ReportIssueDialog({
     if (title.trim()) params.set("title", title.trim());
     try {
       await openUrl(`${REPO_ISSUES_URL}?${params}`);
-      toast.success("Thanks! Finish submitting the issue in your browser.");
+      toast.success(t("toast.reportThanks"));
       onOpenChange(false);
     } catch (e) {
-      toast.error("Couldn't open the browser", { description: String(e) });
+      toast.error(t("toast.couldNotOpenBrowser"), {
+        description: String(e),
+      });
     }
   };
 
@@ -415,17 +422,16 @@ function ReportIssueDialog({
         />
         <DialogClose className="absolute right-4 top-4 z-[2] grid size-7 cursor-pointer place-items-center rounded-lg border border-w070 bg-w030 text-t6 transition-colors duration-[140ms] hover:bg-w080 hover:text-t2">
           <IconX className="size-3" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t("common.close")}</span>
         </DialogClose>
 
         {/* Right padding clears the close button. */}
         <DialogHeader className="gap-2 pr-[34px]">
           <DialogTitle className="text-2xl font-bold leading-none tracking-[-0.02em] text-t1">
-            Report an issue
+            {t("report.title")}
           </DialogTitle>
           <DialogDescription className="text-[13.5px] leading-[1.5] text-t4 text-pretty">
-            Tell us what went wrong or what you'd like to see. Submitting
-            opens a prefilled GitHub issue in your browser.
+            {t("report.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -433,13 +439,13 @@ function ReportIssueDialog({
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Short summary (optional)"
+            placeholder={t("report.summaryPlaceholder")}
           />
           {/* Same surface as `Input`, minus its fixed height. */}
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="What happened? Steps to reproduce, expected vs actual…"
+            placeholder={t("report.bodyPlaceholder")}
             rows={7}
             className="w-full resize-none rounded-lg border border-w120 bg-w050 px-3 py-3 text-[13.5px] leading-[1.5] text-t2 outline-none transition-[background-color,border-color,box-shadow] duration-[140ms] placeholder:text-tph hover:border-w200 hover:bg-w080 focus-visible:border-acc1 focus-visible:bg-w070 focus-visible:ring-[3px] focus-visible:ring-[rgba(var(--acc1rgb),0.18)]"
           />
@@ -451,10 +457,10 @@ function ReportIssueDialog({
             size="lg"
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button size="lg" onClick={() => void submit()} disabled={!body.trim()}>
-            Submit
+            {t("report.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -44,20 +44,43 @@ import {
   type SettingsTab,
 } from "@/lib/store/settings-dialog";
 import { cn } from "@/lib/utils";
+import { translate, useT } from "@/lib/i18n";
 
 const TABS: {
   id: SettingsTab;
-  label: string;
+  labelKey: string;
   icon: ComponentType<{ className?: string }>;
 }[] = [
-  { id: "general", label: "General", icon: IconAdjustmentsFilled },
-  { id: "playback", label: "Playback", icon: IconPlayerPlayFilled },
-  { id: "appearance", label: "Appearance", icon: IconContrastFilled },
+  {
+    id: "general",
+    labelKey: "settings.tabs.general",
+    icon: IconAdjustmentsFilled,
+  },
+  {
+    id: "playback",
+    labelKey: "settings.tabs.playback",
+    icon: IconPlayerPlayFilled,
+  },
+  {
+    id: "appearance",
+    labelKey: "settings.tabs.appearance",
+    icon: IconContrastFilled,
+  },
   // Fork addition: Home-section ordering lives in its own tab (8982ce0).
-  { id: "home", label: "Home", icon: IconHomeFilled },
-  { id: "storage", label: "Storage", icon: IconDatabaseFilled },
-  { id: "integrations", label: "Integrations", icon: IconPuzzleFilled },
+  { id: "home", labelKey: "settings.tabs.home", icon: IconHomeFilled },
+  { id: "storage", labelKey: "settings.tabs.storage", icon: IconDatabaseFilled },
+  {
+    id: "integrations",
+    labelKey: "settings.tabs.integrations",
+    icon: IconPuzzleFilled,
+  },
 ];
+
+/** The tab's label in the active locale. */
+function tabLabel(id: SettingsTab): string {
+  const tab = TABS.find((x) => x.id === id);
+  return tab ? translate(tab.labelKey) : id;
+}
 
 /**
  * The settings popup: tab rail on the left, the active tab's panel on
@@ -69,6 +92,7 @@ export function SettingsDialog() {
   const setOpen = useSettingsDialog((s) => s.setOpen);
   const tab = useSettingsDialog((s) => s.tab);
   const setTab = useSettingsDialog((s) => s.setTab);
+  const t = useT();
 
   // Settings search: once the query is long enough the right pane shows
   // matching rows from every tab; picking one jumps to it and flashes it.
@@ -77,8 +101,7 @@ export function SettingsDialog() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const searching = query.trim().length >= MIN_QUERY_LENGTH;
   const matches = useMemo(
-    () =>
-      searchSettings(query, (t) => TABS.find((x) => x.id === t)?.label ?? t),
+    () => searchSettings(query, tabLabel),
     [query],
   );
   const pick = (entry: SettingEntry) => {
@@ -145,7 +168,7 @@ export function SettingsDialog() {
               active tab's title land on one baseline without hand-tuned
               offsets. */}
           <DialogTitle className="flex h-7 items-center px-1.5 text-xl font-semibold leading-none tracking-[-0.015em] text-t1">
-            Settings
+            {t("settings.title")}
           </DialogTitle>
           <SettingsSearchField
             value={query}
@@ -155,7 +178,7 @@ export function SettingsDialog() {
             }}
           />
           <nav className="-mt-2 flex flex-col gap-0.5">
-            {TABS.map(({ id, label, icon: Icon }) => (
+            {TABS.map(({ id, labelKey, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
@@ -172,7 +195,7 @@ export function SettingsDialog() {
                 )}
               >
                 <Icon className="size-4 shrink-0" />
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </nav>
@@ -182,14 +205,14 @@ export function SettingsDialog() {
             </span>
             <span className="text-[11.5px] text-t10">
               {phase === "ready"
-                ? "Restart to update"
+                ? t("update.restartToUpdate")
                 : phase === "available"
-                  ? "Update available"
+                  ? t("update.available")
                   : phase === "error"
-                    ? "Update failed"
+                    ? t("update.failed")
                     : phase === "idle"
-                      ? "Up to date"
-                      : "Downloading update"}
+                      ? t("update.upToDate")
+                      : t("update.downloading")}
             </span>
           </div>
         </aside>
@@ -199,14 +222,12 @@ export function SettingsDialog() {
               on the same row. It doesn't scroll away. */}
           <div className="flex items-center gap-4 border-b border-w055 p-5">
             <h3 className="text-xl font-semibold leading-none tracking-[-0.015em] text-t1">
-              {searching
-                ? "Search results"
-                : TABS.find((t) => t.id === tab)?.label}
+              {searching ? t("search.results") : tabLabel(tab)}
             </h3>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close settings"
+              aria-label={t("settings.close")}
               className="ml-auto grid size-7 flex-none cursor-pointer place-items-center rounded-lg border border-w070 bg-w030 text-t6 transition-colors duration-[140ms] hover:bg-w080 hover:text-t2"
             >
               <IconX className="size-3" />

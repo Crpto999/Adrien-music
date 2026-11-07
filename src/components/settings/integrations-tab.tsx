@@ -46,6 +46,7 @@ import {
   getUserInfo,
 } from "@/lib/lastfm/api";
 import { useDiscordStore, isDiscordConfigured } from "@/lib/store/discord";
+import { useT } from "@/lib/i18n";
 
 type IntegrationId = "lastfm" | "discord";
 
@@ -56,6 +57,7 @@ type IntegrationId = "lastfm" | "discord";
  * cluttering a single long scroll as more integrations are added.
  */
 export function IntegrationsTab() {
+  const t = useT();
   // Settings search can ask for a drill-in page; consume the request once.
   const requested = useSettingsDialog((s) => s.integrationPage);
   const [active, setActive] = useState<IntegrationId | null>(requested);
@@ -66,7 +68,7 @@ export function IntegrationsTab() {
   if (active === "lastfm") {
     return (
       <TabPane>
-        <BackRow label="Last.fm" onBack={() => setActive(null)} />
+        <BackRow label={t("settings.integrations.lastfm")} onBack={() => setActive(null)} />
         <LastfmGroup />
       </TabPane>
     );
@@ -74,7 +76,10 @@ export function IntegrationsTab() {
   if (active === "discord") {
     return (
       <TabPane>
-        <BackRow label="Discord Rich Presence" onBack={() => setActive(null)} />
+        <BackRow
+          label={t("settings.integrations.discord")}
+          onBack={() => setActive(null)}
+        />
         <DiscordGroup />
       </TabPane>
     );
@@ -84,13 +89,15 @@ export function IntegrationsTab() {
     <TabPane>
       <IntegrationListRow
         icon={IconMusicFilled}
-        title="Last.fm"
+        settingId="lastfm"
+        title={t("settings.integrations.lastfm")}
         status={<LastfmStatusBadge />}
         onClick={() => setActive("lastfm")}
       />
       <IntegrationListRow
         icon={IconMessageCircleFilled}
-        title="Discord Rich Presence"
+        settingId="discord"
+        title={t("settings.integrations.discord")}
         status={<DiscordStatusBadge />}
         onClick={() => setActive("discord")}
       />
@@ -122,17 +129,20 @@ function IntegrationListRow({
   title,
   status,
   onClick,
+  settingId,
 }: {
   icon: ComponentType<{ className?: string }>;
   title: string;
   status: ReactNode;
   onClick: () => void;
+  settingId: string;
 }) {
   return (
     <button type="button" onClick={onClick} className="text-left">
       <SettingRow
         icon={Icon}
         title={title}
+        settingId={settingId}
         control={
           <div className="flex shrink-0 items-center gap-2">
             {status}
@@ -145,6 +155,7 @@ function IntegrationListRow({
 }
 
 function LastfmStatusBadge() {
+  const t = useT();
   const { apiKey, apiSecret, sessionKey, username, avatarUrl } =
     useLastfmStore();
   const linked = isLastfmLinked({ apiKey, apiSecret, sessionKey });
@@ -160,15 +171,16 @@ function LastfmStatusBadge() {
         variant="secondary"
         className="bg-rose-500/15 text-rose-600 dark:text-rose-400"
       >
-        {username ? `@${username}` : "Connected"}
+        {username ? `@${username}` : t("settings.integrations.connected")}
       </Badge>
     </div>
   ) : (
-    <Badge variant="outline">Not connected</Badge>
+    <Badge variant="outline">{t("settings.integrations.notConnected")}</Badge>
   );
 }
 
 function DiscordStatusBadge() {
+  const t = useT();
   const { enabled, applicationId } = useDiscordStore();
   const configured = isDiscordConfigured({ enabled, applicationId });
   return (
@@ -180,7 +192,11 @@ function DiscordStatusBadge() {
           : undefined
       }
     >
-      {!enabled ? "Disabled" : configured ? "Enabled" : "Needs Client ID"}
+      {!enabled
+        ? t("settings.integrations.disabled")
+        : configured
+          ? t("settings.integrations.enabled")
+          : t("settings.integrations.needsClientId")}
     </Badge>
   );
 }
@@ -193,6 +209,7 @@ const LASTFM_API_ACCOUNT_URL = "https://www.last.fm/api/account/create";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function LastfmGroup() {
+  const t = useT();
   const {
     apiKey,
     apiSecret,
@@ -230,7 +247,7 @@ function LastfmGroup() {
     const key = keyInput.trim();
     const secret = secretInput.trim();
     if (!key || !secret) {
-      toast.error("Enter your Last.fm API key and shared secret first.");
+      toast.error(t("toast.lastfmMissingCredentials"));
       return;
     }
     setCredentials(key, secret);
@@ -240,9 +257,7 @@ function LastfmGroup() {
     try {
       const token = await getToken(creds);
       await openUrl(authorizeUrl(key, token));
-      toast.info(
-        "Authorize YTubic in the browser tab that opened — linking will finish automatically.",
-      );
+      toast.info(t("toast.lastfmAuthorized"));
       // Poll for the authorized session. Last.fm returns error 14 ("token
       // not authorized") until the user grants access, and 15 once the
       // token expires (~1 hour, but we give up long before that).
@@ -253,7 +268,9 @@ function LastfmGroup() {
         try {
           const session = await getSession(creds, token);
           setSession(session.key, session.name);
-          toast.success(`Connected to Last.fm as ${session.name}`);
+          toast.success(
+            t("settings.integrations.connectedAs", { name: session.name }),
+          );
           return;
         } catch (e) {
           const code = (e as { code?: number }).code;
@@ -262,10 +279,14 @@ function LastfmGroup() {
         }
       }
       if (!cancelledRef.current) {
-        toast.error("Timed out waiting for Last.fm authorization.");
+        toast.error(t("toast.lastfmTimeout"));
       }
     } catch (e) {
-      toast.error(`Last.fm: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(
+        t("settings.integrations.lastfmError", {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      );
     } finally {
       setConnecting(false);
     }
@@ -278,15 +299,16 @@ function LastfmGroup() {
 
   const unlink = () => {
     disconnect();
-    toast.success("Disconnected from Last.fm");
+    toast.success(t("toast.lastfmDisconnected"));
   };
 
   return (
     <Group>
       <SettingRow
         icon={IconMusicFilled}
-        title="Last.fm"
-        description="Scrobble what you play and share your now-playing status. Uses your own Last.fm API account — nothing is sent anywhere until you connect."
+        settingId="lastfm"
+        title={t("settings.integrations.lastfm")}
+        description={t("settings.integrations.lastfmDesc")}
         control={
           linked ? (
             <div className="flex shrink-0 items-center gap-2">
@@ -302,15 +324,17 @@ function LastfmGroup() {
                 variant="secondary"
                 className="bg-rose-500/15 text-rose-600 dark:text-rose-400"
               >
-                {username ? `@${username}` : "Connected"}
+                {username ? `@${username}` : t("settings.integrations.connected")}
               </Badge>
               <Button variant="outline" size="sm" onClick={unlink}>
                 <IconLogout stroke={2.3} />
-                Disconnect
+                {t("settings.integrations.disconnect")}
               </Button>
             </div>
           ) : (
-            <Badge variant="outline">Not connected</Badge>
+            <Badge variant="outline">
+              {t("settings.integrations.notConnected")}
+            </Badge>
           )
         }
       />
@@ -318,25 +342,27 @@ function LastfmGroup() {
         <>
           <SettingRow
             icon={IconRadioFilled}
-            title="Scrobble tracks"
-            description="Send plays and now-playing updates to Last.fm."
+            settingId="scrobble-tracks"
+            title={t("settings.integrations.scrobbleTracks")}
+            description={t("settings.integrations.scrobbleTracksDesc")}
             control={
               <Switch
                 checked={scrobblingEnabled}
                 onCheckedChange={setScrobblingEnabled}
-                aria-label="Enable scrobbling"
+                aria-label={t("settings.integrations.enableScrobbling")}
               />
             }
           />
           <SettingRow
             icon={IconHeartFilled}
-            title="Love liked tracks"
-            description="When you like a song in YTubic, also love it on Last.fm."
+            settingId="love-liked-tracks"
+            title={t("settings.integrations.loveLikedTracks")}
+            description={t("settings.integrations.loveLikedTracksDesc")}
             control={
               <Switch
                 checked={loveSyncEnabled}
                 onCheckedChange={setLoveSyncEnabled}
-                aria-label="Sync loved tracks"
+                aria-label={t("settings.integrations.syncLovedTracks")}
               />
             }
           />
@@ -345,13 +371,13 @@ function LastfmGroup() {
         <div className="flex flex-col gap-3 py-4">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="lastfm-key" className="text-sm font-medium">
-              API key
+              {t("settings.integrations.apiKey")}
             </label>
             <Input
               id="lastfm-key"
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
-              placeholder="Your Last.fm API key"
+              placeholder={t("settings.integrations.apiKey")}
               disabled={connecting}
               autoComplete="off"
               spellCheck={false}
@@ -359,14 +385,14 @@ function LastfmGroup() {
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="lastfm-secret" className="text-sm font-medium">
-              Shared secret
+              {t("settings.integrations.apiSecret")}
             </label>
             <Input
               id="lastfm-secret"
               type="password"
               value={secretInput}
               onChange={(e) => setSecretInput(e.target.value)}
-              placeholder="Your Last.fm shared secret"
+              placeholder={t("settings.integrations.apiSecret")}
               disabled={connecting}
               autoComplete="off"
               spellCheck={false}
@@ -377,7 +403,7 @@ function LastfmGroup() {
             onClick={() => openUrl(LASTFM_API_ACCOUNT_URL)}
             className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
           >
-            Create a Last.fm API account
+            {t("settings.integrations.createLastfmAccount")}
             <IconExternalLink className="size-3" />
           </button>
           <div className="flex items-center gap-2">
@@ -387,11 +413,13 @@ function LastfmGroup() {
               ) : (
                 <IconLogin stroke={2.3} />
               )}
-              {connecting ? "Waiting for authorization…" : "Connect"}
+              {connecting
+                ? t("settings.integrations.waitingForAuth")
+                : t("settings.integrations.connect")}
             </Button>
             {connecting && (
               <Button variant="ghost" onClick={cancel}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             )}
           </div>
@@ -409,6 +437,7 @@ const DISCORD_DEVELOPER_PORTAL_URL =
   "https://discord.com/developers/applications";
 
 function DiscordGroup() {
+  const t = useT();
   const {
     enabled,
     applicationId,
@@ -447,8 +476,9 @@ function DiscordGroup() {
     <Group>
       <SettingRow
         icon={IconMessageCircleFilled}
-        title="Discord Rich Presence"
-        description="Show what you're playing on your Discord profile. Talks directly to your local Discord app — nothing is sent anywhere else."
+        settingId="discord"
+        title={t("settings.integrations.discord")}
+        description={t("settings.integrations.discordDesc")}
         control={
           <div className="flex shrink-0 items-center gap-2">
             <Badge
@@ -460,15 +490,15 @@ function DiscordGroup() {
               }
             >
               {!enabled
-                ? "Disabled"
+                ? t("settings.integrations.disabled")
                 : configured
-                  ? "Enabled"
-                  : "Needs Client ID"}
+                  ? t("settings.integrations.enabled")
+                  : t("settings.integrations.needsClientId")}
             </Badge>
             <Switch
               checked={enabled}
               onCheckedChange={setEnabled}
-              aria-label="Enable Discord Rich Presence"
+              aria-label={t("settings.integrations.enableDiscord")}
             />
           </div>
         }
@@ -481,7 +511,7 @@ function DiscordGroup() {
                 htmlFor="discord-client-id"
                 className="text-sm font-medium"
               >
-                Application (Client) ID
+                {t("settings.integrations.clientId")}
               </label>
               <Input
                 id="discord-client-id"
@@ -489,15 +519,12 @@ function DiscordGroup() {
                 onChange={(e) => setIdInput(e.target.value)}
                 onBlur={commitId}
                 onKeyDown={(e) => e.key === "Enter" && commitId()}
-                placeholder="Your Discord application's Client ID"
+                placeholder={t("settings.integrations.clientId")}
                 autoComplete="off"
                 spellCheck={false}
               />
               <p className="text-xs text-amber-600 dark:text-amber-500">
-                Pre-filled with YTubic&apos;s own Discord application.
-                Don&apos;t change this unless you know what you&apos;re doing —
-                it only needs to change if you&apos;re intentionally presenting
-                as a different Discord app (e.g. one you registered yourself).
+                {t("settings.integrations.clientIdHint")}
               </p>
             </div>
             <button
@@ -505,7 +532,7 @@ function DiscordGroup() {
               onClick={() => openUrl(DISCORD_DEVELOPER_PORTAL_URL)}
               className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
-              Create a Discord application
+              {t("settings.integrations.createDiscordApp")}
               <IconExternalLink className="size-3" />
             </button>
             <div className="flex flex-col gap-1.5">
@@ -513,7 +540,7 @@ function DiscordGroup() {
                 htmlFor="discord-presence-name"
                 className="text-sm font-medium"
               >
-                Presence name
+                {t("settings.integrations.presenceName")}
               </label>
               <Input
                 id="discord-presence-name"
@@ -524,121 +551,138 @@ function DiscordGroup() {
                 spellCheck={false}
               />
               <p className="text-xs text-muted-foreground">
-                The name in &quot;&lt;verb&gt; NAME&quot; — independent of
-                whatever the Discord application above is actually named.
+                {t("settings.integrations.presenceNameHint")}
               </p>
             </div>
           </div>
 
           <SettingRow
             icon={IconActivity}
-            title="Activity type"
-            description='The verb in "<verb> <app name>".'
+            settingId="activity-type"
+            title={t("settings.integrations.activityType")}
+            description={t("settings.integrations.activityTypeDesc")}
             control={
               <SegmentedControl
                 value={activityType}
                 onChange={setActivityType}
                 options={[
-                  { value: "listening", label: "Listening" },
-                  { value: "playing", label: "Playing" },
-                  { value: "watching", label: "Watching" },
+                  {
+                    value: "listening",
+                    label: t("settings.integrations.listening"),
+                  },
+                  {
+                    value: "playing",
+                    label: t("settings.integrations.playing"),
+                  },
+                  {
+                    value: "watching",
+                    label: t("settings.integrations.watching"),
+                  },
                 ]}
               />
             }
           />
           <SettingRow
             icon={IconTypography}
-            title="Track title"
-            description='Shown as the "details" line.'
+            settingId="show-track-title"
+            title={t("settings.integrations.showTrackTitle")}
+            description={t("settings.integrations.showTrackTitleDesc")}
             control={
               <Switch
                 checked={showTitle}
                 onCheckedChange={setShowTitle}
-                aria-label="Show track title"
+                aria-label={t("settings.integrations.showTrackTitle")}
               />
             }
           />
           <SettingRow
             icon={IconMicrophoneFilled}
-            title="Artist"
-            description='Shown as the "state" line.'
+            settingId="show-artist"
+            title={t("settings.integrations.showArtist")}
+            description={t("settings.integrations.showArtistDesc")}
             control={
               <Switch
                 checked={showArtist}
                 onCheckedChange={setShowArtist}
-                aria-label="Show artist"
+                aria-label={t("settings.integrations.showArtist")}
               />
             }
           />
           <SettingRow
             icon={IconPhotoFilled}
-            title="Album art"
-            description="Large cover image."
+            settingId="show-album-art"
+            title={t("settings.integrations.showAlbumArt")}
+            description={t("settings.integrations.showAlbumArtDesc")}
             control={
               <Switch
                 checked={showAlbumArt}
                 onCheckedChange={setShowAlbumArt}
-                aria-label="Show album art"
+                aria-label={t("settings.integrations.showAlbumArt")}
               />
             }
           />
           <SettingRow
             icon={IconDiscFilled}
-            title="Album name"
-            description="Shown when hovering the cover."
+            settingId="show-album-name"
+            title={t("settings.integrations.showAlbumName")}
+            description={t("settings.integrations.showAlbumNameDesc")}
             control={
               <Switch
                 checked={showAlbumName}
                 onCheckedChange={setShowAlbumName}
-                aria-label="Show album name"
+                aria-label={t("settings.integrations.showAlbumName")}
               />
             }
           />
           <SettingRow
             icon={IconClockFilled}
-            title="Elapsed time"
-            description="Live progress bar (e.g. 01:36 / 02:51)."
+            settingId="show-elapsed-time"
+            title={t("settings.integrations.showElapsedTime")}
+            description={t("settings.integrations.showElapsedTimeDesc")}
             control={
               <Switch
                 checked={showTimestamps}
                 onCheckedChange={setShowTimestamps}
-                aria-label="Show elapsed time"
+                aria-label={t("settings.integrations.showElapsedTime")}
               />
             }
           />
           <SettingRow
             icon={IconClickFilled}
-            title='"Listen" button'
-            description="Links back to the track on YouTube Music."
+            settingId="show-listen-button"
+            title={t("settings.integrations.showListenButton")}
+            description={t("settings.integrations.showListenButtonDesc")}
             control={
               <Switch
                 checked={showButton}
                 onCheckedChange={setShowButton}
-                aria-label="Show Listen button"
+                aria-label={t("settings.integrations.showListenButton")}
               />
             }
           />
           <SettingRow
             icon={IconFilterFilled}
-            title="Only show for songs"
-            description="Hide presence for standalone music videos — only share real album songs."
+            settingId="only-for-songs"
+            title={t("settings.integrations.onlyForSongs")}
+            description={t("settings.integrations.onlyForSongsDesc")}
             control={
               <Switch
                 checked={onlySongs}
                 onCheckedChange={setOnlySongs}
-                aria-label="Only show for songs"
+                aria-label={t("settings.integrations.onlyForSongs")}
               />
             }
           />
           <SettingRow
             icon={IconEyeOffFilled}
-            title="Hide while paused"
-            description="Clear presence when playback is paused, instead of freezing the bar."
+            settingId="hide-while-paused"
+            title={t("settings.integrations.hideWhilePaused")}
+            description={t("settings.integrations.hideWhilePausedDesc")}
             control={
               <Switch
                 checked={hideWhenPaused}
                 onCheckedChange={setHideWhenPaused}
-                aria-label="Hide while paused"
+                aria-label={t("settings.integrations.hideWhilePaused")}
               />
             }
           />

@@ -58,6 +58,7 @@ import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
 import { usePanelsStore } from "@/lib/store/panels";
 import { useScrubStore } from "@/lib/store/scrub";
 import { lookupITunesCover, cacheCoverToDisk } from "@/lib/cover-art";
+import { translate, useT } from "@/lib/i18n";
 import type { QueueTrack, RepeatMode } from "@/lib/store/playback";
 
 /**
@@ -104,13 +105,19 @@ export function formatTime(seconds: number): string {
  * tooltip and its `aria-label` so the three states (off → all → one)
  * are distinguishable — otherwise "off" and "all" differ only by the
  * icon's tint, which reads as "nothing happened" on the first click.
+ *
+ * Takes the translator rather than reading the locale itself, so the
+ * label re-renders when the user switches language.
  */
-export function repeatLabel(repeat: RepeatMode): string {
+export function repeatLabel(
+  repeat: RepeatMode,
+  t: (key: string) => string = translate,
+): string {
   return repeat === "one"
-    ? "Repeat one"
+    ? t("action.repeatOne")
     : repeat === "all"
-      ? "Repeat all"
-      : "Repeat off";
+      ? t("action.repeatAll")
+      : t("action.repeatOff");
 }
 
 /* Fork note: SourceToggle intentionally omitted — fork moved the
@@ -207,6 +214,7 @@ export function VolumeControl({
   /** Extra classes for the speaker button (the full-screen chip). */
   className?: string;
 }) {
+  const t = useT();
   const { volume, muted } = usePlaybackStore(
     useShallow((s) => ({ volume: s.volume, muted: s.muted })),
   );
@@ -272,7 +280,7 @@ export function VolumeControl({
       <Button
         variant="ghost"
         size="icon"
-        aria-label={muted ? "Unmute" : "Mute"}
+        aria-label={muted ? t("action.unmute") : t("action.mute")}
         onClick={toggleMute}
         className={cn(playerIconButton, className)}
       >
@@ -306,7 +314,7 @@ export function VolumeControl({
               max={100}
               step={1}
               className="h-16 min-h-0"
-              aria-label="Volume"
+              aria-label={t("action.volume")}
               onValueChange={([v]) => setVolume(v / 100)}
             />
           </div>
@@ -323,7 +331,7 @@ export function VolumeControl({
             max={100}
             step={1}
             className="min-w-24 flex-1"
-            aria-label="Volume"
+            aria-label={t("action.volume")}
             onValueChange={([v]) => setVolume(v / 100)}
           />
           <span className="w-7 shrink-0 text-right text-xs font-medium tabular-nums text-foreground">
@@ -342,6 +350,7 @@ export function PlayerBar({
 }: {
   variant?: PlayerBarVariant;
 }) {
+  const t = useT();
   const {
     playing,
     status,
@@ -526,7 +535,7 @@ export function PlayerBar({
         <div className="flex items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-base font-medium">
-              {track?.title ?? "Nothing playing"}
+              {track?.title ?? t("player.nothingPlaying")}
             </span>
             {track ? (
               <span className="truncate text-sm text-muted-foreground">
@@ -588,7 +597,7 @@ export function PlayerBar({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Shuffle"
+            aria-label={t("action.shuffle")}
             aria-pressed={shuffle}
             onClick={() => setShuffle(!shuffle)}
             className={cn(shuffle && "text-brand")}
@@ -598,7 +607,7 @@ export function PlayerBar({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Previous"
+            aria-label={t("action.previous")}
             onClick={prev}
             disabled={!hasTrack}
           >
@@ -606,7 +615,7 @@ export function PlayerBar({
           </Button>
           <Button
             size="icon"
-            aria-label={playing ? "Pause" : "Play"}
+            aria-label={playing ? t("action.pause") : t("action.play")}
             onClick={toggle}
             disabled={!hasTrack}
             className="size-12 rounded-full bg-brand text-white hover:bg-brand/90"
@@ -622,7 +631,7 @@ export function PlayerBar({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Next"
+            aria-label={t("action.next")}
             onClick={next}
             disabled={!hasTrack}
           >
@@ -633,7 +642,7 @@ export function PlayerBar({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label={repeatLabel(repeat)}
+                aria-label={repeatLabel(repeat, t)}
                 aria-pressed={repeat !== "off"}
                 onClick={cycleRepeat}
                 className={cn(repeat !== "off" && "text-brand")}
@@ -641,7 +650,7 @@ export function PlayerBar({
                 {repeat === "one" ? <IconRepeatOnce /> : <IconRepeat />}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{repeatLabel(repeat)}</TooltipContent>
+            <TooltipContent>{repeatLabel(repeat, t)}</TooltipContent>
           </Tooltip>
         </div>
       </div>

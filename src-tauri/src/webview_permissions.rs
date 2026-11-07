@@ -35,7 +35,7 @@ pub fn install(win: &WebviewWindow) {
         let core = match webview.controller().CoreWebView2() {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("[permissions] CoreWebView2 unavailable: {e}");
+                crate::log!("[permissions] CoreWebView2 unavailable: {e}");
                 return;
             }
         };
@@ -62,7 +62,7 @@ pub fn install(win: &WebviewWindow) {
         }));
         let mut token = 0i64;
         if let Err(e) = core.add_PermissionRequested(&handler, &mut token) {
-            eprintln!("[permissions] add_PermissionRequested failed: {e}");
+            crate::log!("[permissions] add_PermissionRequested failed: {e}");
         }
     });
 }

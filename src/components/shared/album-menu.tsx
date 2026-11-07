@@ -39,6 +39,7 @@ import { usePlaybackStore } from "@/lib/store/playback";
 import { usePlaybackSettings } from "@/lib/store/playback-settings";
 import { armFadeInto } from "@/lib/fade-request";
 import type { AlbumPage, ShelfItem } from "@/lib/innertube/types";
+import { useT, translate } from "@/lib/i18n";
 
 // Album rows carry no per-track thumbnail (the cover lives at the album
 // level), so backfill it before queuing — otherwise the player card and
@@ -119,7 +120,7 @@ export function useAlbumMenuController(albumId: string, album?: AlbumPage) {
     const items = withCover(a);
     if (items.length === 0) return;
     usePlaybackStore.getState().appendToQueue(items);
-    toast.success(`Added to queue: ${a.title}`);
+    toast.success(translate("toast.addedToQueue", { title: a.title }));
   };
 
   const startRadio = async () => {
@@ -141,7 +142,7 @@ export function useAlbumMenuController(albumId: string, album?: AlbumPage) {
     if (!a) return;
     const artist = a.artists.find((x) => x.id);
     if (!artist?.id) {
-      toast.error("No artist page for this album");
+      toast.error(translate("toast.noArtistPage"));
       return;
     }
     navigate({ to: "/artist/$id", params: { id: artist.id } });
@@ -247,12 +248,13 @@ export function AlbumContextMenu({
 
 /** ⋯ button for the album page header. Same actions as the card menu. */
 export function AlbumMoreMenu({ album }: { album: AlbumPage }) {
+  const t = useT();
   const controller = useAlbumMenuController(album.id, album);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" aria-label="More actions">
+        <Button variant="outline" size="icon" aria-label={t("common.moreActions")}>
           <IconDots />
         </Button>
       </DropdownMenuTrigger>

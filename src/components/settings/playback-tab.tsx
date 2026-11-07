@@ -30,6 +30,7 @@ import {
   type EqPreset,
 } from "@/lib/store/playback-settings";
 import { canSelectOutputDevice } from "@/lib/audio-graph";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -64,6 +65,7 @@ export function PlaybackTab() {
 /* ------------------------------------------------------------------ */
 
 function CrossfadeRow() {
+  const t = useT();
   const seconds = usePlaybackSettings((s) => s.crossfadeSec);
   const setSeconds = usePlaybackSettings((s) => s.setCrossfadeSec);
   const bassSwap = usePlaybackSettings((s) => s.mixBassSwap);
@@ -75,8 +77,9 @@ function CrossfadeRow() {
     <>
       <SettingRow
         icon={IconTransitionRightFilled}
-        title="Crossfade"
-        description="Fade the end of a track into the start of the next one."
+        settingId="crossfade"
+        title={t("settings.playback.crossfade")}
+        description={t("settings.playback.crossfadeDesc")}
         control={
           <div className="flex items-center gap-3.5">
             <Slider
@@ -85,7 +88,7 @@ function CrossfadeRow() {
               min={0}
               max={30}
               step={1}
-              aria-label="Crossfade seconds"
+              aria-label={t("settings.playback.crossfadeSeconds")}
               className="w-[150px]"
             />
             <Stepper value={seconds} onChange={setSeconds} min={0} max={30} />
@@ -94,27 +97,29 @@ function CrossfadeRow() {
       />
       <SettingRow
         icon={IconTransitionRightFilled}
-        title="DJ bass swap"
-        description="Swap basslines during the crossfade so the two tracks don't clash."
+        settingId="dj-bass-swap"
+        title={t("settings.playback.djBassSwap")}
+        description={t("settings.playback.djBassSwapDesc")}
         control={
           <Switch
             checked={bassSwap}
             onCheckedChange={setBassSwap}
             disabled={seconds === 0}
-            aria-label="DJ bass swap"
+            aria-label={t("settings.playback.djBassSwap")}
           />
         }
       />
       <SettingRow
         icon={IconTransitionRightFilled}
-        title="Smart mix timing"
-        description="Start the mix as the outro begins and skip silent intros and endings."
+        settingId="smart-mix-timing"
+        title={t("settings.playback.smartMixTiming")}
+        description={t("settings.playback.smartMixTimingDesc")}
         control={
           <Switch
             checked={smartTiming}
             onCheckedChange={setSmartTiming}
             disabled={seconds === 0}
-            aria-label="Smart mix timing"
+            aria-label={t("settings.playback.smartMixTiming")}
           />
         }
       />
@@ -134,6 +139,7 @@ function Stepper({
   min: number;
   max: number;
 }) {
+  const t = useT();
   const step = (delta: number) =>
     onChange(Math.min(max, Math.max(min, value + delta)));
 
@@ -149,14 +155,21 @@ function Stepper({
           const next = Number(e.target.value);
           if (Number.isFinite(next)) onChange(next);
         }}
-        aria-label="Crossfade seconds"
+        aria-label={t("settings.playback.crossfadeSeconds")}
         // Chromium's own spinners would sit next to ours.
         className="w-6 bg-transparent text-right text-[13px] font-semibold tabular-nums text-t2 outline-hidden [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       <span className="pl-1 pr-1.5 text-[12px] text-t6">s</span>
       <div className="flex flex-col gap-px">
-        <StepButton label="Increase" onClick={() => step(1)} up />
-        <StepButton label="Decrease" onClick={() => step(-1)} />
+        <StepButton
+          label={t("settings.playback.increase")}
+          onClick={() => step(1)}
+          up
+        />
+        <StepButton
+          label={t("settings.playback.decrease")}
+          onClick={() => step(-1)}
+        />
       </div>
     </div>
   );
@@ -191,44 +204,50 @@ function StepButton({
 /* ------------------------------------------------------------------ */
 
 function NormalizeRow() {
+  const t = useT();
   const on = usePlaybackSettings((s) => s.normalizeVolume);
   const set = usePlaybackSettings((s) => s.setNormalizeVolume);
   return (
     <SettingRow
       icon={IconDeviceSpeakerFilled}
-      title="Volume normalization"
-      description="Keep every track at a similar loudness."
+      settingId="volume-normalization"
+      title={t("settings.playback.volumeNormalization")}
+      description={t("settings.playback.volumeNormalizationDesc")}
       control={<Switch checked={on} onCheckedChange={set} />}
     />
   );
 }
 
 function MonoRow() {
+  const t = useT();
   const on = usePlaybackSettings((s) => s.monoAudio);
   const set = usePlaybackSettings((s) => s.setMonoAudio);
   return (
     <SettingRow
       icon={IconCircleFilled}
-      title="Mono audio"
-      description="Play the same audio in both channels."
+      settingId="mono-audio"
+      title={t("settings.playback.monoAudio")}
+      description={t("settings.playback.monoAudioDesc")}
       control={<Switch checked={on} onCheckedChange={set} />}
     />
   );
 }
 
 function RadioVarietyRow() {
+  const t = useT();
   const on = usePlaybackSettings((s) => s.radioVariety);
   const set = usePlaybackSettings((s) => s.setRadioVariety);
   return (
     <SettingRow
       icon={IconArrowsShuffle}
-      title="Varied radio & autoplay"
-      description="Mix more tracks into radio and autoplay and shuffle them a bit, so it isn't the same songs every time."
+      settingId="varied-radio"
+      title={t("settings.playback.variedRadio")}
+      description={t("settings.playback.variedRadioDesc")}
       control={
         <Switch
           checked={on}
           onCheckedChange={set}
-          aria-label="Varied radio & autoplay"
+          aria-label={t("settings.playback.variedRadio")}
         />
       }
     />
@@ -236,13 +255,15 @@ function RadioVarietyRow() {
 }
 
 function ResumeRow() {
+  const t = useT();
   const on = usePlaybackSettings((s) => s.resumePlayback);
   const set = usePlaybackSettings((s) => s.setResumePlayback);
   return (
     <SettingRow
       icon={IconPlayerPlayFilled}
-      title="Resume where you left off"
-      description="Remember the track and position after a restart."
+      settingId="resume-where-you-left-off"
+      title={t("settings.playback.resumeWhereYouLeftOff")}
+      description={t("settings.playback.resumeWhereYouLeftOffDesc")}
       control={<Switch checked={on} onCheckedChange={set} />}
     />
   );
@@ -252,16 +273,17 @@ function ResumeRow() {
 /* Equalizer                                                           */
 /* ------------------------------------------------------------------ */
 
-const PRESET_LABELS: { value: EqPreset; label: string }[] = [
-  { value: "flat", label: "Flat" },
-  { value: "bass", label: "Bass boost" },
-  { value: "vocal", label: "Vocal" },
-  { value: "treble", label: "Treble" },
-  { value: "late", label: "Late night" },
-  { value: "custom", label: "Custom" },
-];
+const PRESET_LABEL_KEYS: Record<EqPreset, string> = {
+  flat: "settings.playback.eqFlat",
+  bass: "settings.playback.eqBass",
+  vocal: "settings.playback.eqVocal",
+  treble: "settings.playback.eqTreble",
+  late: "settings.playback.eqLate",
+  custom: "settings.playback.eqCustom",
+};
 
 function EqualizerGroup() {
+  const t = useT();
   const enabled = usePlaybackSettings((s) => s.eqEnabled);
   const setEnabled = usePlaybackSettings((s) => s.setEqEnabled);
   const preset = usePlaybackSettings((s) => s.eqPreset);
@@ -272,20 +294,21 @@ function EqualizerGroup() {
       <div className="flex flex-col">
         <SettingRow
           icon={IconAdjustmentsFilled}
-          title="Equalizer"
-          description="Shape the sound with a preset, or tune the bands yourself."
+          settingId="equalizer"
+          title={t("settings.playback.equalizer")}
+          description={t("settings.playback.equalizerDesc")}
           control={<Switch checked={enabled} onCheckedChange={setEnabled} />}
         />
         {enabled ? (
           <div className="flex flex-col gap-3.5 pb-4 pt-0.5">
             <div className="flex flex-wrap gap-[7px]">
-              {PRESET_LABELS.map(({ value, label }) => {
+              {Object.entries(PRESET_LABEL_KEYS).map(([value, key]) => {
                 const on = preset === value;
                 return (
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setPreset(value)}
+                    onClick={() => setPreset(value as EqPreset)}
                     className={cn(
                       "cursor-pointer rounded-lg border px-3 py-1.5 text-[12.5px] transition-colors duration-[140ms]",
                       on
@@ -293,7 +316,7 @@ function EqualizerGroup() {
                         : "border-w070 bg-w040 font-medium text-t5 hover:bg-w070 hover:text-t3",
                     )}
                   >
-                    {label}
+                    {t(key)}
                   </button>
                 );
               })}
@@ -487,13 +510,15 @@ function OutputDeviceRow() {
   };
 
   const current = devices.find((d) => d.deviceId === deviceId);
-  const label = current?.label ?? "System default";
+  const t = useT();
+  const label = current?.label ?? t("settings.playback.systemDefault");
 
   return (
     <SettingRow
       icon={IconHeadphonesFilled}
-      title="Output device"
-      description="Where audio is sent when YTubic starts playing."
+      settingId="output-device"
+      title={t("settings.playback.outputDevice")}
+      description={t("settings.playback.outputDeviceDesc")}
       control={
         <DropdownMenu
           onOpenChange={(open) => {
@@ -512,7 +537,9 @@ function OutputDeviceRow() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[232px]">
             <DropdownMenuItem onSelect={() => setDeviceId("")}>
-              <span className="flex-1 truncate">System default</span>
+              <span className="flex-1 truncate">
+                {t("settings.playback.systemDefault")}
+              </span>
               {deviceId === "" ? (
                 <IconCheck className="size-4 text-acc1!" stroke={2.4} />
               ) : null}
@@ -539,13 +566,14 @@ function OutputDeviceRow() {
 /* Back button                                                         */
 /* ------------------------------------------------------------------ */
 
-const BACK_OPTIONS: { value: BackButtonMode; label: string }[] = [
-  { value: "previous", label: "Previous track" },
-  { value: "restart", label: "Restart track" },
-  { value: "smart", label: "Smart" },
+const BACK_OPTIONS: { value: BackButtonMode; labelKey: string }[] = [
+  { value: "previous", labelKey: "settings.playback.backPrevious" },
+  { value: "restart", labelKey: "settings.playback.backRestart" },
+  { value: "smart", labelKey: "settings.playback.backSmart" },
 ];
 
 function BackButtonGroup() {
+  const t = useT();
   const mode = usePlaybackSettings((s) => s.backButton);
   const setMode = usePlaybackSettings((s) => s.setBackButton);
   const seconds = usePlaybackSettings((s) => s.smartBackSeconds);
@@ -556,20 +584,24 @@ function BackButtonGroup() {
       <div className="flex flex-col">
         <SettingRow
           icon={IconPlayerSkipBackFilled}
-          title="Back button"
-          description="What happens when you press previous mid-track."
+          settingId="back-button"
+          title={t("settings.playback.backButton")}
+          description={t("settings.playback.backButtonDesc")}
           control={
             <SegmentedControl
               value={mode}
               onChange={setMode}
-              options={BACK_OPTIONS}
+              options={BACK_OPTIONS.map((o) => ({
+                value: o.value,
+                label: t(o.labelKey),
+              }))}
             />
           }
         />
         {mode === "smart" ? (
           <div className="flex items-center justify-between gap-6 pb-4">
             <span className="text-[12.5px] text-t6">
-              Restart if more than this has played, otherwise go back a track
+              {t("settings.playback.smartBackHint")}
             </span>
             <SegmentedControl
               value={String(seconds)}

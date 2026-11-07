@@ -1,4 +1,5 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { proxyOptions } from "@/lib/proxy";
 import { useTrackMetaStore, type TrackMeta } from "@/lib/store/track-meta";
 
 /**
@@ -39,6 +40,7 @@ export async function fetchTrackMetaOEmbed(
       const res = await tauriFetch(url, {
         method: "GET",
         signal: AbortSignal.timeout(OEMBED_TIMEOUT_MS),
+        ...proxyOptions(),
       });
       if (!res.ok) {
         failed.add(videoId);

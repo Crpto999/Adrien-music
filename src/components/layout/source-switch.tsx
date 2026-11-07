@@ -12,6 +12,7 @@ import { IconMusicFilled } from "@/components/shared/filled-icons";
 import type { SourceKind } from "@/lib/store/track-source";
 import type { VideoQuality } from "@/lib/store/settings";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 /** Same height and corner radius as the layout switch beside these pills. */
 const SIZE = 36;
@@ -27,6 +28,8 @@ const SPRING = {
 type Option<T extends string | number> = {
   value: T;
   label: string;
+  /** Translation key for the label; resolved with the active locale. */
+  labelKey?: string;
   Icon?: ComponentType<{ className?: string }>;
   /** Shown faded: still clickable, but known to have nothing behind it. */
   dim?: boolean;
@@ -200,8 +203,18 @@ function GlowPill<T extends string | number>({
 }
 
 const SOURCE_OPTIONS: Option<SourceKind>[] = [
-  { value: "song", label: "Song", Icon: IconMusicFilled },
-  { value: "video", label: "Video", Icon: IconVideoFilled },
+  {
+    value: "song",
+    label: "Song",
+    labelKey: "player.song",
+    Icon: IconMusicFilled,
+  },
+  {
+    value: "video",
+    label: "Video",
+    labelKey: "player.video",
+    Icon: IconVideoFilled,
+  },
 ];
 
 /** Song / Video pill for the immersive fullscreen view. */
@@ -217,16 +230,18 @@ export function SourceSwitch({
   videoUnavailable?: boolean;
   onChange: (v: SourceKind) => void;
 }) {
-  const options = SOURCE_OPTIONS.map((o) =>
-    o.value === "video" && videoUnavailable
-      ? { ...o, dim: true, title: "No video available for this track" }
-      : o,
-  );
+  const t = useT();
+  const options = SOURCE_OPTIONS.map((o) => {
+    const localized = { ...o, label: t(o.labelKey ?? o.value) };
+    return o.value === "video" && videoUnavailable
+      ? { ...localized, dim: true, title: t("player.noVideoAvailable") }
+      : localized;
+  });
   const Current = options.find((o) => o.value === value)?.Icon;
   return (
     <GlowPill
       id="source-switch-pill"
-      label="Playback source"
+      label={t("player.playbackSource")}
       value={value}
       options={options}
       busy={busy}
@@ -250,10 +265,11 @@ export function QualitySwitch({
   value: VideoQuality;
   onChange: (v: VideoQuality) => void;
 }) {
+  const t = useT();
   return (
     <GlowPill
       id="quality-switch-pill"
-      label="Video quality"
+      label={t("player.videoQuality")}
       value={value}
       options={QUALITY_OPTIONS}
       collapsed={

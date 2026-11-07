@@ -9,6 +9,7 @@ import { TrackList } from "@/components/shared/track-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Shelf } from "@/lib/innertube/types";
 import { ErrorCard } from "@/components/shared/error-card";
+import { useT } from "@/lib/i18n";
 
 /**
  * Generic full-list browse page — the target of a shelf "More" link on
@@ -29,8 +30,9 @@ export const Route = createFileRoute("/browse/$id")({
 });
 
 function BrowsePageView() {
+  const t = useT();
   const { id } = Route.useParams();
-  const { p, t, a, aid, img, view } = Route.useSearch();
+  const { p, t: title, a, aid, img, view } = Route.useSearch();
   const isTopSongs = view === "top-songs";
 
   const {
@@ -68,7 +70,7 @@ function BrowsePageView() {
     <div className="flex flex-col gap-6 px-6 pb-6 pt-3">
       {aid ? (
         <EntityHeader
-          title={t || (isTopSongs ? "Top songs" : "Browse")}
+          title={title || (isTopSongs ? t("playlist.topSongs") : t("nav.browse"))}
           subtitle={
             a ? (
               <Link
@@ -85,12 +87,14 @@ function BrowsePageView() {
           keepSubtitleInCompact
         />
       ) : (
-        <h1 className="text-3xl font-bold tracking-tight">{t || "Browse"}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {title || t("nav.browse")}
+        </h1>
       )}
 
       {error ? (
         <ErrorCard
-          title="Couldn't load this list"
+          title={t("entity.couldNotLoadList")}
           message={(error as Error).message}
           onRetry={() => refetch()}
         />

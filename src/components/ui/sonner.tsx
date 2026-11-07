@@ -85,7 +85,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
           // into three ragged lines.
           title:
             "truncate text-[13px] font-semibold tracking-[-0.008em] text-t1",
-          description: "truncate text-[11.5px] leading-[1.35] text-t5",
+          // An error message is the one case where the FULL text
+          // matters: "command relink_account not found" was cut off
+          // after "command relink" and the missing half was the whole
+          // diagnosis. The title stays truncated (it carries the
+          // headline), the description wraps.
+          description:
+            "line-clamp-6 break-words text-[11.5px] leading-[1.35] text-t5",
           actionButton: `${BUTTON} text-t2`,
           cancelButton: `${BUTTON} text-t6`,
           // Sonner renders the close button first in the DOM, where it

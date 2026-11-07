@@ -120,6 +120,29 @@ describe("classifyAllRow", () => {
       ),
     ).toBeNull();
   });
+
+  it("buckets rows by their Chinese subtitle token", () => {
+    // Tokens verified against live zh-CN search responses.
+    const cases: [string, string][] = [
+      ["歌曲", "song"],
+      ["视频", "video"],
+      ["专辑", "album"],
+      ["单曲", "album"],
+      ["音乐人", "artist"],
+      ["播放列表", "playlist"],
+    ];
+    for (const [token, group] of cases) {
+      const r = classifyAllRow(row(token, { videoId: "vid1" }));
+      expect(r?.group, token).toBe(group);
+    }
+  });
+
+  it("skips Chinese types the app has no destination for", () => {
+    // 个人资料 (profile), 分集 (episode), 播客 (podcast).
+    for (const token of ["个人资料", "分集", "播客"]) {
+      expect(classifyAllRow(row(token, { videoId: "vid1" })), token).toBeNull();
+    }
+  });
 });
 
 function card(opts: {

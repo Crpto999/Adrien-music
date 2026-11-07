@@ -23,6 +23,7 @@ import { fetchChannelList, type ChannelChoice } from "@/lib/innertube/channels";
 import { useAccounts } from "@/lib/store/accounts";
 import { useChannelPickerDialog } from "@/lib/store/channel-picker";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 /**
  * Lets the user pick which YouTube channel (personal or brand) the
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils";
  * after a sign-in that discovers more than one channel.
  */
 export function ChannelPickerDialog() {
+  const t = useT();
   const open = useChannelPickerDialog((s) => s.open);
   const setOpen = useChannelPickerDialog((s) => s.setOpen);
 
@@ -88,17 +90,16 @@ export function ChannelPickerDialog() {
         />
         <DialogClose className="absolute right-4 top-4 z-[2] grid size-7 cursor-pointer place-items-center rounded-lg border border-w070 bg-w030 text-t6 transition-colors duration-[140ms] hover:bg-w080 hover:text-t2">
           <IconX className="size-3" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t("common.close")}</span>
         </DialogClose>
 
         {/* Right padding clears the close button. */}
         <DialogHeader className="gap-2 pr-[34px]">
           <DialogTitle className="text-2xl font-bold leading-none tracking-[-0.02em] text-t1">
-            Choose a channel
+            {t("channel.chooseTitle")}
           </DialogTitle>
           <DialogDescription className="text-[13.5px] leading-[1.5] text-t4 text-pretty">
-            Your library, likes and recommendations belong to the channel, not
-            the account. Pick the one YTubic should use.
+            {t("channel.chooseDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -109,15 +110,14 @@ export function ChannelPickerDialog() {
         ) : channels.isError ? (
           <div className="flex flex-col items-start gap-3.5 py-1">
             <p className="text-[13.5px] leading-[1.5] text-t4">
-              Couldn't load the channel list. Check your connection and try
-              again.
+              {t("channel.couldNotLoad")}
             </p>
             <Button
               variant="secondary"
               size="sm"
               onClick={() => void channels.refetch()}
             >
-              Try again
+              {t("action.retryNow")}
             </Button>
           </div>
         ) : (
@@ -148,7 +148,9 @@ export function ChannelPickerDialog() {
                     </span>
                     <span className="truncate text-[12.5px] leading-none text-t6">
                       {c.byline ||
-                        (c.pageId ? "Brand channel" : "Personal channel")}
+                        (c.pageId
+                          ? t("channel.brandChannel")
+                          : t("channel.personalChannel"))}
                     </span>
                   </span>
                   {isCurrent ? (
@@ -162,7 +164,7 @@ export function ChannelPickerDialog() {
             })}
             {channels.data && channels.data.length === 0 ? (
               <p className="py-4 text-[13.5px] text-t5">
-                No channels found for this account.
+                {t("channel.noneFound")}
               </p>
             ) : null}
           </div>

@@ -21,6 +21,7 @@ import {
 import { downloadCover, lookupITunesCover } from "@/lib/cover-art";
 import type { QueueTrack } from "@/lib/store/playback";
 import type { ShelfItem } from "@/lib/innertube/types";
+import { translate } from "@/lib/i18n";
 
 type Props = {
   track: QueueTrack | undefined;
@@ -70,7 +71,9 @@ export function PlayerCoverMenu({ track, children }: Props) {
         [itunes, largest ? getHighResVariant(largest, 1080) : null, largest],
         artistLine ? `${artistLine} - ${track.title}` : track.title,
       );
-      toast.success("Cover saved", { description: path });
+      toast.success(translate("toast.coverSavedWithPath"), {
+        description: path,
+      });
     } catch (e) {
       toast.error(`Couldn't save cover: ${String(e)}`);
     } finally {

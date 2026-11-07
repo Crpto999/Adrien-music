@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { findAlternateVideoId } from "@/lib/innertube/alternate-source";
 import type { QueueTrack } from "@/lib/store/playback";
 import { useTrackSourceStore, type SourceKind } from "@/lib/store/track-source";
+import { translate } from "@/lib/i18n";
 
 /** Tracks (this session) for which no matching version of a kind exists. */
 const useMissingSources = create<{
@@ -77,8 +78,8 @@ export function useSourceSwitch(track: QueueTrack) {
           if (!silent) {
             toast.error(
               target === "video"
-                ? "No video available for this track"
-                : "No song version found",
+                ? translate("player.noVideoAvailable")
+                : translate("player.noSongVersionFound"),
             );
           }
           return false;

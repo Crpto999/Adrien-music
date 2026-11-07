@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useSettingsStore } from "@/lib/store/settings";
 import { fetchUpdateSource } from "@/lib/update-source";
 import { useUpdateStore } from "@/lib/store/update";
+import { translate } from "@/lib/i18n";
 
 const TOAST_ID = "app-update";
 
@@ -88,7 +89,7 @@ export async function checkForUpdates({
       update = await check();
     } catch (e) {
       if (!silent) {
-        toast.error("Couldn't check for updates", {
+        toast.error(translate("toast.couldNotCheckUpdates"), {
           id: TOAST_ID,
           description: String(e),
         });
@@ -98,7 +99,7 @@ export async function checkForUpdates({
 
     if (!update) {
       if (!silent)
-        toast.success("You're on the latest version.", { id: TOAST_ID });
+        toast.success(translate("toast.latestVersion"), { id: TOAST_ID });
       return;
     }
 
@@ -143,7 +144,7 @@ export async function restartToUpdate(): Promise<void> {
   const { handle } = store;
   if (!handle) {
     store.reset();
-    toast.success("Preview only: a real update would restart here.", {
+    toast.success(translate("toast.previewOnlyUpdate"), {
       id: TOAST_ID,
       duration: 4000,
     });

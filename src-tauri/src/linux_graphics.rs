@@ -32,7 +32,7 @@ pub fn configure() {
     // Respect ANY explicit environment value (including an empty/non-Unicode
     // value), allowing users to test Skia with the preference set to 1.
     std::env::set_var(COMPOSITOR_ENV, "0");
-    eprintln!(
+    crate::log!(
         "[linux-graphics] WebKitGTK {major}.{minor}.{micro}: using TextureMapper compositor; \
          set {COMPOSITOR_ENV}=1 to opt into Skia (see docs/linux-graphics.md)"
     );

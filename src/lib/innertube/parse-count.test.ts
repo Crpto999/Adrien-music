@@ -23,4 +23,12 @@ describe("parseTrackCount", () => {
     expect(parseTrackCount("Playlist • Various artists")).toBeUndefined();
     expect(parseTrackCount("")).toBeUndefined();
   });
+
+  it("parses the Chinese track count", () => {
+    // Verified against a live zh-CN response.
+    expect(parseTrackCount("56 首歌曲")).toBe(56);
+    expect(parseTrackCount("60 首歌曲")).toBe(60);
+    expect(parseTrackCount("120 首")).toBe(120);
+    expect(parseTrackCount("1,200 首歌曲")).toBe(1200);
+  });
 });

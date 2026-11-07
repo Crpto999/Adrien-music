@@ -1,5 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { mapShelfWrapper, splitSetCookieHeader, type YtNode } from "./shared";
+import {
+  looksLikeDate,
+  mapShelfWrapper,
+  splitSetCookieHeader,
+  type YtNode,
+} from "./shared";
+
+// The "Added" column classifier. YTM renders the date in the request's
+// `hl`, so the English and Chinese wordings have to be recognised
+// alike. The Chinese forms below were verified against live responses.
+describe("looksLikeDate", () => {
+  it("accepts English dates", () => {
+    expect(looksLikeDate("Apr 23")).toBe(true);
+    expect(looksLikeDate("2 days ago")).toBe(true);
+    expect(looksLikeDate("yesterday")).toBe(true);
+    expect(looksLikeDate("2024")).toBe(true);
+    expect(looksLikeDate("3/12/24")).toBe(true);
+  });
+
+  it("accepts Chinese dates", () => {
+    expect(looksLikeDate("2026年")).toBe(true);
+    expect(looksLikeDate("2025年7月22日")).toBe(true);
+    expect(looksLikeDate("7月22日")).toBe(true);
+    expect(looksLikeDate("3 天前")).toBe(true);
+    expect(looksLikeDate("2 小时前")).toBe(true);
+    expect(looksLikeDate("昨天")).toBe(true);
+    expect(looksLikeDate("今天")).toBe(true);
+  });
+
+  it("rejects counters and plain numbers", () => {
+    expect(looksLikeDate("2057万")).toBe(false);
+    expect(looksLikeDate("播放次数：2057万")).toBe(false);
+    expect(looksLikeDate("1234567")).toBe(false);
+    expect(looksLikeDate("周杰倫")).toBe(false);
+  });
+});
 
 // Fallback splitter for runtimes without Headers.getSetCookie. The
 // tricky part is NOT splitting on the comma inside an Expires date.

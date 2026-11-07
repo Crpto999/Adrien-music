@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Group, SettingRow, TabPane } from "@/components/settings/primitives";
 import { INTERFACE_FONTS, interfaceFontStack } from "@/lib/interface-font";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type LayoutMode } from "@/lib/store/layout";
 import {
@@ -33,20 +34,16 @@ import {
   type VideoQuality,
 } from "@/lib/store/settings";
 
-const THEME_OPTIONS = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "System" },
-];
-
 // Segments carry the very glyphs the setting switches between.
-const RATING_OPTIONS: { value: RatingButtons; label: React.ReactNode }[] = [
+const RATING_OPTIONS = (
+  t: (key: string) => string,
+): { value: RatingButtons; label: React.ReactNode }[] => [
   {
     value: "heart",
     label: (
       <span className="flex items-center gap-[7px]">
         <IconHeart className="size-[15px]" stroke={1.7} />
-        Heart
+        {t("settings.appearance.like")}
       </span>
     ),
   },
@@ -56,13 +53,14 @@ const RATING_OPTIONS: { value: RatingButtons; label: React.ReactNode }[] = [
       <span className="flex items-center gap-0.5">
         <IconThumbUp className="size-[15px]" stroke={1.7} />
         <IconThumbDown className="size-[15px]" stroke={1.7} />
-        <span className="ml-1.5">Like</span>
+        <span className="ml-1.5">{t("settings.appearance.like")}</span>
       </span>
     ),
   },
 ];
 
 export function AppearanceTab() {
+  const t = useT();
   const { theme, setTheme } = useTheme();
   const background = useSettingsStore((s) => s.background);
   const setBackground = useSettingsStore((s) => s.setBackground);
@@ -82,8 +80,9 @@ export function AppearanceTab() {
       <Group>
         <SettingRow
           icon={IconPaletteFilled}
-          title="Theme"
-          description="Choose light or dark, or follow your OS preference."
+          settingId="theme"
+          title={t("settings.appearance.theme")}
+          description={t("settings.appearance.themeDesc")}
           control={
             <SegmentedControl
               // `theme` is undefined during the very first render
@@ -91,7 +90,11 @@ export function AppearanceTab() {
               // "system" so the control never renders empty.
               value={theme ?? "system"}
               onChange={setTheme}
-              options={THEME_OPTIONS}
+              options={[
+                { value: "light", label: t("theme.light") },
+                { value: "dark", label: t("theme.dark") },
+                { value: "system", label: t("theme.system") },
+              ]}
             />
           }
         />
@@ -100,45 +103,49 @@ export function AppearanceTab() {
             than a two-up segmented control. */}
         <SettingRow
           icon={IconPhotoFilled}
-          title="Ambient background"
-          description="Tint the window with the current album art, or keep it plain."
+          settingId="ambient-background"
+          title={t("settings.appearance.ambientBackground")}
+          description={t("settings.appearance.ambientBackgroundDesc")}
           control={
             <Switch
               checked={background === "ambient"}
               onCheckedChange={(v) => setBackground(v ? "ambient" : "plain")}
-              aria-label="Ambient background"
+              aria-label={t("settings.appearance.ambientBackground")}
             />
           }
         />
         <SettingRow
           icon={IconSparkles}
-          title="Window glow"
-          description="A soft glowing accent outline around the window edge."
+          settingId="window-glow"
+          title={t("settings.appearance.windowGlow")}
+          description={t("settings.appearance.windowGlowDesc")}
           control={
             <Switch
               checked={windowGlow}
               onCheckedChange={setWindowGlow}
-              aria-label="Window glow"
+              aria-label={t("settings.appearance.windowGlow")}
             />
           }
         />
         <SettingRow
           icon={IconSparkles}
-          title="Glow matches cover"
-          description="Tint the window glow with the current cover's dominant color."
+          settingId="glow-matches-cover"
+          title={t("settings.appearance.glowMatchesCover")}
+          description={t("settings.appearance.glowMatchesCoverDesc")}
           control={
             <Switch
               checked={windowGlowCover}
               onCheckedChange={setWindowGlowCover}
               disabled={!windowGlow}
-              aria-label="Glow matches cover"
+              aria-label={t("settings.appearance.glowMatchesCover")}
             />
           }
         />
         <SettingRow
           icon={IconSparkles}
-          title="Glow size"
-          description="How far the window glow reaches into the window."
+          settingId="glow-size"
+          title={t("settings.appearance.glowSize")}
+          description={t("settings.appearance.glowSizeDesc")}
           control={
             <Slider
               value={[windowGlowSize]}
@@ -147,15 +154,16 @@ export function AppearanceTab() {
               max={100}
               step={5}
               disabled={!windowGlow}
-              aria-label="Glow size"
+              aria-label={t("settings.appearance.glowSize")}
               className="w-[150px]"
             />
           }
         />
         <SettingRow
           icon={IconPhotoFilled}
-          title="Video quality"
-          description="Picture quality for Video mode in immersive fullscreen. Higher takes longer to load the first time."
+          settingId="video-quality"
+          title={t("settings.appearance.videoQuality")}
+          description={t("settings.appearance.videoQualityDesc")}
           control={
             <SegmentedControl
               value={String(videoQuality)}
@@ -170,13 +178,14 @@ export function AppearanceTab() {
         />
         <SettingRow
           icon={IconHeartFilled}
-          title="Rating buttons"
-          description="Show a single heart, or separate like and dislike buttons."
+          settingId="rating-buttons"
+          title={t("settings.appearance.ratingButtons")}
+          description={t("settings.appearance.ratingButtonsDesc")}
           control={
             <SegmentedControl
               value={rating}
               onChange={setRating}
-              options={RATING_OPTIONS}
+              options={RATING_OPTIONS(t)}
             />
           }
         />
@@ -261,6 +270,7 @@ function LayoutTile({
  * all, with the player drawn where that mode puts it.
  */
 function PlayerLayoutRow() {
+  const t = useT();
   const value = useLayoutStore((s) => s.mode);
   const setValue = useLayoutStore((s) => s.setMode);
 
@@ -268,17 +278,18 @@ function PlayerLayoutRow() {
     <div className="flex flex-col">
       <SettingRow
         icon={IconLayoutFilled}
-        title="Player layout"
-        description="Choose where the now-playing card lives."
+        settingId="player-layout"
+        title={t("settings.appearance.playerLayout")}
+        description={t("settings.appearance.playerLayoutDesc")}
       />
       <div role="radiogroup" className="grid grid-cols-3 gap-3 pb-4">
-        {PLAYER_TILES.map(({ id, label, body }) => {
+        {PLAYER_TILES.map(({ id, labelKey, body }) => {
           const on = value === id;
           return (
             <LayoutTile
               key={id}
               on={on}
-              label={label}
+              label={t(labelKey)}
               onSelect={() => setValue(id)}
             >
               {body(on)}
@@ -426,12 +437,12 @@ function WindowDots() {
 
 const PLAYER_TILES: {
   id: LayoutMode;
-  label: string;
+  labelKey: string;
   body: (on: boolean) => React.ReactNode;
 }[] = [
   {
     id: "right",
-    label: "Side card",
+    labelKey: "player.sideCard",
     body: (on) => (
       <div className="flex h-full">
         <MiniSidebar />
@@ -453,7 +464,7 @@ const PLAYER_TILES: {
   },
   {
     id: "bottom",
-    label: "Bottom bar",
+    labelKey: "player.bottomBar",
     body: (on) => (
       <div className="flex h-full">
         <MiniSidebar />
@@ -484,7 +495,7 @@ const PLAYER_TILES: {
   },
   {
     id: "floating",
-    label: "Floating",
+    labelKey: "player.floatingWindow",
     body: (on) => (
       <>
         <div className="absolute inset-0 flex opacity-35">
@@ -519,6 +530,7 @@ const PLAYER_TILES: {
  * button.
  */
 function FullscreenLayoutRow() {
+  const t = useT();
   const value = useSettingsStore((s) => s.fullscreenLayout);
   const setValue = useSettingsStore((s) => s.setFullscreenLayout);
 
@@ -526,17 +538,18 @@ function FullscreenLayoutRow() {
     <div className="flex flex-col">
       <SettingRow
         icon={IconAppWindowFilled}
-        title="Fullscreen player layout"
-        description="How the now-playing screen fills the display."
+        settingId="fullscreen-layout"
+        title={t("settings.appearance.fullscreenLayout")}
+        description={t("settings.appearance.fullscreenLayoutDesc")}
       />
       <div role="radiogroup" className="grid grid-cols-3 gap-3 pb-4">
-        {FS_TILES.map(({ id, label, body }) => {
+        {FS_TILES.map(({ id, labelKey, body }) => {
           const on = value === id;
           return (
             <LayoutTile
               key={id}
               on={on}
-              label={label}
+              label={t(labelKey)}
               onSelect={() => setValue(id)}
             >
               {body}
@@ -631,12 +644,12 @@ function MiniTransport({ on }: { on: boolean }) {
 
 const FS_TILES: {
   id: FullscreenLayout;
-  label: string;
+  labelKey: string;
   body: React.ReactNode;
 }[] = [
   {
     id: "cover",
-    label: "Centered",
+    labelKey: "player.fsCentered",
     body: (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 pb-1.5 pt-2.5">
         <MiniCover />
@@ -646,7 +659,7 @@ const FS_TILES: {
   },
   {
     id: "lyrics",
-    label: "With lyrics",
+    labelKey: "player.fsWithLyrics",
     body: (
       <div className="flex min-h-0 flex-1 items-center gap-3.5 px-5 pb-1.5 pt-2.5">
         <MiniCover />
@@ -660,7 +673,7 @@ const FS_TILES: {
   },
   {
     id: "immersive",
-    label: "Immersive art",
+    labelKey: "player.fsImmersive",
     body: (
       <>
         <div className="absolute inset-0" style={{ background: DUSK_ART }} />
@@ -675,6 +688,7 @@ const FS_TILES: {
 
 /** Menu of the bundled typefaces, each entry set in its own face. */
 function InterfaceFontRow() {
+  const t = useT();
   const font = useSettingsStore((s) => s.interfaceFont);
   const setFont = useSettingsStore((s) => s.setInterfaceFont);
   const current = INTERFACE_FONTS.find((f) => f.id === font);
@@ -682,8 +696,9 @@ function InterfaceFontRow() {
   return (
     <SettingRow
       icon={IconTypography}
-      title="Interface font"
-      description="Applies to the whole app. Track and artist names use it too."
+      settingId="interface-font"
+      title={t("settings.appearance.interfaceFont")}
+      description={t("settings.appearance.interfaceFontDesc")}
       control={
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -693,7 +708,7 @@ function InterfaceFontRow() {
               style={{ fontFamily: interfaceFontStack(font) }}
             >
               <span className="min-w-0 flex-1 truncate text-left">
-                {current?.label ?? "System default"}
+                {current?.label ?? t("settings.appearance.fontSystem")}
               </span>
               <IconChevronDown className="size-3 shrink-0 text-t6" />
             </button>

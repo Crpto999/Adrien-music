@@ -1,7 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { settingSlug } from "@/components/settings/settings-index";
 
 /**
  * Shared building blocks for the settings dialog tabs — the same
@@ -25,14 +24,20 @@ export function SettingRow({
   icon: ComponentType<{ className?: string }>;
   iconClassName?: string;
   title: string;
-  /** Stable id the settings search scrolls to; defaults to the title's slug. */
-  settingId?: string;
+  /**
+   * Stable id the settings search scrolls to (`data-setting`).
+   *
+   * Required rather than derived from the title: titles are translated,
+   * so a slug of the title would change with the language and the search
+   * would stop finding its target. The ids live in `settings-index.ts`.
+   */
+  settingId: string;
   description?: ReactNode;
   control?: ReactNode;
 }) {
   return (
     <div
-      data-setting={settingId ?? settingSlug(title)}
+      data-setting={settingId}
       className="flex items-center gap-3.5 rounded-[10px] py-4"
     >
       {/* The icon sits on the same resting fill as the switch and the

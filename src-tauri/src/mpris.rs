@@ -329,7 +329,7 @@ pub fn init(app: &AppHandle) {
         Ok(conn) => {
             let _ = HANDLE.set(Handle { conn, state });
         }
-        Err(e) => eprintln!("[mpris] failed to register player: {e}"),
+        Err(e) => crate::log!("[mpris] failed to register player: {e}"),
     }
 }
 

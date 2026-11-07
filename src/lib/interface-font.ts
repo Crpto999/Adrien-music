@@ -15,6 +15,36 @@ import { useSettingsStore, type InterfaceFont } from "@/lib/store/settings";
 export const SYSTEM_FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif';
 
+/**
+ * CJK fallbacks appended to every stack.
+ *
+ * The bundled faces (Inter, Roboto, Google Sans, IBM Plex Sans) carry no
+ * CJK glyphs, so without these a Chinese UI renders its Chinese text in
+ * whatever the OS picks — which on Windows is a mismatched serif-ish
+ * fallback and looks nothing like the rest of the app.
+ *
+ * The order matters: `Microsoft YaHei` and `PingFang SC` are the UI
+ * faces on Windows and macOS respectively, and the Noto / Source Han
+ * entries cover Linux. The generic `sans-serif` at the end is the
+ * platform's last resort.
+ */
+const CJK_FALLBACKS = [
+  '"Microsoft YaHei"',
+  '"PingFang SC"',
+  '"Hiragino Sans GB"',
+  '"Noto Sans CJK SC"',
+  '"Source Han Sans SC"',
+  '"Noto Sans SC"',
+  '"WenQuanYi Micro Hei"',
+  '"Heiti SC"',
+  "sans-serif",
+].join(", ");
+
+/** A stack with the CJK fallbacks appended. */
+function withCjk(stack: string): string {
+  return `${stack}, ${CJK_FALLBACKS}`;
+}
+
 export const INTERFACE_FONTS: {
   id: InterfaceFont;
   label: string;
@@ -23,24 +53,24 @@ export const INTERFACE_FONTS: {
   {
     id: "gsans",
     label: "Google Sans",
-    stack: "'Google Sans Flex Variable', system-ui, sans-serif",
+    stack: withCjk("'Google Sans Flex Variable', system-ui, sans-serif"),
   },
   {
     id: "inter",
     label: "Inter",
-    stack: "'Inter Variable', system-ui, sans-serif",
+    stack: withCjk("'Inter Variable', system-ui, sans-serif"),
   },
   {
     id: "roboto",
     label: "Roboto",
-    stack: "'Roboto Variable', system-ui, sans-serif",
+    stack: withCjk("'Roboto Variable', system-ui, sans-serif"),
   },
   {
     id: "plex",
     label: "IBM Plex Sans",
-    stack: "'IBM Plex Sans Variable', system-ui, sans-serif",
+    stack: withCjk("'IBM Plex Sans Variable', system-ui, sans-serif"),
   },
-  { id: "system", label: "System default", stack: SYSTEM_FONT_STACK },
+  { id: "system", label: "System default", stack: withCjk(SYSTEM_FONT_STACK) },
 ];
 
 export function interfaceFontStack(id: InterfaceFont): string {

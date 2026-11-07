@@ -3,6 +3,7 @@ import { IconLoader2 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { usePlaybackStore } from "@/lib/store/playback";
 import { videoUrlFor } from "@/lib/stream";
+import { useT } from "@/lib/i18n";
 
 /** Beyond this the picture is re-seeked; below it the rate is nudged. */
 const HARD_SEEK_SEC = 0.6;
@@ -46,6 +47,7 @@ export function ImmersiveVideo({
   const activeRef = useRef<0 | 1>(0);
   const [ready, setReady] = useState(false);
   const [switching, setSwitching] = useState<number | null>(null);
+  const t = useT();
   const promotingRef = useRef(false);
   const playing = usePlaybackStore((s) => s.playing);
 
@@ -242,7 +244,9 @@ export function ImmersiveVideo({
       {!ready || switching !== null ? (
         <div className="absolute bottom-[38%] flex items-center gap-2 rounded-[10px] bg-w080 px-3.5 py-1.5 text-[12px] font-medium text-(--fs-txt2) backdrop-blur-md">
           <IconLoader2 className="size-3.5 animate-spin" />
-          {switching !== null ? `Loading ${switching}p…` : "Loading video…"}
+          {switching !== null
+            ? t("player.loadingQuality", { quality: switching })
+            : t("player.loadingVideo")}
         </div>
       ) : null}
     </div>

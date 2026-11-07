@@ -45,6 +45,7 @@ import {
   type PlaylistSortMode,
 } from "@/lib/store/playlist-sort";
 import { ErrorCard } from "@/components/shared/error-card";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/playlist/$id")({
   component: PlaylistPageView,
@@ -70,8 +71,9 @@ export const Route = createFileRoute("/playlist/$id")({
 type AnyPage = PlaylistFirstPage | PlaylistNextPage;
 
 function PlaylistPageView() {
+  const t = useT();
   const { id } = Route.useParams();
-  const { view, t, a, aid, img, from } = Route.useSearch();
+  const { view, t: title, a, aid, img, from } = Route.useSearch();
   const isArtistTopSongs = view === "top-songs";
   const openedFromArtist = from === "artist";
 
@@ -172,7 +174,7 @@ function PlaylistPageView() {
   if (query.error && !header) {
     return (
       <ErrorCard
-        title="Couldn't load playlist"
+        title={t("entity.couldNotLoadPlaylist")}
         message={query.error.message}
         onRetry={() => query.refetch()}
       />
@@ -219,7 +221,7 @@ function PlaylistPageView() {
 
   const metadataParts = [
     header.owner,
-    header.trackCount ? `${header.trackCount} songs` : undefined,
+    header.trackCount ? t("entity.songCount", { count: header.trackCount }) : undefined,
   ].filter(Boolean) as string[];
   const headerMetadata = isArtistTopSongs
     ? undefined
@@ -230,9 +232,9 @@ function PlaylistPageView() {
       <EntityHeader
         title={
           isArtistTopSongs
-            ? t || "Top songs"
+            ? title || t("playlist.topSongs")
             : openedFromArtist
-              ? t || header.title
+              ? title || header.title
               : header.title
         }
         subtitle={
@@ -289,7 +291,7 @@ function PlaylistPageView() {
               <Button
                 variant="outline"
                 size="icon"
-                aria-label="Share"
+                aria-label={t("action.share")}
                 onClick={() =>
                   void copyLink(
                     universalShareUrl(
@@ -333,8 +335,8 @@ function PlaylistPageView() {
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <IconLoader2 className="size-3 animate-spin" />
             {normalizedQuery
-              ? "Loading full playlist for search…"
-              : "Loading full playlist for sort…"}
+              ? t("playlist.loadingFullForSearch")
+              : t("playlist.loadingFullForSort")}
           </span>
         ) : null}
       </div>
@@ -343,7 +345,7 @@ function PlaylistPageView() {
 
       {normalizedQuery && visibleTracks.length === 0 && !query.hasNextPage ? (
         <div className="py-6 text-center text-sm text-muted-foreground">
-          No tracks match “{searchQuery.trim()}”.
+          {t("playlist.noTrackMatches", { query: searchQuery.trim() })}
         </div>
       ) : (
         <TrackList tracks={visibleTracks} showPlays={isArtistTopSongs} />
@@ -357,10 +359,10 @@ function PlaylistPageView() {
           {query.isFetchingNextPage ? (
             <>
               <IconLoader2 className="mr-2 size-4 animate-spin" />
-              Loading more…
+              {t("common.loading")}
             </>
           ) : (
-            <span className="sr-only">Scroll to load more</span>
+            <span className="sr-only">{t("library.scrollToLoadMore")}</span>
           )}
         </div>
       )}
@@ -439,14 +441,14 @@ function sortTracks(tracks: ShelfItem[], mode: PlaylistSortMode): ShelfItem[] {
   return copy;
 }
 
-const SORT_LABELS: Record<PlaylistSortMode, string> = {
-  default: "Date added (newest)",
-  "date-added-asc": "Date added (oldest)",
-  "title-asc": "Title (A–Z)",
-  "title-desc": "Title (Z–A)",
-  "artist-asc": "Artist (A–Z)",
-  "duration-asc": "Duration (shortest)",
-  "duration-desc": "Duration (longest)",
+const SORT_LABEL_KEYS: Record<PlaylistSortMode, string> = {
+  default: "playlist.sort.dateAddedNewest",
+  "date-added-asc": "playlist.sort.dateAddedOldest",
+  "title-asc": "playlist.sort.titleAsc",
+  "title-desc": "playlist.sort.titleDesc",
+  "artist-asc": "playlist.sort.artistAsc",
+  "duration-asc": "playlist.sort.durationAsc",
+  "duration-desc": "playlist.sort.durationDesc",
 };
 
 function SearchInput({
@@ -456,6 +458,7 @@ function SearchInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const t = useT();
   return (
     <div className="relative flex-1">
       <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -466,14 +469,14 @@ function SearchInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Search in playlist"
+        placeholder={t("search.inPlaylist")}
         className="h-8 pl-8 pr-7 text-sm"
       />
       {value ? (
         <button
           type="button"
           onClick={() => onChange("")}
-          aria-label="Clear search"
+          aria-label={t("search.clear")}
           className="absolute right-1.5 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <IconX className="size-3.5" />
@@ -492,6 +495,7 @@ function SortMenu({
   onChange: (m: PlaylistSortMode) => void;
   isLikedSongs: boolean;
 }) {
+  const t = useT();
   const options: PlaylistSortMode[] = [
     "default",
     "date-added-asc",
@@ -504,7 +508,9 @@ function SortMenu({
   // Non-Liked playlists have a server-defined order that isn't always
   // chronological — relabel "default" to something accurate.
   const labelFor = (m: PlaylistSortMode) =>
-    m === "default" && !isLikedSongs ? "Default order" : SORT_LABELS[m];
+    m === "default" && !isLikedSongs
+      ? t("playlist.sort.defaultOrder")
+      : t(SORT_LABEL_KEYS[m]);
 
   return (
     <DropdownMenu>
@@ -516,7 +522,7 @@ function SortMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
-        <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("playlist.sortBy")}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
           value={mode}

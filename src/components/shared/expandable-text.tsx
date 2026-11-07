@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const CLAMP: Record<number, string> = {
   2: "line-clamp-2",
@@ -23,6 +24,7 @@ type Props = {
  * the expanded state resets when the content changes.
  */
 export function ExpandableText({ text, lines = 3, className }: Props) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [clamped, setClamped] = useState(false);
   const ref = useRef<HTMLParagraphElement>(null);
@@ -55,7 +57,7 @@ export function ExpandableText({ text, lines = 3, className }: Props) {
           onClick={() => setExpanded((v) => !v)}
           className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground"
         >
-          {expanded ? "Show less" : "Read more"}
+          {expanded ? t("common.showLess") : t("common.readMore")}
         </button>
       ) : null}
     </div>

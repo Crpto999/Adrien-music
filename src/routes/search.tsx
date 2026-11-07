@@ -52,6 +52,7 @@ import type {
   TopResultAction,
 } from "@/lib/innertube/types";
 import { ErrorCard } from "@/components/shared/error-card";
+import { useT } from "@/lib/i18n";
 
 type SearchParams = {
   q?: string;
@@ -95,6 +96,7 @@ function useDebounced<T>(value: T, ms = 300): T {
 }
 
 function SearchPage() {
+  const t = useT();
   const { q = "", filter = "all" } = Route.useSearch();
   const [scope, setScope] = useState<Scope>("catalog");
 
@@ -119,19 +121,29 @@ function SearchPage() {
     library.isLoggedIn &&
     !library.isLoading &&
     library.matches.length > 0
-      ? `${library.matches.length} ${
-          library.matches.length === 1 ? "song" : "songs"
-        } in your library${library.truncated ? " (most recent)" : ""}`
+      ? t(
+          library.matches.length === 1
+            ? "search.libraryMatchesOne"
+            : "search.libraryMatches",
+          {
+            count: library.matches.length,
+            suffix: library.truncated ? t("search.mostRecent") : "",
+          },
+        )
       : null;
 
   return (
     <div className="flex flex-col gap-6 px-6 pb-6 pt-3">
       <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">
-          {query ? `Results for "${query}"` : "Search"}
+          {query
+            ? t("search.resultsFor", { query })
+            : t("nav.search")}
         </h1>
         {scope === "catalog" && isFetching && !isLoading ? (
-          <span className="text-xs text-muted-foreground">Searching…</span>
+          <span className="text-xs text-muted-foreground">
+            {t("search.searching")}
+          </span>
         ) : null}
       </div>
 
@@ -153,7 +165,7 @@ function SearchPage() {
         <LibraryResults state={library} query={query} />
       ) : error ? (
         <ErrorCard
-          title="Search failed"
+          title={t("search.failed")}
           message={(error as Error).message}
           onRetry={() => refetch()}
         />
@@ -175,7 +187,16 @@ function FilterChip({
   filter: SearchFilter;
   active: boolean;
 }) {
+  const t = useT();
   const navigate = useNavigate({ from: Route.fullPath });
+  const FILTER_LABEL: Record<SearchFilter, string> = {
+    all: "search.filterAll",
+    songs: "search.filterSongs",
+    albums: "search.filterAlbums",
+    artists: "search.filterArtists",
+    playlists: "search.filterPlaylists",
+    videos: "search.filterVideos",
+  };
   return (
     <button
       type="button"
@@ -190,7 +211,7 @@ function FilterChip({
           : "border-input bg-transparent text-foreground hover:bg-black/5 dark:bg-input/30 dark:hover:bg-white/15",
       )}
     >
-      {filter.charAt(0).toUpperCase() + filter.slice(1)}
+      {t(FILTER_LABEL[filter])}
     </button>
   );
 }
@@ -254,6 +275,7 @@ function ScopeToggle({
   onChange: (s: Scope) => void;
   className?: string;
 }) {
+  const t = useT();
   return (
     <div
       className={cn(
@@ -263,8 +285,8 @@ function ScopeToggle({
     >
       {(
         [
-          ["catalog", "Catalog"],
-          ["library", "My library"],
+          ["catalog", t("search.scopeCatalog")],
+          ["library", t("search.scopeLibrary")],
         ] as const
       ).map(([value, label]) => (
         <button
@@ -298,23 +320,39 @@ function ScopeToggle({
 // scrollable carousels capped to a generous preview.
 const ALL_SECTIONS: {
   filter: SearchFilter;
-  title: string;
+  titleKey: string;
   display: "list" | "card";
   cap: number;
 }[] = [
-  { filter: "songs", title: "Songs", display: "list", cap: 8 },
-  { filter: "artists", title: "Artists", display: "card", cap: 15 },
-  { filter: "albums", title: "Albums & singles", display: "card", cap: 15 },
-  { filter: "videos", title: "Videos", display: "card", cap: 15 },
+  { filter: "songs", titleKey: "searchGroup.song", display: "list", cap: 8 },
+  {
+    filter: "artists",
+    titleKey: "searchGroup.artist",
+    display: "card",
+    cap: 15,
+  },
+  {
+    filter: "albums",
+    titleKey: "searchGroup.album",
+    display: "card",
+    cap: 15,
+  },
+  {
+    filter: "videos",
+    titleKey: "searchGroup.video",
+    display: "card",
+    cap: 15,
+  },
   {
     filter: "playlists",
-    title: "Community playlists",
+    titleKey: "searchGroup.playlist",
     display: "card",
     cap: 15,
   },
 ];
 
 function AllResults({ data }: { data: SearchResults }) {
+  const t = useT();
   const { topResult, query } = data;
 
   // Per-type items from the single "all" response — the instant first paint.
@@ -349,6 +387,7 @@ function AllResults({ data }: { data: SearchResults }) {
       : source;
     return {
       ...s,
+      title: t(s.titleKey),
       items: deduped.slice(0, s.cap),
       loading: enrich[i].isLoading,
     };
@@ -362,7 +401,9 @@ function AllResults({ data }: { data: SearchResults }) {
     const enrichError = enrich.find((e) => e.isError)?.error as
       Error | undefined;
     if (!topResult && enrichError && enrich.every((e) => e.isError)) {
-      return <ErrorCard title="Search failed" message={enrichError.message} />;
+      return (
+        <ErrorCard title={t("search.failed")} message={enrichError.message} />
+      );
     }
     return <NoResults query={query} />;
   }
@@ -387,7 +428,7 @@ function AllResults({ data }: { data: SearchResults }) {
             replace
             className="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            Show all
+            {t("search.showAll")}
             <IconChevronRight className="size-4" />
           </Link>
         );
@@ -425,6 +466,7 @@ function TopResultHero({
   action?: TopResultAction;
 }) {
   const [pending, setPending] = useState(false);
+  const t = useT();
   const radius =
     item.kind === "artist" || item.kind === "album" || item.kind === "playlist"
       ? "rounded-lg"
@@ -444,7 +486,7 @@ function TopResultHero({
     try {
       const tracks = await fetchWatchQueue(action.playlistId);
       if (tracks.length) store.playShelfItems(tracks, 0);
-      else toast.error("Couldn't start playback — no tracks returned.");
+      else toast.error(t("entity.couldNotStartPlayback"));
     } catch (e) {
       toast.error(`Couldn't start playback: ${(e as Error).message}`);
     } finally {
@@ -483,7 +525,7 @@ function TopResultHero({
     ) : (
       <button
         type="button"
-        aria-label={`Play ${item.title}`}
+        aria-label={t("search.playItem", { title: item.title })}
         onClick={() => usePlaybackStore.getState().playNow(item)}
         className={cn(overlayCls, "cursor-pointer")}
       />
@@ -551,7 +593,9 @@ function TopResultHero({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="px-1 text-xl font-semibold tracking-tight">Top result</h2>
+      <h2 className="px-1 text-xl font-semibold tracking-tight">
+        {t("search.topResult")}
+      </h2>
       {item.kind === "song" || item.kind === "video" ? (
         <TrackContextMenu item={item}>{card}</TrackContextMenu>
       ) : (
@@ -685,14 +729,15 @@ function LibraryResults({
   state: LibrarySearchState;
   query: string;
 }) {
+  const t = useT();
   if (state.loggedInKnown && !state.isLoggedIn) return <LibrarySignInHint />;
   if (state.isLoading) return <TrackRowSkeletonList count={8} />;
   if (state.error)
-    return <ErrorCard title="Search failed" message={state.error.message} />;
+    return <ErrorCard title={t("search.failed")} message={state.error.message} />;
   if (state.matches.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No songs in your library match "{query}".
+        {t("search.noLibraryMatches", { query })}
       </p>
     );
   }
@@ -700,15 +745,16 @@ function LibraryResults({
 }
 
 function LibrarySignInHint() {
+  const t = useT();
   return (
     <div className="flex flex-col items-center gap-4 p-12 text-center">
       <IconLogin className="size-12 text-muted-foreground" />
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold">
-          Sign in to search your library
+          {t("search.signInToSearch")}
         </h2>
         <p className="text-sm text-muted-foreground">
-          Import your YouTube Music session to search your liked songs.
+          {t("search.signInToSearchDesc")}
         </p>
       </div>
       <button
@@ -716,7 +762,7 @@ function LibrarySignInHint() {
         onClick={() => openSettings("general")}
         className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
       >
-        Go to Settings
+        {t("action.goToSettings")}
       </button>
     </div>
   );
@@ -735,6 +781,7 @@ function SearchField({
   urlQ: string;
   className?: string;
 }) {
+  const t = useT();
   const navigate = useNavigate({ from: Route.fullPath });
 
   const [value, setValue] = useState(urlQ);
@@ -851,7 +898,7 @@ function SearchField({
         <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
-          placeholder="Search songs, albums, artists…"
+          placeholder={t("search.placeholder")}
           className="pl-9 pr-9"
           value={value}
           onChange={(e) => {
@@ -872,7 +919,7 @@ function SearchField({
         {value ? (
           <button
             type="button"
-            aria-label="Clear search"
+            aria-label={t("search.clear")}
             onClick={clear}
             className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-t5 transition-colors hover:bg-w070 hover:text-t1 focus-visible:outline-2 focus-visible:outline-ring"
           >
@@ -923,7 +970,7 @@ function SearchField({
                 inputRef.current?.blur();
               }}
             >
-              Clear search history
+              {t("search.clearHistory")}
             </button>
           </div>
         </div>
@@ -937,8 +984,11 @@ function SearchField({
 // ---------------------------------------------------------------------------
 
 function NoResults({ query }: { query: string }) {
+  const t = useT();
   return (
-    <p className="text-sm text-muted-foreground">No results for "{query}".</p>
+    <p className="text-sm text-muted-foreground">
+      {t("search.noResultsFor", { query })}
+    </p>
   );
 }
 
@@ -979,6 +1029,7 @@ function ShelfSkeleton({
  * responsive card grid (wider 16:9 cards for Videos).
  */
 function SearchSkeleton({ filter }: { filter: SearchFilter }) {
+  const t = useT();
   if (filter === "songs") return <TrackRowSkeletonList count={8} />;
   if (filter !== "all") {
     const video = filter === "videos";
@@ -1000,7 +1051,7 @@ function SearchSkeleton({ filter }: { filter: SearchFilter }) {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
         <h2 className="px-1 text-xl font-semibold tracking-tight text-muted-foreground/60">
-          Top result
+          {t("search.topResult")}
         </h2>
         {/* TopResultHero's card: cover, title and subtitle, action button. */}
         <div className="flex items-center gap-3 rounded-xl border bg-card/40 p-4 pr-5">
@@ -1019,7 +1070,7 @@ function SearchSkeleton({ filter }: { filter: SearchFilter }) {
       {ALL_SECTIONS.slice(0, 2).map((sec) => (
         <ShelfSkeleton
           key={sec.filter}
-          title={sec.title}
+          title={t(sec.titleKey)}
           display={sec.display}
         />
       ))}

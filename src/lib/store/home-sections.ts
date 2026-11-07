@@ -1,44 +1,28 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { safeLocalStorage } from "./safe-storage";
+import { homeSectionKey, HOME_SECTION_TITLES } from "@/lib/i18n/home-sections";
 
 /**
  * Seed order matching what a typical signed-in home feed shows today.
+ *
  * The home feed carries no stable server-side id per shelf (see
  * `lib/innertube/home.ts` — the client-synthesized `Shelf.id` embeds a
- * per-page cursor hash, so it changes across refreshes), so the section
- * **title string** is the only identifier we can key an ordering
- * preference on. Titles this user hasn't seen yet (new sections, or
- * dynamic ones like an artist-name shelf) get appended the first time
- * `register` sees them, so they still show up in the reorder list.
+ * per-page cursor hash, so it changes across refreshes), so a stable
+ * key has to come from somewhere else. `homeSectionKey` maps a shelf's
+ * title — in any language the API returned it — onto a canonical id
+ * (`home-sections.ts`), and the order below is that canonical list.
+ *
+ * Titles this user hasn't seen yet (new sections, or dynamic ones like
+ * an artist-name shelf) get appended the first time `register` sees
+ * them, so they still show up in the reorder list.
  */
-export const DEFAULT_HOME_SECTION_ORDER: string[] = [
-  "Listen again",
-  "New releases",
-  "Your daily discover",
-  "Forgotten favorites",
-  "Quick picks",
-  "Albums for you",
-  "R&B & soul",
-  "Music videos for you",
-  "Mixed for you",
-  "Featured playlists for you",
-  "Fresh finds",
-  "Old favorites",
-  "All-time essentials",
-  "From your library",
-  "Shows for you",
-  "Trending songs for you",
-  "From the community",
-  "Live performances",
-  "Long listen",
-  "Recaps",
-  "Charts",
-  "Covers and remixes",
-];
+export const DEFAULT_HOME_SECTION_ORDER: string[] = HOME_SECTION_TITLES.map(
+  (s) => s.id,
+);
 
 type State = {
-  /** Ordered section titles — index is the user's preferred rank. */
+  /** Ordered section keys — index is the user's preferred rank. */
   order: string[];
   /**
    * Becomes `true` the first time the user reorders a section. Gates
@@ -50,10 +34,10 @@ type State = {
   /** Move the title at `from` to `to`, splice-style (same shape as
    *  `pinned-playlists.ts`'s `reorder`). */
   reorder: (from: number, to: number) => void;
-  /** Append any titles not already known, preserving their relative
+  /** Append any keys not already known, preserving their relative
    *  order — called as the home feed loads so newly-seen or rotated
    *  sections still show up in the settings list. */
-  register: (titles: string[]) => void;
+  register: (keys: string[]) => void;
   /** Back to the seed order, and un-set `customized` so the home route
    *  goes back to plain lazy infinite scroll. */
   resetToDefault: () => void;
@@ -73,10 +57,10 @@ export const useHomeSectionsStore = create<State>()(
           next.splice(to, 0, moved);
           return { order: next, customized: true };
         }),
-      register: (titles) =>
+      register: (keys) =>
         set((s) => {
           const known = new Set(s.order);
-          const additions = titles.filter((t) => t && !known.has(t));
+          const additions = keys.filter((k) => k && !known.has(k));
           if (additions.length === 0) return s;
           return { order: [...s.order, ...additions] };
         }),
@@ -94,6 +78,22 @@ export const useHomeSectionsStore = create<State>()(
       // instead (see its doc comment for the full story).
       storage: createJSONStorage(() => safeLocalStorage),
       partialize: (s) => ({ order: s.order, customized: s.customized }),
+      /**
+       * Orders saved before the locale work were keyed on the shelf's
+       * *title*, which broke as soon as the app spoke another language
+       * (the API returns titles in the active locale). Map those old
+       * titles onto the canonical ids so an existing user's ordering
+       * survives the upgrade.
+       */
+      migrate: (persisted) => {
+        const state = persisted as { order?: unknown };
+        if (!state || !Array.isArray(state.order)) return persisted;
+        const order = (state.order as string[]).map((entry) =>
+          homeSectionKey(entry),
+        );
+        return { ...(persisted as object), order };
+      },
+      version: 1,
     },
   ),
 );

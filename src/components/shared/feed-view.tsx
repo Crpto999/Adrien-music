@@ -6,6 +6,7 @@ import { ShelfGrid } from "@/components/shared/shelf-grid";
 import { ShelfSectionSkeleton } from "@/components/shared/skeletons";
 import type { Shelf } from "@/lib/innertube/types";
 import { ErrorCard } from "@/components/shared/error-card";
+import { translate } from "@/lib/i18n";
 
 export type FeedPage = {
   shelves: Shelf[];
@@ -30,7 +31,7 @@ export function FeedView({
   queryKey,
   fetcher,
   header,
-  errorLabel = "Couldn't load feed",
+  errorLabel,
 }: Props) {
   const {
     data,
@@ -84,7 +85,7 @@ export function FeedView({
 
       {error ? (
         <ErrorCard
-          title={errorLabel}
+          title={errorLabel ?? translate("explore.couldNotLoad")}
           message={(error as Error).message}
           onRetry={() => refetch()}
         />

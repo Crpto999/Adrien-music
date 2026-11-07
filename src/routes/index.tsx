@@ -5,10 +5,12 @@ import { fetchHomeFeedPage } from "@/lib/innertube/home";
 import { ShelfCarousel } from "@/components/shared/shelf-carousel";
 import { ShelfSectionSkeleton } from "@/components/shared/skeletons";
 import { useHomeSectionsStore } from "@/lib/store/home-sections";
+import { homeSectionKey } from "@/lib/i18n/home-sections";
 import type { Shelf } from "@/lib/innertube/types";
 import { IconAlertCircle, IconLoader2, IconRefresh } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { ErrorCard } from "@/components/shared/error-card";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -24,14 +26,19 @@ export const Route = createFileRoute("/")({
  * tiebreak instead of leaving the comparator result undefined.
  */
 function sortShelvesByOrder(shelves: Shelf[], order: string[]): Shelf[] {
-  const rank = new Map(order.map((title, i) => [title, i]));
+  const rank = new Map(order.map((key, i) => [key, i]));
   return shelves
-    .map((shelf, i) => ({ shelf, i, rank: rank.get(shelf.title) ?? Infinity }))
+    .map((shelf, i) => ({
+      shelf,
+      i,
+      rank: rank.get(homeSectionKey(shelf.title)) ?? Infinity,
+    }))
     .sort((a, b) => a.rank - b.rank || a.i - b.i)
     .map((x) => x.shelf);
 }
 
 function HomePage() {
+  const t = useT();
   const qc = useQueryClient();
   const {
     data,
@@ -64,7 +71,7 @@ function HomePage() {
   // path.
   useEffect(() => {
     if (shelves.length === 0) return;
-    registerSections(shelves.map((s) => s.title));
+    registerSections(shelves.map((s) => homeSectionKey(s.title)));
   }, [shelves, registerSections]);
 
   const displayShelves = useMemo(
@@ -131,24 +138,26 @@ function HomePage() {
   return (
     <div className="flex flex-col gap-8 px-6 pb-6 pt-3">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Home</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {t("home.title")}
+        </h1>
         <button
           type="button"
           onClick={handleRefresh}
           disabled={refreshing}
-          aria-label="Refresh home feed"
+          aria-label={t("home.refresh")}
           className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-70"
         >
           <IconRefresh
             className={cn("size-3.5", refreshing && "animate-spin")}
           />
-          {refreshing ? "Refreshing…" : "Refresh"}
+          {refreshing ? t("common.loading") : t("action.refresh")}
         </button>
       </div>
 
       {error && shelves.length === 0 ? (
         <ErrorCard
-          title="Couldn't load home feed"
+          title={t("home.couldNotLoad")}
           message={(error as Error).message}
           onRetry={resetFeed}
         />
@@ -165,13 +174,15 @@ function HomePage() {
       {error && shelves.length > 0 ? (
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <IconAlertCircle className="size-4 shrink-0 text-destructive" />
-          <span>Couldn't load more — {(error as Error).message}</span>
+          <span>
+            {t("home.couldNotLoadMore", { error: (error as Error).message })}
+          </span>
           <button
             type="button"
             onClick={resetFeed}
             className="text-brand hover:underline"
           >
-            Retry
+            {t("common.retry")}
           </button>
         </div>
       ) : null}

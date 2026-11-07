@@ -25,12 +25,14 @@ import {
 } from "@/lib/innertube/playlist";
 import { openSettings } from "@/lib/store/settings-dialog";
 import { ErrorCard } from "@/components/shared/error-card";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/library")({
   component: LibraryPage,
 });
 
 function LibraryPage() {
+  const t = useT();
   const loggedIn = useQuery(authLoggedInQuery);
 
   const [tab, setTab] = useState("playlists");
@@ -41,15 +43,17 @@ function LibraryPage() {
 
   return (
     <div className="flex flex-col gap-6 px-6 pb-6 pt-3">
-      <h1 className="text-3xl font-bold tracking-tight">Library</h1>
+      <h1 className="text-3xl font-bold tracking-tight">
+        {t("library.title")}
+      </h1>
       <AnimatedTabs
         activeTab={tab}
         onChange={setTab}
         tabs={[
-          { id: "playlists", label: "Playlists" },
-          { id: "songs", label: "Songs" },
-          { id: "albums", label: "Albums" },
-          { id: "artists", label: "Artists" },
+          { id: "playlists", label: t("nav.playlists") },
+          { id: "songs", label: t("search.filterSongs") },
+          { id: "albums", label: t("search.filterAlbums") },
+          { id: "artists", label: t("search.filterArtists") },
         ]}
       />
       <div className="pt-2">
@@ -78,17 +82,21 @@ function LibraryPage() {
 }
 
 function LoggedOutState() {
+  const t = useT();
   return (
     <div className="flex flex-col items-center gap-4 p-12 text-center">
       <IconLogin className="size-12 text-muted-foreground" />
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold">Sign in to see your library</h2>
+        <h2 className="text-xl font-semibold">
+          {t("library.signInToSee")}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Import your YouTube Music session from a browser to unlock liked
-          songs, playlists, and premium-quality streams.
+          {t("library.signInToSeeDesc")}
         </p>
       </div>
-      <Button onClick={() => openSettings("general")}>Go to Settings</Button>
+      <Button onClick={() => openSettings("general")}>
+        {t("action.goToSettings")}
+      </Button>
     </div>
   );
 }
@@ -100,6 +108,7 @@ function SectionsView({
   queryKey: readonly string[];
   fetcher: () => Promise<LibrarySection[]>;
 }) {
+  const t = useT();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey,
     queryFn: fetcher,
@@ -108,14 +117,16 @@ function SectionsView({
   if (error)
     return (
       <ErrorCard
-        title="Couldn't load library"
+        title={t("entity.couldNotLoadLibrary")}
         message={(error as Error).message}
         onRetry={() => refetch()}
       />
     );
   if (isLoading) return <SectionsSkeleton />;
   if (!data || data.length === 0) {
-    return <p className="text-sm text-muted-foreground">Nothing here yet.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">{t("library.empty")}</p>
+    );
   }
 
   // Flatten all sections into a single grid. Library shelves come back with
@@ -135,6 +146,7 @@ function SectionsView({
 type AnyPage = PlaylistFirstPage | PlaylistNextPage;
 
 function LikedSongsView() {
+  const t = useT();
   const query = useInfiniteQuery<AnyPage, Error>({
     queryKey: ["library", "liked-songs-pages"],
     initialPageParam: undefined,
@@ -175,7 +187,7 @@ function LikedSongsView() {
   if (query.error && tracks.length === 0)
     return (
       <ErrorCard
-        title="Couldn't load library"
+        title={t("entity.couldNotLoadLibrary")}
         message={query.error.message}
         onRetry={() => query.refetch()}
       />
@@ -185,7 +197,9 @@ function LikedSongsView() {
   }
   if (tracks.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No liked songs yet.</p>
+      <p className="text-sm text-muted-foreground">
+        {t("library.noLikedSongs")}
+      </p>
     );
   }
 
@@ -200,10 +214,10 @@ function LikedSongsView() {
           {query.isFetchingNextPage ? (
             <>
               <IconLoader2 className="mr-2 size-4 animate-spin" />
-              Loading more…
+              {t("common.loading")}
             </>
           ) : (
-            <span className="sr-only">Scroll to load more</span>
+            <span className="sr-only">{t("library.scrollToLoadMore")}</span>
           )}
         </div>
       )}

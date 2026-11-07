@@ -33,6 +33,7 @@ import { usePlaybackStore } from "@/lib/store/playback";
 import type { QueueTrack } from "@/lib/store/playback";
 import { useScrubStore } from "@/lib/store/scrub";
 import { useSettingsStore } from "@/lib/store/settings";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const PREF_KEY = "ytm:lyrics-source";
@@ -157,11 +158,14 @@ export function LyricsBody({
   /** Full-screen sizing: bigger type, same motion. */
   large?: boolean;
 }) {
+  const t = useT();
   if (!state.hasTrack) return null;
   if (!state.enabled) return null;
   if (state.isLoading && !state.active) {
     return (
-      <p className="px-4 py-2 text-sm text-muted-foreground">Loading lyrics…</p>
+      <p className="px-4 py-2 text-sm text-muted-foreground">
+        {t("lyrics.loading")}
+      </p>
     );
   }
   if (!state.active) {
@@ -172,8 +176,9 @@ export function LyricsBody({
       return (
         <div className="flex flex-col items-start gap-2 px-4 py-2">
           <p className="text-sm text-muted-foreground">
-            Couldn&apos;t reach{" "}
-            {state.failed.map((s) => SOURCE_LABELS[s]).join(", ")}.
+            {t("lyrics.couldNotReach", {
+              sources: state.failed.map((s) => SOURCE_LABELS[s]).join(", "),
+            })}
           </p>
           <Button
             variant="secondary"
@@ -182,14 +187,14 @@ export function LyricsBody({
             disabled={state.isRetrying}
           >
             <IconRefresh className={state.isRetrying ? "animate-spin" : ""} />
-            {state.isRetrying ? "Trying…" : "Try again"}
+            {state.isRetrying ? t("lyrics.trying") : t("lyrics.tryAgain")}
           </Button>
         </div>
       );
     }
     return (
       <p className="px-4 py-2 text-sm text-muted-foreground">
-        No lyrics found.
+        {t("lyrics.notFound")}
       </p>
     );
   }
@@ -539,6 +544,7 @@ export function LyricsSourceButton({
   className?: string;
 }) {
   const { pref, setPref, best, availability, enabled, setEnabled } = state;
+  const t = useT();
 
   return (
     <DropdownMenu>
@@ -548,14 +554,14 @@ export function LyricsSourceButton({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Lyrics source"
+              aria-label={t("lyrics.source")}
               className={cn(playerIconButton, className)}
             >
               <IconMicrophoneFilled />
             </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent>Lyrics source</TooltipContent>
+        <TooltipContent>{t("lyrics.source")}</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="start" className="w-52">
         <DropdownMenuCheckboxItem
@@ -563,21 +569,21 @@ export function LyricsSourceButton({
           onCheckedChange={setEnabled}
           onSelect={(e) => e.preventDefault()}
         >
-          Show lyrics
+          {t("lyrics.showLyrics")}
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         {/* `inset` lines the label up with the `pl-8` the checkbox item
             above and the radio items below all reserve for their
             indicator, so every row in this menu starts its text at the
             same left edge instead of three different ones. */}
-        <DropdownMenuLabel inset>Lyrics source</DropdownMenuLabel>
+        <DropdownMenuLabel inset>{t("lyrics.source")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={pref}
           onValueChange={(v) => setPref(v as Pref)}
         >
           <DropdownMenuRadioItem value="auto" disabled={!enabled}>
             <span className="flex-1">
-              Auto
+              {t("lyrics.auto")}
               {best ? (
                 <span className="ml-1 text-xs text-muted-foreground">
                   ({SOURCE_LABELS[best]})

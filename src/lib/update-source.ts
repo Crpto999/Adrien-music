@@ -88,10 +88,19 @@ export function useUpdateSource() {
 export type SystemUpdateGuidance = {
   /** Short channel label: "AUR", "package manager". */
   channel: string;
+  /**
+   * i18n key for the channel label, so the label reads in the app's
+   * language ("package manager" → "系统包管理器").
+   */
+  channelLabelKey: string;
   /** One-line explanation for the About footer / banner sub. */
   blurb: string;
+  /** i18n key for the one-line explanation. */
+  blurbKey: string;
   /** Action button label. */
   actionLabel: string;
+  /** i18n key for the action button label. */
+  actionLabelKey: string;
   /** Set for AUR (copied); otherwise the Releases page is opened. */
   command?: string;
 };
@@ -109,14 +118,20 @@ export function systemUpdateGuidance(
     const command = aurUpdateCmd(helper);
     return {
       channel: "AUR",
+      channelLabelKey: "update.channelAur",
       blurb: `Installed via the AUR — refresh it with ${command}.`,
+      blurbKey: "update.blurbAur",
       actionLabel: "Copy command",
+      actionLabelKey: "update.copyCommand",
       command,
     };
   }
   return {
     channel: "package manager",
+    channelLabelKey: "update.channelPackageManager",
     blurb: "Installed as a system package — grab the new release below.",
+    blurbKey: "update.blurbPackage",
     actionLabel: "Releases",
+    actionLabelKey: "update.releases",
   };
 }

@@ -29,6 +29,7 @@ import { findAlternateVideoId } from "@/lib/innertube/alternate-source";
 import { useTrackSourceStore, type SourceKind } from "@/lib/store/track-source";
 import type { QueueTrack } from "@/lib/store/playback";
 import type { ShelfItem } from "@/lib/innertube/types";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   track: QueueTrack | undefined;
@@ -70,6 +71,7 @@ export function PlayerMoreMenu({
   side = "top",
   className,
 }: Props) {
+  const t = useT();
   const item: ShelfItem = track
     ? {
         kind: "song",
@@ -93,7 +95,7 @@ export function PlayerMoreMenu({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="More"
+                aria-label={t("common.moreActions")}
                 disabled={!track}
                 // The design draws this one a hair smaller than its
                 // neighbours — three dots read heavy at 17px.
@@ -103,14 +105,14 @@ export function PlayerMoreMenu({
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>More</TooltipContent>
+          <TooltipContent>{t("common.more")}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align={align} side={side} className="w-56">
           {track ? (
             <>
               {includeSource ? (
                 <>
-                  <DropdownMenuLabel>Source</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t("player.source")}</DropdownMenuLabel>
                   <SourceMenuItems track={track} />
                   <DropdownMenuSeparator />
                 </>
@@ -142,6 +144,7 @@ export function PlayerMoreMenu({
  * `findAlternateVideoId` lookup — the menu form is just less wide.
  */
 function SourceMenuItems({ track }: { track: QueueTrack }) {
+  const t = useT();
   const record = useTrackSourceStore((s) => s.byVideoId[track.videoId]);
   const setSelected = useTrackSourceStore((s) => s.setSelected);
   const setAlternate = useTrackSourceStore((s) => s.setAlternate);
@@ -167,8 +170,8 @@ function SourceMenuItems({ track }: { track: QueueTrack }) {
       if (!altId) {
         toast.error(
           target === "video"
-            ? "No video version found"
-            : "No song version found",
+            ? t("player.noVideoVersionFound")
+            : t("player.noSongVersionFound"),
         );
         return;
       }
@@ -195,7 +198,7 @@ function SourceMenuItems({ track }: { track: QueueTrack }) {
         ) : (
           <IconMusicFilled className="size-4" />
         )}
-        <span className="flex-1">Song</span>
+        <span className="flex-1">{t("player.song")}</span>
         {selected === "song" ? (
           <IconCheck className="size-4" stroke={2.4} />
         ) : null}
@@ -212,7 +215,7 @@ function SourceMenuItems({ track }: { track: QueueTrack }) {
         ) : (
           <IconVideoFilled className="size-4" />
         )}
-        <span className="flex-1">Video</span>
+        <span className="flex-1">{t("player.video")}</span>
         {selected === "video" ? (
           <IconCheck className="size-4" stroke={2.4} />
         ) : null}

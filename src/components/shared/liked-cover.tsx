@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 
 type CoverArt = {
   label: string;
+  /** i18n key for the label, so the picker can localise it. */
+  labelKey: string;
   /** Any CSS `background` shorthand, including theme-aware layers. */
   bg: string;
   /** Two of them are glass and read the wash behind the panel. */
@@ -29,6 +31,7 @@ type CoverArt = {
 export const LIKED_COVERS: Record<LikedCoverPreset, CoverArt> = {
   theme: {
     label: "Theme",
+    labelKey: "theme.title",
     bg: "radial-gradient(120% 100% at 0% 0%, rgba(var(--acc1rgb),0.10), transparent 65%), linear-gradient(145deg, var(--w090), var(--w020)), var(--surface)",
     ring: "var(--w100)",
     fill: "var(--t2)",
@@ -36,18 +39,21 @@ export const LIKED_COVERS: Record<LikedCoverPreset, CoverArt> = {
   },
   ytubic: {
     label: "YTubic",
+    labelKey: "app.name",
     bg: "radial-gradient(130% 110% at 22% 12%,#FF5F79,#E8214C 34%,#8E1230 68%,#2A0913)",
     ring: "var(--w140)",
     fill: "rgba(255,255,255,0.94)",
   },
   default: {
     label: "Classic",
+    labelKey: "cover.classic",
     bg: "linear-gradient(150deg,#6C4BFF 0%,#C93BC0 55%,#FF4E7A 100%)",
     ring: "var(--w120)",
     fill: "rgba(255,255,255,0.92)",
   },
   clear: {
     label: "Clear",
+    labelKey: "cover.clear",
     bg: "var(--w055)",
     blur: "blur(18px)",
     ring: "var(--w120)",
@@ -55,6 +61,7 @@ export const LIKED_COVERS: Record<LikedCoverPreset, CoverArt> = {
   },
   glow: {
     label: "Glow",
+    labelKey: "cover.glow",
     bg: "radial-gradient(150% 130% at 100% 84%, rgba(250,31,75,0.3) 0%, rgba(250,31,75,0.16) 32%, rgba(250,31,75,0.05) 62%, var(--w040) 100%)",
     blur: "blur(18px)",
     ring: "var(--w120)",

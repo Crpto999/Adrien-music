@@ -1,4 +1,5 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { proxyOptions } from "@/lib/proxy";
 
 /**
  * Shared request plumbing for the lyrics providers, with one job: keep the
@@ -138,6 +139,7 @@ export async function lyricsFetch(
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: deadline.signal,
+      ...proxyOptions(),
     });
   } catch (e) {
     if (deadline.timedOut()) throw new LyricsTimeoutError(PROVIDER_TIMEOUT_MS);

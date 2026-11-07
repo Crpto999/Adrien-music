@@ -161,7 +161,7 @@ pub async fn ensure(app: tauri::AppHandle) {
 
     match download(&managed).await {
         Ok(()) => {
-            eprintln!("[ytdlp] downloaded managed binary to {managed:?}");
+            crate::log!("[ytdlp] downloaded managed binary to {managed:?}");
             touch_update_stamp(&managed);
             #[cfg(target_os = "macos")]
             {
@@ -171,7 +171,7 @@ pub async fn ensure(app: tauri::AppHandle) {
             emit_state(&app, "ready", None);
         }
         Err(e) => {
-            eprintln!("[ytdlp] download failed: {e}");
+            crate::log!("[ytdlp] download failed: {e}");
             if !path_works {
                 emit_state(&app, "error", Some(e));
             }
@@ -216,7 +216,13 @@ async fn download(managed: &Path) -> Result<(), String> {
     let _ = tokio::fs::remove_file(&part).await;
 
     let fetch = async {
-        let resp = reqwest::get(DOWNLOAD_URL)
+        // The self-update download goes through the user's proxy like
+        // every other outbound request.
+        let client = crate::proxy::build_client(reqwest::Client::builder())
+            .map_err(|e| format!("client: {e}"))?;
+        let resp = client
+            .get(DOWNLOAD_URL)
+            .send()
             .await
             .map_err(|e| format!("request: {e}"))?
             .error_for_status()
@@ -363,8 +369,8 @@ async fn sweep_legacy_onefile(managed: &Path) {
         return;
     }
     match tokio::fs::remove_file(&legacy).await {
-        Ok(()) => eprintln!("[ytdlp] removed the superseded single-file copy"),
-        Err(e) => eprintln!("[ytdlp] could not remove {legacy:?}: {e}"),
+        Ok(()) => crate::log!("[ytdlp] removed the superseded single-file copy"),
+        Err(e) => crate::log!("[ytdlp] could not remove {legacy:?}: {e}"),
     }
 }
 
@@ -382,7 +388,7 @@ fn prewarm(managed: &Path) {
             .map(|s| s.success())
             .unwrap_or(false);
         if ok {
-            eprintln!("[ytdlp] warmed in {:.1}s", started.elapsed().as_secs_f32());
+            crate::log!("[ytdlp] warmed in {:.1}s", started.elapsed().as_secs_f32());
         }
     });
 }
@@ -435,14 +441,14 @@ async fn maybe_self_update(managed: &Path) {
 #[cfg(target_os = "macos")]
 async fn update_bundle(managed: &Path) {
     let Some(latest) = latest_release_tag().await else {
-        eprintln!("[ytdlp] could not read the latest release tag; keeping the current copy");
+        crate::log!("[ytdlp] could not read the latest release tag; keeping the current copy");
         return;
     };
     let installed = installed_version(managed).await;
     if installed.as_deref() == Some(latest.as_str()) {
         return;
     }
-    eprintln!(
+    crate::log!(
         "[ytdlp] updating {} -> {latest}",
         installed.as_deref().unwrap_or("unknown")
     );
@@ -450,10 +456,10 @@ async fn update_bundle(managed: &Path) {
         // The freshly unpacked dylibs are cold again, so warm them now
         // rather than on the next track the user plays.
         Ok(()) => {
-            eprintln!("[ytdlp] updated to {latest}");
+            crate::log!("[ytdlp] updated to {latest}");
             prewarm(managed);
         }
-        Err(e) => eprintln!("[ytdlp] update failed: {e}"),
+        Err(e) => crate::log!("[ytdlp] update failed: {e}"),
     }
 }
 
@@ -462,7 +468,8 @@ async fn update_bundle(managed: &Path) {
 /// limit — the same reason the download URLs above go through
 /// `latest/download/`.
 async fn latest_release_tag() -> Option<String> {
-    let resp = reqwest::Client::new()
+    let resp = crate::proxy::build_client(reqwest::Client::builder())
+        .ok()?
         .head("https://github.com/yt-dlp/yt-dlp/releases/latest")
         .send()
         .await
@@ -519,13 +526,13 @@ async fn run_self_update(managed: &Path) {
                     .rev()
                     .find(|l| !l.trim().is_empty())
                     .unwrap_or("");
-                eprintln!("[ytdlp] self-update ({}): {line}", out.status);
+                crate::log!("[ytdlp] self-update ({}): {line}", out.status);
             }
-            Err(e) => eprintln!("[ytdlp] self-update spawn failed: {e}"),
+            Err(e) => crate::log!("[ytdlp] self-update spawn failed: {e}"),
         }
     };
     if tokio::time::timeout(UPDATE_TIMEOUT, run).await.is_err() {
-        eprintln!("[ytdlp] self-update timed out");
+        crate::log!("[ytdlp] self-update timed out");
     }
 
     // `-U` reports its own success and can still leave the old copy in
@@ -540,10 +547,10 @@ async fn run_self_update(managed: &Path) {
     if installed_version(managed).await.as_deref() == Some(latest.as_str()) {
         return;
     }
-    eprintln!("[ytdlp] self-update left us behind {latest}; re-downloading");
+    crate::log!("[ytdlp] self-update left us behind {latest}; re-downloading");
     match download(managed).await {
-        Ok(()) => eprintln!("[ytdlp] re-downloaded {latest}"),
-        Err(e) => eprintln!("[ytdlp] re-download failed: {e}"),
+        Ok(()) => crate::log!("[ytdlp] re-downloaded {latest}"),
+        Err(e) => crate::log!("[ytdlp] re-download failed: {e}"),
     }
 }
 

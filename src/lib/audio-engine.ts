@@ -21,6 +21,7 @@ import { useDiscordStore, isDiscordConfigured } from "@/lib/store/discord";
 import { resolveStreamId, useTrackSourceStore } from "@/lib/store/track-source";
 import { pickThumbnail } from "@/components/shared/thumbnail";
 import { IS_LINUX, IS_WINDOWS } from "@/lib/platform";
+import { translate } from "@/lib/i18n";
 // Fork note: Discord/track-meta/playback-position/shuffle restores deferred
 // to a follow-up (see next commit) to keep this port reviewable. Premium
 // gate already removed above.
@@ -638,7 +639,7 @@ export function useAudioEngine() {
         to.removeAttribute("src");
         to.load();
         toast.error(
-          "Couldn't load that version, still playing the current one",
+          translate("toast.couldNotLoadVersionStillPlaying"),
         );
       };
       streamUrlFor(newId)

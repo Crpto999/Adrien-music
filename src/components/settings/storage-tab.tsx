@@ -51,6 +51,7 @@ import {
 import type { ShelfItem } from "@/lib/innertube/types";
 import { authLoggedInQuery } from "@/lib/store/auth-queries";
 import { ArtworkOutline } from "@/components/shared/artwork-outline";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export function StorageTab() {
@@ -106,6 +107,7 @@ function StatCard({
  * groups below use, so react-query dedupes the actual Tauri calls.
  */
 function StorageStats() {
+  const t = useT();
   const cache = useQuery({
     queryKey: ["cache-list"],
     queryFn: () => invoke<CacheEntry[]>("list_cache"),
@@ -125,17 +127,17 @@ function StorageStats() {
     <div className="grid grid-cols-3 gap-3 pb-4">
       <StatCard
         icon={IconMusicFilled}
-        label="Cached tracks"
+        label={t("settings.storage.cachedTracks")}
         value={cache.data ? String(cache.data.length) : "…"}
       />
       <StatCard
         icon={IconDatabaseFilled}
-        label="Used by tracks"
+        label={t("settings.storage.usedByTracks")}
         value={cache.data ? formatBytes(trackBytes) : "…"}
       />
       <StatCard
         icon={IconPhotoFilled}
-        label="Used by covers"
+        label={t("settings.storage.usedByCovers")}
         value={covers.data ? formatBytes(covers.data.bytes) : "…"}
       />
     </div>
@@ -154,6 +156,7 @@ type CacheDirInfo = {
 };
 
 function CacheFolderGroup() {
+  const t = useT();
   const qc = useQueryClient();
   const info = useQuery({
     queryKey: ["cache-dir"],
@@ -165,10 +168,9 @@ function CacheFolderGroup() {
     try {
       await invoke("set_cache_dir", { path });
       await qc.invalidateQueries({ queryKey: ["cache-dir"] });
-      toast.success("Cache folder updated", {
-        description:
-          "Existing files stay where they are; new downloads use the new folder after a restart.",
-        action: { label: "Restart now", onClick: () => void relaunch() },
+      toast.success(t("toast.cacheFolderUpdated"), {
+        description: t("settings.storage.cacheFolderRestartHint"),
+        action: { label: t("settings.storage.restartNow"), onClick: () => void relaunch() },
       });
     } catch (e) {
       toast.error(String(e));
@@ -187,7 +189,8 @@ function CacheFolderGroup() {
     <Group>
       <SettingRow
         icon={IconFolderFilled}
-        title="Cache folder"
+        settingId="cache-folder"
+        title={t("settings.storage.cacheFolder")}
         description={
           info.data ? (
             <span className="break-all">
@@ -195,7 +198,7 @@ function CacheFolderGroup() {
               {info.data.needsRestart ? (
                 <span className="text-amber-600 dark:text-amber-400">
                   {" "}
-                  · restart required
+                  · {t("settings.storage.restartRequired")}
                 </span>
               ) : null}
             </span>
@@ -211,12 +214,12 @@ function CacheFolderGroup() {
                 size="sm"
                 onClick={() => void apply(null)}
               >
-                Reset
+                {t("common.reset")}
               </Button>
             ) : null}
             <Button variant="outline" size="sm" onClick={() => void change()}>
               <IconFolderOpen />
-              Change
+              {t("common.change")}
             </Button>
           </div>
         }
@@ -233,7 +236,7 @@ const GB = 1024 ** 3;
 
 // Presets for the storage-limit picker. `0` = unlimited. Kept in sync
 // with the Rust default (5 GiB) so a fresh install lands on a preset.
-const CACHE_LIMIT_OPTIONS: { label: string; bytes: number }[] = [
+const CACHE_LIMIT_PRESETS: { label: string; bytes: number }[] = [
   { label: "512 MB", bytes: 512 * 1024 * 1024 },
   { label: "1 GB", bytes: 1 * GB },
   { label: "2 GB", bytes: 2 * GB },
@@ -241,10 +244,18 @@ const CACHE_LIMIT_OPTIONS: { label: string; bytes: number }[] = [
   { label: "10 GB", bytes: 10 * GB },
   { label: "25 GB", bytes: 25 * GB },
   { label: "50 GB", bytes: 50 * GB },
-  { label: "Unlimited", bytes: 0 },
+  { label: "", bytes: 0 },
 ];
 
+/** The preset list, with the "Unlimited" entry labelled for the locale. */
+const cacheLimitOptions = (t: (key: string) => string) =>
+  CACHE_LIMIT_PRESETS.map((o) => ({
+    ...o,
+    label: o.bytes === 0 ? t("settings.storage.unlimited") : o.label,
+  }));
+
 function StorageLimitGroup() {
+  const t = useT();
   const qc = useQueryClient();
   const cache = useQuery({
     queryKey: ["cache-list"],
@@ -266,8 +277,8 @@ function StorageLimitGroup() {
       await qc.invalidateQueries({ queryKey: ["cache-list"] });
       toast.success(
         bytes === 0
-          ? "Storage limit removed"
-          : `Storage limit set to ${formatBytes(bytes)}`,
+          ? t("settings.storage.limitRemoved")
+          : t("settings.storage.limitSetTo", { size: formatBytes(bytes) }),
       );
     } catch (e) {
       toast.error(String(e));
@@ -275,7 +286,7 @@ function StorageLimitGroup() {
   };
 
   const current =
-    CACHE_LIMIT_OPTIONS.find((o) => o.bytes === limit)?.label ??
+    cacheLimitOptions(t).find((o) => o.bytes === limit)?.label ??
     formatBytes(limit);
 
   return (
@@ -283,11 +294,17 @@ function StorageLimitGroup() {
       <div className="flex flex-col">
         <SettingRow
           icon={IconGaugeFilled}
-          title="Storage limit"
+          settingId="storage-limit"
+          title={t("settings.storage.storageLimit")}
           description={
             limit === 0
-              ? `Unlimited · using ${formatBytes(totalBytes)}`
-              : `Using ${formatBytes(totalBytes)} of ${formatBytes(limit)}`
+              ? t("settings.storage.unlimitedUsing", {
+                  size: formatBytes(totalBytes),
+                })
+              : t("settings.storage.usingOf", {
+                  used: formatBytes(totalBytes),
+                  total: formatBytes(limit),
+                })
           }
           control={
             <DropdownMenu>
@@ -306,7 +323,7 @@ function StorageLimitGroup() {
                   value={String(limit)}
                   onValueChange={(v) => void setLimit(Number(v))}
                 >
-                  {CACHE_LIMIT_OPTIONS.map((o) => (
+                  {cacheLimitOptions(t).map((o) => (
                     <DropdownMenuRadioItem
                       key={o.bytes}
                       value={String(o.bytes)}
@@ -346,20 +363,15 @@ type CacheEntry = {
 type FilterMode = "all" | "library" | "other";
 type SortMode = "newest" | "oldest" | "largest";
 
-const SORT_LABELS: Record<SortMode, string> = {
-  newest: "Newest",
-  oldest: "Oldest",
-  largest: "Largest",
-};
-
-const AUTO_CLEAN_OPTIONS: { value: CacheAutoCleanPeriod; label: string }[] = [
-  { value: "off", label: "Off" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
+const AUTO_CLEAN_PRESETS: { value: CacheAutoCleanPeriod; labelKey: string }[] = [
+  { value: "off", labelKey: "settings.storage.cleanOff" },
+  { value: "daily", labelKey: "settings.storage.cleanDaily" },
+  { value: "weekly", labelKey: "settings.storage.cleanWeekly" },
+  { value: "monthly", labelKey: "settings.storage.cleanMonthly" },
 ];
 
 function AutoCleanRow({ loggedIn }: { loggedIn: boolean }) {
+  const t = useT();
   const period = useSettingsStore((s) => s.cacheAutoClean);
   const setPeriod = useSettingsStore((s) => s.setCacheAutoClean);
   const lastCleanAt = useSettingsStore((s) => s.lastCacheCleanAt);
@@ -371,23 +383,29 @@ function AutoCleanRow({ loggedIn }: { loggedIn: boolean }) {
   // fixed clock time, so we say "due" instead of showing a stale date.
   const description = (() => {
     if (period === "off") return undefined;
-    if (!loggedIn) return "Sign in to enable automatic clean-up.";
+    if (!loggedIn) return t("settings.storage.cleanSignInHint");
     const nextAt = lastCleanAt + AUTO_CLEAN_PERIOD_MS[period];
     if (!lastCleanAt || nextAt <= Date.now())
-      return "Next clean-up is due — runs on the next check.";
-    return `Next clean-up ${formatDateTime(nextAt)}`;
+      return t("settings.storage.cleanDueSoon");
+    return t("settings.storage.cleanNextAt", {
+      time: formatDateTime(nextAt),
+    });
   })();
 
   return (
     <SettingRow
       icon={IconCalendarFilled}
-      title="Auto-clean tracks not in library"
+      settingId="auto-clean"
+      title={t("settings.storage.autoClean")}
       description={description}
       control={
         <SegmentedControl
           value={period}
           onChange={setPeriod}
-          options={AUTO_CLEAN_OPTIONS}
+          options={AUTO_CLEAN_PRESETS.map((o) => ({
+            value: o.value,
+            label: t(o.labelKey),
+          }))}
           disabled={!loggedIn}
         />
       }
@@ -396,6 +414,7 @@ function AutoCleanRow({ loggedIn }: { loggedIn: boolean }) {
 }
 
 function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
+  const t = useT();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<FilterMode>("all");
   const [sort, setSort] = useState<SortMode>("newest");
@@ -547,7 +566,12 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
       // Drop the in-memory prefetch log: anything we'd previously marked as
       // "warm" might now be gone from disk and should be re-prefetchable.
       clearPrefetchMemo();
-      toast.success(`${label} — freed ${formatBytes(freed)}`);
+      toast.success(
+        t("settings.storage.deletedFreed", {
+          action: label,
+          size: formatBytes(freed),
+        }),
+      );
     } catch (e) {
       toast.error(String(e));
     }
@@ -555,7 +579,7 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
 
   const deleteOne = async (id: string) => {
     setPending((p) => new Set(p).add(id));
-    await deleteEntries([id], "Removed");
+    await deleteEntries([id], t("settings.storage.removed"));
     setPending((p) => {
       const n = new Set(p);
       n.delete(id);
@@ -567,14 +591,15 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
     if (!cache.data?.length) return;
     if (
       !confirm(
-        `Delete all ${cache.data.length} cached tracks (${formatBytes(
-          totalBytes,
-        )})? Tracks from your library will be removed too.`,
+        t("settings.storage.confirmDeleteAll", {
+          count: cache.data.length,
+          size: formatBytes(totalBytes),
+        }),
       )
     )
       return;
     setBulkBusy(true);
-    await deleteEntries([], "Cleared cache");
+    await deleteEntries([], t("settings.storage.clearedCache"));
     setBulkBusy(false);
   };
 
@@ -583,17 +608,17 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
       .filter((e) => !libraryMeta.has(e.videoId))
       .map((e) => e.videoId);
     if (!ids.length) {
-      toast.info("Nothing to clear — everything cached is in your library.");
+      toast.info(t("toast.nothingToClear"));
       return;
     }
     if (
       !confirm(
-        `Delete ${ids.length} cached tracks that aren't in your library?`,
+        t("settings.storage.confirmDeleteOthers", { count: ids.length }),
       )
     )
       return;
     setBulkBusy(true);
-    await deleteEntries(ids, "Cleared non-library tracks");
+    await deleteEntries(ids, t("settings.storage.clearedOthers"));
     setBulkBusy(false);
   };
 
@@ -608,7 +633,7 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
         </div>
         <div className="min-w-0 flex-1">
           <span className="text-sm font-semibold leading-none text-t2">
-            Cached tracks
+            {t("settings.storage.cachedTracks")}
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -618,7 +643,7 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
             onClick={clearAll}
             disabled={bulkBusy || !cache.data?.length}
           >
-            Clear all
+            {t("settings.storage.clearAll")}
           </Button>
           <Button
             variant="outline"
@@ -634,7 +659,7 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
             ) : (
               <IconTrash />
             )}
-            Clear others
+            {t("settings.storage.clearOthers")}
           </Button>
         </div>
       </div>
@@ -643,9 +668,9 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search cached tracks by title or artist…"
+          placeholder={t("settings.storage.searchCachedTracksPlaceholder")}
           className="h-9 ps-8"
-          aria-label="Search cached tracks"
+          aria-label={t("settings.storage.searchCachedTracks")}
         />
       </div>
       {/* Filter toggle + sort share the second row. The toggle
@@ -659,12 +684,18 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
               value={filter}
               onChange={setFilter}
               options={[
-                { value: "all", label: `All (${cache.data?.length ?? 0})` },
+                {
+                  value: "all",
+                  label: `${t("settings.storage.filterAll")} (${cache.data?.length ?? 0})`,
+                },
                 {
                   value: "library",
-                  label: `In library (${inLibraryCount})`,
+                  label: `${t("settings.storage.inLibrary")} (${inLibraryCount})`,
                 },
-                { value: "other", label: `Other (${otherCount})` },
+                {
+                  value: "other",
+                  label: `${t("settings.storage.filterOther")} (${otherCount})`,
+                },
               ]}
             />
           </div>
@@ -675,7 +706,7 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
               <IconSortDescending />
-              {SORT_LABELS[sort]}
+              {t(`settings.storage.sort.${sort}`)}
               <IconChevronDown className="opacity-50" />
             </Button>
           </DropdownMenuTrigger>
@@ -685,13 +716,13 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
               onValueChange={(v) => setSort(v as SortMode)}
             >
               <DropdownMenuRadioItem value="newest">
-                Newest first
+                {t("settings.storage.sortNewestFirst")}
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="oldest">
-                Oldest first
+                {t("settings.storage.sortOldestFirst")}
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="largest">
-                Largest first
+                {t("settings.storage.sortLargestFirst")}
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
@@ -713,17 +744,17 @@ function CacheGroup({ loggedIn }: { loggedIn: boolean }) {
         <div className="flex flex-col divide-y divide-border/50">
           {cache.isLoading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
-              Loading…
+              {t("common.loading")}
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               {cache.isError
-                ? "Couldn't read the cache folder."
+                ? t("settings.storage.couldNotReadCache")
                 : cache.data?.length === 0
-                  ? "Cache is empty — tracks land here as you play them."
+                  ? t("settings.storage.cacheEmpty")
                   : search.trim()
-                    ? "No tracks match your search."
-                    : "No tracks match this filter."}
+                    ? t("settings.storage.noSearchMatches")
+                    : t("settings.storage.noFilterMatches")}
             </div>
           ) : (
             filtered.map((entry) => (
@@ -756,6 +787,7 @@ function CacheRow({
   isDeleting: boolean;
   onDelete: () => void;
 }) {
+  const t = useT();
   // YouTube publishes thumbnails for every videoId on a public CDN, so we
   // can render one without needing a real API round-trip just to draw
   // this row.
@@ -801,8 +833,8 @@ function CacheRow({
           {inLibrary && (
             <Badge
               variant="secondary"
-              title="In library"
-              aria-label="In library"
+              title={t("settings.storage.inLibrary")}
+              aria-label={t("settings.storage.inLibrary")}
               // Icon-only chip; px-1 tightens the now text-less pill so
               // it isn't mostly padding. Meaning is carried by the
               // title/aria-label instead of a visible caption.
@@ -814,7 +846,7 @@ function CacheRow({
         </div>
         <div className="truncate text-xs text-muted-foreground">
           {subtitle ? `${subtitle} · ` : ""}
-          {formatRelative(entry.modifiedSecs)}
+          {formatRelative(entry.modifiedSecs, t)}
         </div>
       </div>
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -825,7 +857,7 @@ function CacheRow({
         size="icon"
         onClick={onDelete}
         disabled={isDeleting}
-        aria-label="Delete cached track"
+        aria-label={t("settings.storage.deleteCachedTrack")}
         className="text-muted-foreground hover:text-destructive"
       >
         {isDeleting ? (
@@ -843,6 +875,7 @@ function CacheRow({
 /* ------------------------------------------------------------------ */
 
 function CoverCacheGroup() {
+  const t = useT();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
 
@@ -857,9 +890,10 @@ function CoverCacheGroup() {
     if (!stats.data?.count) return;
     if (
       !confirm(
-        `Delete ${stats.data.count} cached cover image${
-          stats.data.count === 1 ? "" : "s"
-        } (${formatBytes(stats.data.bytes)})?`,
+        t("settings.storage.confirmDeleteCovers", {
+          count: stats.data.count,
+          size: formatBytes(stats.data.bytes),
+        }),
       )
     )
       return;
@@ -867,7 +901,11 @@ function CoverCacheGroup() {
     try {
       const freed = await invoke<number>("clear_cover_cache");
       await qc.invalidateQueries({ queryKey: ["cover-cache-stats"] });
-      toast.success(`Cover cache cleared — freed ${formatBytes(freed)}`);
+      toast.success(
+        t("settings.storage.coverCacheCleared", {
+          size: formatBytes(freed),
+        }),
+      );
     } catch (e) {
       toast.error(String(e));
     } finally {
@@ -879,7 +917,8 @@ function CoverCacheGroup() {
     <Group>
       <SettingRow
         icon={IconPhotoFilled}
-        title="Cover art cache"
+        settingId="cover-art-cache"
+        title={t("settings.storage.coverArtCache")}
         control={
           // Counts live in the stat cards up top — the row keeps just
           // the action.
@@ -890,7 +929,7 @@ function CoverCacheGroup() {
             disabled={busy || !stats.data?.count}
           >
             {busy ? <IconLoader2 className="animate-spin" /> : <IconTrash />}
-            Clear
+            {t("common.clear")}
           </Button>
         }
       />

@@ -84,7 +84,7 @@ pub fn init(app: &AppHandle) {
         let mut controls = match MediaControls::new(config) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("[media] failed to create OS media controls: {e:?}");
+                crate::log!("[media] failed to create OS media controls: {e:?}");
                 return;
             }
         };
@@ -111,7 +111,7 @@ pub fn init(app: &AppHandle) {
             }
         });
         if let Err(e) = attached {
-            eprintln!("[media] failed to attach media controls: {e:?}");
+            crate::log!("[media] failed to attach media controls: {e:?}");
             return;
         }
 

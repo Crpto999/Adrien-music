@@ -2,6 +2,7 @@ import { m, useReducedMotion } from "motion/react";
 import { type ReactNode, useCallback, useId, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 export interface AnimatedTabsProps {
   activeTab?: string;
@@ -28,6 +29,7 @@ export function AnimatedTabs({
   layoutId: customLayoutId,
   className,
 }: AnimatedTabsProps) {
+  const t = useT();
   const shouldReduceMotion = useReducedMotion();
   const generatedId = useId();
   const layoutId = customLayoutId ?? `animated-tabs-${generatedId}`;
@@ -124,7 +126,7 @@ export function AnimatedTabs({
 
   return (
     <div
-      aria-label="Tabs"
+      aria-label={t("common.tabs")}
       className={cn(baseContainerStyles, className)}
       role="tablist"
     >

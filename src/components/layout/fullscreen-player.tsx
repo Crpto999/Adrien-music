@@ -53,6 +53,7 @@ import {
 import { PlayerMoreMenu } from "@/components/layout/player-more-menu";
 import { QueuePopover } from "@/components/layout/queue-panel";
 import { LyricsSourceButton } from "@/components/layout/lyrics-view";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useFullscreenStore } from "@/lib/store/fullscreen";
 import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
@@ -112,6 +113,7 @@ const sideButton = (on: boolean) =>
 /* ------------------------------------------------------------------ */
 
 function FullscreenView({ track }: { track: QueueTrack }) {
+  const t = useT();
   const setOpen = useFullscreenStore((s) => s.setOpen);
   const layout = useSettingsStore((s) => s.fullscreenLayout);
   const setLayout = useSettingsStore((s) => s.setFullscreenLayout);
@@ -227,7 +229,9 @@ function FullscreenView({ track }: { track: QueueTrack }) {
             onFail={(reason) => {
               setFailedId(streamId);
               console.error("[video] failed:", streamId, reason);
-              toast.error("Couldn't load the video", { description: reason });
+              toast.error(t("player.couldNotLoadVideo"), {
+                description: reason,
+              });
             }}
           />
         ) : null}
@@ -261,11 +265,12 @@ function FullscreenView({ track }: { track: QueueTrack }) {
           <div className="flex shrink-0 items-center gap-2.5">
             <div
               role="radiogroup"
-              aria-label="Full screen layout"
+              aria-label={t("player.fullScreenLayout")}
               className="flex gap-0.5 rounded-[10px] border border-w080 bg-w070 p-[3px]"
             >
-              {LAYOUTS.map(({ value, label, Icon }) => {
+              {LAYOUTS.map(({ value, labelKey, Icon }) => {
                 const on = shown === value;
+                const label = t(labelKey);
                 // Lyrics master switch lives in Settings; tapping "With
                 // lyrics" while it is off turns it back on instead of
                 // dead-clicking back to the cover view.
@@ -277,7 +282,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
                         type="button"
                         role="radio"
                         aria-checked={on}
-                        aria-label={wakesLyrics ? "Turn lyrics on" : label}
+                        aria-label={wakesLyrics ? t("lyrics.turnOn") : label}
                         onClick={() => {
                           if (wakesLyrics) lyricsState.setEnabled(true);
                           setLayout(value);
@@ -293,7 +298,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
                       </button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {wakesLyrics ? "Turn lyrics on" : label}
+                      {wakesLyrics ? t("lyrics.turnOn") : label}
                     </TooltipContent>
                   </Tooltip>
                 );
@@ -423,7 +428,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Shuffle"
+                aria-label={t("action.shuffle")}
                 aria-pressed={shuffle}
                 onClick={() => setShuffle(!shuffle)}
                 className={sideButton(shuffle)}
@@ -433,7 +438,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Previous"
+                aria-label={t("action.previous")}
                 onClick={prev}
                 className={ghostButton}
               >
@@ -441,7 +446,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
               </Button>
               <Button
                 size="icon"
-                aria-label={playing ? "Pause" : "Play"}
+                aria-label={playing ? t("action.pause") : t("action.play")}
                 onClick={toggle}
                 className="mx-1.5 size-16 rounded-full text-white shadow-[0_6px_20px_-4px_rgba(var(--acc1rgb),0.28),inset_0_1px_1px_var(--w220)] transition-[filter,box-shadow] duration-[140ms] hover:brightness-[1.16] hover:shadow-[0_10px_28px_-6px_rgba(var(--acc1rgb),0.36),inset_0_1px_1px_var(--w260)]"
                 style={{
@@ -462,7 +467,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Next"
+                aria-label={t("action.next")}
                 onClick={next}
                 className={ghostButton}
               >
@@ -473,7 +478,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={repeatLabel(repeat)}
+                    aria-label={repeatLabel(repeat, t)}
                     aria-pressed={repeat !== "off"}
                     onClick={cycleRepeat}
                     className={sideButton(repeat !== "off")}
@@ -485,7 +490,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{repeatLabel(repeat)}</TooltipContent>
+                <TooltipContent>{repeatLabel(repeat, t)}</TooltipContent>
               </Tooltip>
             </div>
           </div>
@@ -509,6 +514,7 @@ const ghostButton =
  * row buttons do, so with thumbs on it grows a thumbs-down chip too.
  */
 function LikePill({ track }: { track: QueueTrack }) {
+  const t = useT();
   const qc = useQueryClient();
   const both = useSettingsStore((s) => s.ratingButtons === "both");
   const isDisliked = useDislikesStore((s) => !!s.ids[track.videoId]);
@@ -565,13 +571,13 @@ function LikePill({ track }: { track: QueueTrack }) {
         )}
       >
         <LikeIcon className="size-4" stroke={1.9} />
-        {isLiked ? "Liked" : "Like"}
+        {isLiked ? t("like.liked") : t("like.like")}
       </button>
       {both ? (
         <button
           type="button"
           disabled={busy}
-          aria-label={isDisliked ? "Remove dislike" : "Dislike"}
+          aria-label={isDisliked ? t("like.removeDislike") : t("like.dislike")}
           aria-pressed={isDisliked}
           onClick={() =>
             run(() =>
@@ -743,10 +749,14 @@ function ImmersiveGlyph() {
 
 const LAYOUTS: {
   value: FullscreenLayout;
-  label: string;
+  labelKey: string;
   Icon: () => React.JSX.Element;
 }[] = [
-  { value: "cover", label: "Centered", Icon: CoverGlyph },
-  { value: "lyrics", label: "With lyrics", Icon: LyricsGlyph },
-  { value: "immersive", label: "Immersive art", Icon: ImmersiveGlyph },
+  { value: "cover", labelKey: "player.fsCentered", Icon: CoverGlyph },
+  { value: "lyrics", labelKey: "player.fsWithLyrics", Icon: LyricsGlyph },
+  {
+    value: "immersive",
+    labelKey: "player.fsImmersive",
+    Icon: ImmersiveGlyph,
+  },
 ];

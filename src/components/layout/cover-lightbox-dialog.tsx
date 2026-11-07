@@ -5,6 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCoverLightboxStore } from "@/lib/store/cover-lightbox";
+import { translate } from "@/lib/i18n";
 
 /**
  * Full-size cover art popup. Opened by clicking a cover in the
@@ -23,9 +24,11 @@ export function CoverLightboxDialog() {
     <Dialog open={open && !!url} onOpenChange={setOpen}>
       {url ? (
         <DialogContent className="w-fit max-w-[min(90vw,40rem)] border-none bg-transparent p-0 shadow-none sm:max-w-[min(90vw,40rem)]">
-          <DialogTitle className="sr-only">{alt || "Cover art"}</DialogTitle>
+          <DialogTitle className="sr-only">
+            {alt || translate("entity.coverArt")}
+          </DialogTitle>
           <DialogDescription className="sr-only">
-            Enlarged cover art
+            {translate("entity.enlargedCoverArt")}
           </DialogDescription>
           <img
             src={url}

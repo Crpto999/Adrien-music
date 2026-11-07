@@ -1,4 +1,5 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { proxyOptions } from "@/lib/proxy";
 import { invoke } from "@tauri-apps/api/core";
 import { createStore, del, entries, get, set } from "idb-keyval";
 
@@ -209,6 +210,7 @@ export async function lookupITunesCover(
       const res = await tauriFetch(url, {
         method: "GET",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        ...proxyOptions(),
       });
       if (!res.ok) {
         // Don't cache transient HTTP failures.

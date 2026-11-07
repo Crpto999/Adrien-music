@@ -1,326 +1,386 @@
 import type { IntegrationPage, SettingsTab } from "@/lib/store/settings-dialog";
+import { translate } from "@/lib/i18n";
 
 /** Fewest characters before the search starts ("more than 2 letters"). */
 export const MIN_QUERY_LENGTH = 3;
 
 export type SettingEntry = {
   tab: SettingsTab;
-  title: string;
-  description: string;
+  /** i18n key of the row's title. */
+  titleKey: string;
+  /** i18n key of the row's description. */
+  descriptionKey: string;
   /** Extra words people might type that the row's own text does not contain. */
   keywords?: string;
   /** Integrations only: the drill-in page the row lives on. */
   page?: IntegrationPage;
-  /** DOM id the row carries (`data-setting`); defaults to the title's slug. */
-  id?: string;
+  /** Stable DOM id the row carries (`data-setting`). */
+  id: string;
 };
-
-export const settingSlug = (title: string): string =>
-  title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-
-export const entryId = (e: SettingEntry): string =>
-  e.id ?? settingSlug(e.title);
 
 /**
  * Everything the search can find. The tabs render their own rows, so this
  * is a hand-kept mirror of their titles and descriptions; the test next to
  * it fails when a row is added or renamed without updating this list.
+ *
+ * Titles and descriptions live in the translation dictionary, so the index
+ * stores *keys* and resolves them against the active locale. The `id` is a
+ * hand-written slug rather than a derived one: it has to stay stable
+ * across a language change, because it is the scroll target the search
+ * jumps to.
  */
 export const SETTINGS_INDEX: SettingEntry[] = [
   // General
   {
     tab: "general",
-    title: "Launch at startup",
-    description: "Start YTubic automatically when you log in.",
+    titleKey: "settings.general.launchAtStartup",
+    descriptionKey: "settings.general.launchAtStartupDesc",
+    id: "launch-at-startup",
     keywords: "autostart boot login",
   },
   {
     tab: "general",
-    title: "Playback notifications",
-    description:
-      "Show a system notification when the track changes in the background.",
+    titleKey: "settings.general.playbackNotifications",
+    descriptionKey: "settings.general.playbackNotificationsDesc",
+    id: "playback-notifications",
     keywords: "toast alert popup",
   },
   {
     tab: "general",
-    title: "Close to tray",
+    titleKey: "settings.general.closeToTray",
+    descriptionKey: "settings.general.closeToTrayDesc",
     id: "close-to-tray",
-    description:
-      "Hide YTubic to the tray when you press ✕ instead of quitting.",
     keywords: "menu bar minimize background quit exit",
   },
   {
     tab: "general",
-    title: "Automatic updates",
-    description:
-      "Download updates quietly and install them on your next restart.",
+    titleKey: "settings.general.automaticUpdates",
+    descriptionKey: "settings.general.automaticUpdatesDesc",
+    id: "automatic-updates",
     keywords: "update upgrade version",
+  },
+  {
+    tab: "general",
+    titleKey: "settings.language.title",
+    descriptionKey: "settings.language.description",
+    id: "language",
+    keywords: "locale language chinese english i18n",
+  },
+  {
+    tab: "general",
+    titleKey: "settings.general.proxy",
+    descriptionKey: "settings.general.proxyDesc",
+    id: "proxy",
+    keywords: "network socks http https vpn tunnel proxy 代理",
+  },
+  {
+    tab: "general",
+    titleKey: "settings.general.logPath",
+    descriptionKey: "settings.general.logPathDesc",
+    id: "diagnostics",
+    keywords: "log diagnostics debug crash report 日志 诊断",
   },
 
   // Playback
   {
     tab: "playback",
-    title: "Crossfade",
-    description: "Fade the end of a track into the start of the next one.",
+    titleKey: "settings.playback.crossfade",
+    descriptionKey: "settings.playback.crossfadeDesc",
+    id: "crossfade",
     keywords: "transition mix blend seconds",
   },
   {
     tab: "playback",
-    title: "DJ bass swap",
-    description:
-      "Swap basslines during the crossfade so the two tracks don't clash.",
+    titleKey: "settings.playback.djBassSwap",
+    descriptionKey: "settings.playback.djBassSwapDesc",
+    id: "dj-bass-swap",
     keywords: "dj mix low end",
   },
   {
     tab: "playback",
-    title: "Smart mix timing",
-    description:
-      "Start the mix as the outro begins and skip silent intros and endings.",
+    titleKey: "settings.playback.smartMixTiming",
+    descriptionKey: "settings.playback.smartMixTimingDesc",
+    id: "smart-mix-timing",
     keywords: "dj mix outro intro silence",
   },
   {
     tab: "playback",
-    title: "Volume normalization",
-    description: "Keep every track at a similar loudness.",
+    titleKey: "settings.playback.volumeNormalization",
+    descriptionKey: "settings.playback.volumeNormalizationDesc",
+    id: "volume-normalization",
     keywords: "loudness level volume leveling",
   },
   {
     tab: "playback",
-    title: "Mono audio",
-    description: "Play the same audio in both channels.",
+    titleKey: "settings.playback.monoAudio",
+    descriptionKey: "settings.playback.monoAudioDesc",
+    id: "mono-audio",
     keywords: "stereo channels accessibility",
   },
   {
     tab: "playback",
-    title: "Equalizer",
-    description: "Shape the sound with a preset, or tune the bands yourself.",
+    titleKey: "settings.playback.equalizer",
+    descriptionKey: "settings.playback.equalizerDesc",
+    id: "equalizer",
     keywords: "eq bass boost vocal treble late night preset bands custom",
   },
   {
     tab: "playback",
-    title: "Output device",
-    description: "Where audio is sent when YTubic starts playing.",
+    titleKey: "settings.playback.outputDevice",
+    descriptionKey: "settings.playback.outputDeviceDesc",
+    id: "output-device",
     keywords: "speakers headphones audio sink soundcard",
   },
   {
     tab: "playback",
-    title: "Back button",
-    description: "What happens when you press previous mid-track.",
+    titleKey: "settings.playback.backButton",
+    descriptionKey: "settings.playback.backButtonDesc",
+    id: "back-button",
     keywords: "previous skip restart rewind",
   },
   {
     tab: "playback",
-    title: "Resume where you left off",
-    description: "Remember the track and position after a restart.",
+    titleKey: "settings.playback.resumeWhereYouLeftOff",
+    descriptionKey: "settings.playback.resumeWhereYouLeftOffDesc",
+    id: "resume-where-you-left-off",
     keywords: "restore last session position",
   },
   {
     tab: "playback",
-    title: "Varied radio & autoplay",
-    description:
-      "Mix more tracks into radio and autoplay and shuffle them a bit, so it isn't the same songs every time.",
+    titleKey: "settings.playback.variedRadio",
+    descriptionKey: "settings.playback.variedRadioDesc",
+    id: "varied-radio",
     keywords: "randomize random shuffle station variety",
   },
 
   // Appearance
   {
     tab: "appearance",
-    title: "Theme",
-    description: "Choose light or dark, or follow your OS preference.",
+    titleKey: "settings.appearance.theme",
+    descriptionKey: "settings.appearance.themeDesc",
+    id: "theme",
     keywords: "dark light mode system colors",
   },
   {
     tab: "appearance",
-    title: "Ambient background",
-    description:
-      "Tint the window with the current album art, or keep it plain.",
+    titleKey: "settings.appearance.ambientBackground",
+    descriptionKey: "settings.appearance.ambientBackgroundDesc",
+    id: "ambient-background",
     keywords: "cover colour color blur",
   },
   {
     tab: "appearance",
-    title: "Window glow",
-    description: "A soft glowing accent outline around the window edge.",
+    titleKey: "settings.appearance.windowGlow",
+    descriptionKey: "settings.appearance.windowGlowDesc",
+    id: "window-glow",
     keywords: "outline border light neon",
   },
   {
     tab: "appearance",
-    title: "Glow matches cover",
-    description:
-      "Tint the window glow with the current cover's dominant color.",
+    titleKey: "settings.appearance.glowMatchesCover",
+    descriptionKey: "settings.appearance.glowMatchesCoverDesc",
+    id: "glow-matches-cover",
     keywords: "colour adapt album art",
   },
   {
     tab: "appearance",
-    title: "Glow size",
-    description: "How far the window glow reaches into the window.",
+    titleKey: "settings.appearance.glowSize",
+    descriptionKey: "settings.appearance.glowSizeDesc",
+    id: "glow-size",
     keywords: "thickness width slider",
   },
   {
     tab: "appearance",
-    title: "Video quality",
-    description:
-      "Picture quality for Video mode in immersive fullscreen. Higher takes longer to load the first time.",
+    titleKey: "settings.appearance.videoQuality",
+    descriptionKey: "settings.appearance.videoQualityDesc",
+    id: "video-quality",
     keywords: "720p 1080p 1440p resolution hd",
   },
   {
     tab: "appearance",
-    title: "Rating buttons",
-    description: "Show a single heart, or separate like and dislike buttons.",
+    titleKey: "settings.appearance.ratingButtons",
+    descriptionKey: "settings.appearance.ratingButtonsDesc",
+    id: "rating-buttons",
     keywords: "like dislike thumbs heart favourite favorite",
   },
   {
     tab: "appearance",
-    title: "Player layout",
-    description: "Choose where the now-playing card lives.",
+    titleKey: "settings.appearance.playerLayout",
+    descriptionKey: "settings.appearance.playerLayoutDesc",
+    id: "player-layout",
     keywords: "now playing card sidebar bar position",
   },
   {
     tab: "appearance",
-    title: "Fullscreen player layout",
-    description: "How the now-playing screen fills the display.",
+    titleKey: "settings.appearance.fullscreenLayout",
+    descriptionKey: "settings.appearance.fullscreenLayoutDesc",
+    id: "fullscreen-layout",
     keywords: "immersive cover lyrics video",
   },
   {
     tab: "appearance",
-    title: "Interface font",
-    description: "Applies to the whole app. Track and artist names use it too.",
+    titleKey: "settings.appearance.interfaceFont",
+    descriptionKey: "settings.appearance.interfaceFontDesc",
+    id: "interface-font",
     keywords: "typeface text size",
   },
 
   // Home
   {
     tab: "home",
-    title: "Section order",
-    description: "Drag to reorder the sections shown on the Home page.",
+    titleKey: "settings.home.sectionOrder",
+    descriptionKey: "settings.home.sectionOrderDesc",
+    id: "section-order",
     keywords: "home page sort arrange",
   },
 
   // Storage
   {
     tab: "storage",
-    title: "Cache folder",
-    description: "Where downloaded tracks are kept on disk.",
+    titleKey: "settings.storage.cacheFolder",
+    descriptionKey: "settings.storage.cacheFolderDesc",
+    id: "cache-folder",
     keywords: "path directory location open",
   },
   {
     tab: "storage",
-    title: "Storage limit",
-    description: "How much disk space the track cache may use.",
+    titleKey: "settings.storage.storageLimit",
+    descriptionKey: "settings.storage.storageLimitDesc",
+    id: "storage-limit",
     keywords: "size disk space gigabytes unlimited",
   },
   {
     tab: "storage",
-    title: "Auto-clean tracks not in library",
-    description: "Periodically delete cached tracks you haven't saved.",
+    titleKey: "settings.storage.autoClean",
+    descriptionKey: "settings.storage.autoCleanDesc",
+    id: "auto-clean",
     keywords: "delete remove clean up cache",
   },
   {
     tab: "storage",
-    title: "Cover art cache",
-    description: "Cached album art images.",
+    titleKey: "settings.storage.coverArtCache",
+    descriptionKey: "settings.storage.coverArtCacheDesc",
+    id: "cover-art-cache",
     keywords: "clear delete images thumbnails",
   },
 
   // Integrations
   {
     tab: "integrations",
-    title: "Last.fm",
+    titleKey: "settings.integrations.lastfm",
+    descriptionKey: "settings.integrations.lastfmDesc",
+    id: "lastfm",
     page: "lastfm",
-    description:
-      "Scrobble what you play and share your now-playing status. Uses your own Last.fm API account.",
     keywords: "scrobble scrobbling api key lastfm account",
   },
   {
     tab: "integrations",
-    title: "Scrobble tracks",
+    titleKey: "settings.integrations.scrobbleTracks",
+    descriptionKey: "settings.integrations.scrobbleTracksDesc",
+    id: "scrobble-tracks",
     page: "lastfm",
-    description: "Send plays and now-playing updates to Last.fm.",
     keywords: "scrobbling lastfm",
   },
   {
     tab: "integrations",
-    title: "Love liked tracks",
+    titleKey: "settings.integrations.loveLikedTracks",
+    descriptionKey: "settings.integrations.loveLikedTracksDesc",
+    id: "love-liked-tracks",
     page: "lastfm",
-    description: "When you like a song in YTubic, also love it on Last.fm.",
     keywords: "heart favourite favorite lastfm",
   },
   {
     tab: "integrations",
-    title: "Discord Rich Presence",
+    titleKey: "settings.integrations.discord",
+    descriptionKey: "settings.integrations.discordDesc",
+    id: "discord",
     page: "discord",
-    description:
-      "Show what you're playing on your Discord profile. Talks directly to your local Discord app.",
     keywords: "status activity",
   },
   {
     tab: "integrations",
-    title: "Activity type",
+    titleKey: "settings.integrations.activityType",
+    descriptionKey: "settings.integrations.activityTypeDesc",
+    id: "activity-type",
     page: "discord",
-    description: 'The verb in "<verb> <app name>".',
     keywords: "discord listening playing watching",
   },
   {
     tab: "integrations",
-    title: "Track title",
+    titleKey: "settings.integrations.showTrackTitle",
+    descriptionKey: "settings.integrations.showTrackTitleDesc",
+    id: "show-track-title",
     page: "discord",
-    description: 'Shown as the "details" line.',
     keywords: "discord presence",
   },
   {
     tab: "integrations",
-    title: "Artist",
+    titleKey: "settings.integrations.showArtist",
+    descriptionKey: "settings.integrations.showArtistDesc",
+    id: "show-artist",
     page: "discord",
-    description: 'Shown as the "state" line.',
     keywords: "discord presence",
   },
   {
     tab: "integrations",
-    title: "Album art",
+    titleKey: "settings.integrations.showAlbumArt",
+    descriptionKey: "settings.integrations.showAlbumArtDesc",
+    id: "show-album-art",
     page: "discord",
-    description: "Large cover image.",
     keywords: "discord presence cover",
   },
   {
     tab: "integrations",
-    title: "Album name",
+    titleKey: "settings.integrations.showAlbumName",
+    descriptionKey: "settings.integrations.showAlbumNameDesc",
+    id: "show-album-name",
     page: "discord",
-    description: "Shown when hovering the cover.",
     keywords: "discord presence",
   },
   {
     tab: "integrations",
-    title: "Elapsed time",
+    titleKey: "settings.integrations.showElapsedTime",
+    descriptionKey: "settings.integrations.showElapsedTimeDesc",
+    id: "show-elapsed-time",
     page: "discord",
-    description: "Live progress bar (e.g. 01:36 / 02:51).",
     keywords: "discord presence progress",
   },
   {
     tab: "integrations",
-    title: '"Listen" button',
+    titleKey: "settings.integrations.showListenButton",
+    descriptionKey: "settings.integrations.showListenButtonDesc",
+    id: "show-listen-button",
     page: "discord",
-    description: "Links back to the track on YouTube Music.",
     keywords: "discord presence link",
   },
   {
     tab: "integrations",
-    title: "Only show for songs",
+    titleKey: "settings.integrations.onlyForSongs",
+    descriptionKey: "settings.integrations.onlyForSongsDesc",
+    id: "only-for-songs",
     page: "discord",
-    description:
-      "Hide presence for standalone music videos — only share real album songs.",
     keywords: "discord presence music videos",
   },
   {
     tab: "integrations",
-    title: "Hide while paused",
+    titleKey: "settings.integrations.hideWhilePaused",
+    descriptionKey: "settings.integrations.hideWhilePausedDesc",
+    id: "hide-while-paused",
     page: "discord",
-    description:
-      "Clear presence when playback is paused, instead of freezing the bar.",
     keywords: "discord presence pause",
   },
 ];
+
+/** The row's title in the active locale. */
+export const settingTitle = (e: SettingEntry): string =>
+  translate(e.titleKey);
+
+/** The row's description in the active locale. */
+export const settingDescription = (e: SettingEntry): string =>
+  translate(e.descriptionKey);
+
+/** The DOM id the search scrolls to. */
+export const entryId = (e: SettingEntry): string => e.id;
 
 export type SettingMatch = { entry: SettingEntry; rank: number };
 
@@ -334,6 +394,9 @@ export const queryTerms = (query: string): string[] =>
  * be found in the row's title, description, keywords or tab name. A hit in
  * the title ranks above one in the description, above one in the keywords.
  * Returns nothing until the query reaches MIN_QUERY_LENGTH characters.
+ *
+ * The title and description are resolved against the active locale, so the
+ * search matches what the user actually sees.
  */
 export function searchSettings(
   query: string,
@@ -345,8 +408,8 @@ export function searchSettings(
 
   const out: SettingMatch[] = [];
   SETTINGS_INDEX.forEach((entry, order) => {
-    const title = entry.title.toLowerCase();
-    const desc = entry.description.toLowerCase();
+    const title = settingTitle(entry).toLowerCase();
+    const desc = settingDescription(entry).toLowerCase();
     const extra =
       `${entry.keywords ?? ""} ${tabLabel(entry.tab)}`.toLowerCase();
     let rank = 0;

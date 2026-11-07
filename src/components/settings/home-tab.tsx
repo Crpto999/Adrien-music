@@ -3,6 +3,8 @@ import { IconGripVertical, IconHomeFilled } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Group, SettingRow, TabPane } from "@/components/settings/primitives";
 import { useHomeSectionsStore } from "@/lib/store/home-sections";
+import { useLocale, useT } from "@/lib/i18n";
+import { homeSectionLabel } from "@/lib/i18n/home-sections";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,6 +17,8 @@ import { cn } from "@/lib/utils";
  * even if the API happened to place it on a later page.
  */
 export function HomeTab() {
+  const t = useT();
+  const locale = useLocale();
   const order = useHomeSectionsStore((s) => s.order);
   const reorder = useHomeSectionsStore((s) => s.reorder);
   const resetToDefault = useHomeSectionsStore((s) => s.resetToDefault);
@@ -30,22 +34,23 @@ export function HomeTab() {
       <Group>
         <SettingRow
           icon={IconHomeFilled}
-          title="Section order"
-          description="Drag to reorder the sections shown on the Home page."
+          settingId="section-order"
+          title={t("settings.home.sectionOrder")}
+          description={t("settings.home.sectionOrderDesc")}
           control={
             customized ? (
               <Button variant="ghost" size="sm" onClick={resetToDefault}>
-                Reset
+                {t("common.reset")}
               </Button>
             ) : undefined
           }
         />
       </Group>
       <div className="flex flex-col gap-0.5 pt-4">
-        {order.map((title, i) => (
+        {order.map((key, i) => (
           <HomeSectionRow
-            key={title}
-            title={title}
+            key={key}
+            title={homeSectionLabel(key, locale)}
             isDragging={dragFrom === i}
             isDropTarget={dragOver === i && dragFrom !== i}
             onDragStart={() => setDragFrom(i)}

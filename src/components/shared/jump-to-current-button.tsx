@@ -11,6 +11,7 @@ import { usePanelsStore, CARD_CONTENT_GAP } from "@/lib/store/panels";
 import { useSelectionStore } from "@/lib/store/selection";
 import { findActiveIndex } from "@/lib/track-match";
 import type { ShelfItem } from "@/lib/innertube/types";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   tracks: ShelfItem[];
@@ -33,6 +34,7 @@ type Props = {
  * `position: fixed`. Mounting at the body level escapes both.
  */
 export function JumpToCurrentButton({ tracks }: Props) {
+  const t = useT();
   const active = usePlaybackStore(currentTrack);
   const { state } = useSidebar();
   const mode = useLayoutStore((s) => s.mode);
@@ -149,7 +151,7 @@ export function JumpToCurrentButton({ tracks }: Props) {
         scroller.scrollTo({ top: target, behavior: "smooth" });
       }}
     >
-      Currently playing
+      {t("player.currentlyPlaying")}
       <Icon />
     </Button>,
     document.body,

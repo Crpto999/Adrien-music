@@ -10,6 +10,7 @@ import {
 } from "@tabler/icons-react";
 import { IconPlaylistAddFilled } from "@/components/shared/filled-icons";
 import { toast } from "sonner";
+import { useT, translate } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { MENU_PANEL } from "@/components/ui/menu-chrome";
@@ -50,6 +51,7 @@ type Props = {
  * the bottom player bar when there is one.
  */
 export function SelectionToolbar({ tracks, onClear }: Props) {
+  const t = useT();
   const { state } = useSidebar();
   const mode = useLayoutStore((s) => s.mode);
   const qc = useQueryClient();
@@ -127,13 +129,13 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
     // enqueueNext always inserts right after the current track, so the
     // selection goes in backwards to come out in list order.
     for (const t of [...tracks].reverse()) store.enqueueNext(t);
-    toast.success(`Playing next: ${label}`);
+    toast.success(translate("toast.playingNext", { title: label }));
     onClear();
   };
 
   const addToQueue = () => {
     usePlaybackStore.getState().appendToQueue(tracks);
-    toast.success(`Added to queue: ${label}`);
+    toast.success(translate("toast.addedToQueue", { title: label }));
     onClear();
   };
 
@@ -185,7 +187,7 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
         <div
           ref={pillRef}
           role="toolbar"
-          aria-label="Selected tracks"
+          aria-label={t("selection.selectedTracks")}
           data-selection-ui
           className={cn(
             MENU_PANEL,
@@ -196,7 +198,7 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
             variant="ghost"
             size="icon-sm"
             onClick={onClear}
-            aria-label="Clear selection"
+            aria-label={t("selection.clearSelection")}
           >
             <IconX />
           </Button>
@@ -206,11 +208,11 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
               compact ? "mr-3" : "mr-6",
             )}
           >
-            {count} selected
+            {t("selection.countSelected", { count })}
           </span>
           <DropdownMenu open={saveOpen} onOpenChange={setSaveOpen}>
             {action(
-              "Save to playlist",
+              t("action.saveToPlaylist"),
               busy ? (
                 <IconLoader2 className="animate-spin" />
               ) : (
@@ -229,15 +231,15 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
               {playlists.isFetching && !playlists.data ? (
                 <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
                   <IconLoader2 className="size-3 animate-spin" />
-                  Loading…
+                  {t("common.loading")}
                 </div>
               ) : playlists.isError ? (
                 <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  Sign in to add to playlists.
+                  {t("selection.signInToAdd")}
                 </div>
               ) : (playlists.data ?? []).length === 0 ? (
                 <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  No playlists yet.
+                  {t("selection.noPlaylistsYet")}
                 </div>
               ) : (
                 (playlists.data ?? []).map((p) => (
@@ -249,14 +251,14 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setNewPlaylistOpen(true)}>
                 <IconPlus />
-                New playlist…
+                {t("action.newPlaylist")}…
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          {action("Play next", <IconPlayerTrackNextFilled />, {
+          {action(t("selection.playNext"), <IconPlayerTrackNextFilled />, {
             onClick: playNext,
           })}
-          {action("Add to queue", <IconPlaylistAddFilled />, {
+          {action(t("selection.addToQueue"), <IconPlaylistAddFilled />, {
             onClick: addToQueue,
           })}
         </div>
@@ -264,7 +266,7 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
       <NewPlaylistDialog
         open={newPlaylistOpen}
         onOpenChange={setNewPlaylistOpen}
-        defaultTitle={tracks[0]?.title ?? "New playlist"}
+        defaultTitle={tracks[0]?.title ?? t("action.newPlaylist")}
         videoIds={tracks.map((t) => t.id)}
       />
     </>,

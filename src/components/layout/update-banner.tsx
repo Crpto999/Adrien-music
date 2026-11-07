@@ -16,13 +16,14 @@ import { copyToClipboard } from "@/lib/clipboard";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 type CardConfig = {
   icon: ComponentType<IconProps>;
   /** Glyph size inside the tile; the two arrows are drawn at different weights. */
   iconClass: string;
-  title: string;
-  sub?: string;
+  titleKey: string;
+  subKey?: string;
   onClick?: () => void;
 };
 
@@ -41,6 +42,7 @@ type CardConfig = {
  * clipped by the radius, and the tint made a routine notice shout.
  */
 export function UpdateBanner() {
+  const t = useT();
   const phase = useUpdateStore((s) => s.phase);
   const version = useUpdateStore((s) => s.version);
   const { data: updateSource } = useUpdateSource();
@@ -61,8 +63,8 @@ export function UpdateBanner() {
         onClick={() => {
           if (systemGuidance.command !== undefined) {
             void copyToClipboard(systemGuidance.command).then((ok) => {
-              if (ok) toast.success("Update command copied");
-              else toast.error("Couldn't copy the command");
+              if (ok) toast.success(t("update.commandCopied"));
+              else toast.error(t("update.couldNotCopyCommand"));
             });
           } else {
             void openUrl(RELEASES_URL);
@@ -70,10 +72,15 @@ export function UpdateBanner() {
         }}
         title={
           version
-            ? `Version ${version} available via ${systemGuidance.channel}`
-            : `Update available via ${systemGuidance.channel}`
+            ? t("update.versionAvailableVia", {
+                version,
+                channel: t(systemGuidance.channelLabelKey),
+              })
+            : t("update.availableVia", {
+                channel: t(systemGuidance.channelLabelKey),
+              })
         }
-        aria-label="Update available"
+        aria-label={t("update.available")}
         className={cn(
           "group/upd flex w-full items-center gap-[9px] rounded-[11px] border border-w080 bg-w050 px-[9px] py-2 text-left",
           "shadow-[inset_0_1px_0_var(--w060)] enabled:cursor-pointer enabled:hover:bg-w090 disabled:cursor-default",
@@ -90,13 +97,12 @@ export function UpdateBanner() {
         </span>
         <span data-sidebar-label className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate text-[12.5px] font-semibold leading-tight tracking-[-0.005em] text-t1">
-            Update available
+            {t("update.available")}
           </span>
           <span className="truncate text-[10.5px] font-medium leading-tight text-t5">
             {systemGuidance.channel === "AUR"
-              ? "via AUR — click to copy the command"
-              : "via package manager — click for Releases"}
-          </span>
+              ? t("update.viaAur")
+              : t("update.viaPackageManager")}          </span>
         </span>
       </button>
     );
@@ -119,27 +125,33 @@ export function UpdateBanner() {
     installing: {
       icon: IconArrowDown,
       iconClass: "size-[13px]",
-      title: "Installing update",
-      sub: "Restarting…",
+      titleKey: "update.installing",
+      subKey: "update.restarting",
     },
     ready: {
       icon: IconRefresh,
       iconClass: "size-[15px]",
-      title: "Restart to update",
-      sub: version ? `Version ${version} ready` : "Ready to install",
+      titleKey: "update.restartToUpdate",
+      subKey: version
+        ? "update.versionReady"
+        : "update.readyToInstall",
       onClick: () => void restartToUpdate(),
     },
     error: {
       icon: IconAlertTriangle,
       iconClass: "size-[15px]",
-      title: "Update failed",
-      sub: "Click to retry",
+      titleKey: "update.failed",
+      subKey: "update.clickToRetry",
       onClick: () => void downloadAvailableUpdate(),
     },
   }[phase];
 
   const Icon = cfg.icon;
-  const label = cfg.sub ? `${cfg.title} · ${cfg.sub}` : cfg.title;
+  const title = t(cfg.titleKey);
+  const sub = cfg.subKey
+    ? t(cfg.subKey, version ? { version } : undefined)
+    : undefined;
+  const label = sub ? `${title} · ${sub}` : title;
 
   return (
     <button
@@ -149,7 +161,7 @@ export function UpdateBanner() {
       // Collapsed, the label is gone, so the state has to survive in the
       // native tooltip.
       title={label}
-      aria-label={cfg.title}
+      aria-label={title}
       className={cn(
         "group/upd flex w-full items-center gap-[9px] rounded-[11px] border border-w080 bg-w050 px-[9px] py-2 text-left",
         "shadow-[inset_0_1px_0_var(--w060)] enabled:cursor-pointer enabled:hover:bg-w090 disabled:cursor-default",
@@ -227,11 +239,11 @@ export function UpdateBanner() {
 
       <span data-sidebar-label className="flex min-w-0 flex-1 flex-col gap-px">
         <span className="truncate text-[12.5px] font-semibold leading-tight tracking-[-0.005em] text-t1">
-          {cfg.title}
+          {title}
         </span>
-        {cfg.sub ? (
+        {sub ? (
           <span className="truncate text-[10.5px] font-medium leading-tight text-t5">
-            {cfg.sub}
+            {sub}
           </span>
         ) : null}
       </span>

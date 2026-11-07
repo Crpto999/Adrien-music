@@ -41,6 +41,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ArtworkOutline } from "@/components/shared/artwork-outline";
 import { Thumbnail } from "@/components/shared/thumbnail";
@@ -139,6 +140,7 @@ const CARD_CLASS =
   "group flex w-full flex-col gap-2 rounded-lg p-2 text-left transition-colors hover:bg-accent/60 focus-visible:bg-accent focus-visible:outline-none";
 
 export function ShelfCard({ item, className }: Props) {
+  const t = useT();
   const subtitle =
     item.subtitle ??
     item.artists?.map((a) => a.name).join(", ") ??
@@ -231,7 +233,7 @@ export function ShelfCard({ item, className }: Props) {
               )}
             />
             <div
-              title="Hidden from sidebar"
+              title={t("sidebar.hiddenFromSidebar")}
               className="absolute right-1.5 top-1.5 flex items-center justify-center rounded-md bg-black/65 p-1 text-white shadow-sm"
             >
               <IconEyeOff className="size-4" />
@@ -433,21 +435,25 @@ function HoverPlayButton({
 }
 
 function AlbumPlayButton({ albumId }: { albumId: string }) {
+  const t = useT();
   const { play } = useAlbumMenuController(albumId);
-  return <HoverPlayButton label="Play album" onPlay={() => play(false)} />;
+  return (
+    <HoverPlayButton label={t("action.playAlbum")} onPlay={() => play(false)} />
+  );
 }
 
 function PlaylistPlayButton({ playlistId }: { playlistId: string }) {
+  const t = useT();
   const qc = useQueryClient();
   return (
     <HoverPlayButton
-      label="Play playlist"
+      label={t("action.playPlaylist")}
       onPlay={async () => {
         try {
           const started = await playPlaylistNow(playlistId, qc);
-          if (!started) toast.error("This playlist is empty");
+          if (!started) toast.error(t("entity.playlistIsEmpty"));
         } catch (e) {
-          toast.error(`Couldn't load playlist: ${String(e)}`);
+          toast.error(t("entity.couldNotLoadPlaylistDetail", { error: String(e) }));
         }
       }}
     />

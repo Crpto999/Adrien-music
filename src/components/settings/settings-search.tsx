@@ -3,9 +3,12 @@ import { IconSearch, IconX } from "@tabler/icons-react";
 import {
   MIN_QUERY_LENGTH,
   queryTerms,
+  settingDescription,
+  settingTitle,
   type SettingEntry,
   type SettingMatch,
 } from "@/components/settings/settings-index";
+import { useT } from "@/lib/i18n";
 import type { SettingsTab } from "@/lib/store/settings-dialog";
 
 /** Search box for the top of the settings rail. */
@@ -19,6 +22,7 @@ export function SettingsSearchField({
   /** Enter: open the best result. */
   onSubmit: () => void;
 }) {
+  const t = useT();
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -38,8 +42,8 @@ export function SettingsSearchField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Search settings"
-        aria-label="Search settings"
+        placeholder={t("settings.searchPlaceholder")}
+        aria-label={t("settings.searchPlaceholder")}
         spellCheck={false}
         autoComplete="off"
         className="h-8 w-full rounded-[10px] border border-w070 bg-w050 pl-8 pr-7 text-[13px] text-t2 outline-none transition-colors duration-[140ms] placeholder:text-t8 focus:border-w120 focus:bg-w070"
@@ -48,7 +52,7 @@ export function SettingsSearchField({
         <button
           type="button"
           onClick={() => onChange("")}
-          aria-label="Clear search"
+          aria-label={t("common.clearSearch")}
           className="absolute right-1.5 top-1/2 grid size-5 -translate-y-1/2 cursor-pointer place-items-center rounded-md text-t7 transition-colors hover:bg-w080 hover:text-t2"
         >
           <IconX className="size-3" />
@@ -94,20 +98,22 @@ export function SettingsSearchResults({
   matches: SettingMatch[];
   tabs: {
     id: SettingsTab;
-    label: string;
+    labelKey: string;
     icon: ComponentType<{ className?: string }>;
   }[];
   onPick: (entry: SettingEntry) => void;
 }) {
+  const t = useT();
   const terms = queryTerms(query);
 
   if (matches.length === 0) {
     return (
       <div className="flex flex-col items-center gap-1 px-6 py-16 text-center">
-        <span className="text-sm font-semibold text-t3">No settings found</span>
+        <span className="text-sm font-semibold text-t3">
+          {t("settings.noResults")}
+        </span>
         <span className="text-[12.5px] text-t7">
-          Nothing matches “{query.trim()}”. Try a shorter word, like “fade” or
-          “font”.
+          {t("settings.noResultsHint", { query: query.trim() })}
         </span>
       </div>
     );
@@ -118,9 +124,11 @@ export function SettingsSearchResults({
       {matches.map(({ entry }) => {
         const tab = tabs.find((t) => t.id === entry.tab);
         const Icon = tab?.icon;
+        const title = settingTitle(entry);
+        const description = settingDescription(entry);
         return (
           <button
-            key={`${entry.tab}:${entry.title}`}
+            key={`${entry.tab}:${entry.id}`}
             type="button"
             onClick={() => onPick(entry)}
             className="flex w-full cursor-pointer items-center gap-3.5 rounded-lg py-4 text-left transition-colors duration-[140ms] hover:bg-w030"
@@ -130,14 +138,14 @@ export function SettingsSearchResults({
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
               <span className="text-sm font-semibold leading-none text-t2">
-                <Highlight text={entry.title} terms={terms} />
+                <Highlight text={title} terms={terms} />
               </span>
               <span className="line-clamp-2 text-[12.5px] leading-snug text-t7">
-                <Highlight text={entry.description} terms={terms} />
+                <Highlight text={description} terms={terms} />
               </span>
             </div>
             <span className="shrink-0 rounded-[7px] border border-w070 bg-w050 px-2 py-1 text-[11.5px] font-medium text-t6">
-              {tab?.label}
+              {tab ? t(tab.labelKey) : ""}
             </span>
           </button>
         );

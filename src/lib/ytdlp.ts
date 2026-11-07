@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
+import { translate } from "@/lib/i18n";
 
 type YtdlpState = {
   phase: "downloading" | "ready" | "error";
@@ -53,16 +54,19 @@ export function useYtdlpSetup(): void {
       } else if (phase === "ready") {
         if (sawDownloadRef.current) {
           sawDownloadRef.current = false;
-          toast.success("Audio engine ready", { id: TOAST_ID, duration: 4000 });
+          toast.success(translate("toast.audioEngineReady"), {
+            id: TOAST_ID,
+            duration: 4000,
+          });
         }
       } else if (phase === "error") {
         sawDownloadRef.current = false;
-        toast.error("Couldn't download yt-dlp — playback won't work", {
+        toast.error(translate("toast.couldNotDownloadYtdlp"), {
           id: TOAST_ID,
           duration: Infinity,
           description: message ?? undefined,
           action: {
-            label: "Retry",
+            label: translate("update.retry"),
             onClick: () => {
               runYtdlpCommand("ensure_ytdlp");
             },

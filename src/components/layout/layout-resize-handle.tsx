@@ -10,6 +10,7 @@ import {
   useLayoutStore,
 } from "@/lib/store/layout";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const KEYBOARD_STEP = 8;
 
@@ -193,6 +194,7 @@ function ResizeHandle({
 }
 
 export function SidebarResizeHandle() {
+  const t = useT();
   const { state, isMobile, setOpen } = useSidebar();
   const width = useLayoutStore((s) => s.sidebarWidth);
   const setWidth = useLayoutStore((s) => s.setSidebarWidth);
@@ -206,7 +208,7 @@ export function SidebarResizeHandle() {
       value={width}
       min={MIN_SIDEBAR_WIDTH}
       max={MAX_SIDEBAR_WIDTH}
-      label="Resize sidebar"
+      label={t("sidebar.resizeSidebar")}
       edge="left"
       cssVariable="--sidebar-width"
       onChange={(next) => {
@@ -252,6 +254,7 @@ export function SidebarResizeHandle() {
 }
 
 export function PlayerResizeHandle() {
+  const t = useT();
   const width = useLayoutStore((s) => s.playerWidth);
   const setWidth = useLayoutStore((s) => s.setPlayerWidth);
 
@@ -260,7 +263,7 @@ export function PlayerResizeHandle() {
       value={width}
       min={MIN_PLAYER_WIDTH}
       max={MAX_PLAYER_WIDTH}
-      label="Resize player"
+      label={t("sidebar.resizePlayer")}
       edge="right"
       cssVariable="--player-width"
       onChange={setWidth}

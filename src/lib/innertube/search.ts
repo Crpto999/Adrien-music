@@ -9,6 +9,7 @@ import {
   readThumbnails,
   type YtNode,
 } from "./shared";
+import { SEARCH_TYPE_TOKENS } from "./locale-tokens";
 
 /**
  * YTM search filter params.
@@ -39,12 +40,16 @@ const GROUP_ORDER: SearchGroup[] = [
   "playlist",
 ];
 
-const GROUP_TITLE: Record<SearchGroup, string> = {
-  song: "Songs",
-  artist: "Artists",
-  album: "Albums & singles",
-  video: "Videos",
-  playlist: "Community playlists",
+/**
+ * Section heading per group. Translated at render time so it follows the
+ * user's language; the key lives in the shared dictionary.
+ */
+const GROUP_TITLE_KEY: Record<SearchGroup, string> = {
+  song: "searchGroup.song",
+  artist: "searchGroup.artist",
+  album: "searchGroup.album",
+  video: "searchGroup.video",
+  playlist: "searchGroup.playlist",
 };
 
 /** Group id (`all-<group>`) → the filter tab that shows its full list. */
@@ -59,19 +64,13 @@ export const GROUP_FILTER: Record<SearchGroup, SearchFilter> = {
 // Modern YTM "all" search returns a flat, relevance-ranked list of mixed rows
 // (each `musicResponsiveListItemRenderer` wrapped in its own
 // `itemSectionRenderer`) rather than titled shelves. The row's *type* lives in
-// the first token of its subtitle ("Song • …", "Album • …", "Artist • …"). We
-// pin `hl=en` in the client context, so these tokens are stable English. Types
-// the app has no destination for (Profile / Episode / Podcast) are absent from
-// this map and get skipped.
-const TOKEN_TO_GROUP: Record<string, SearchGroup> = {
-  Song: "song",
-  Video: "video",
-  Album: "album",
-  Single: "album",
-  EP: "album",
-  Artist: "artist",
-  Playlist: "playlist",
-};
+// the first token of its subtitle ("Song • …", "Album • …", "Artist • …").
+// The token is rendered in the request's `hl`, so it is English for an
+// English request and Chinese for a Chinese one ("歌曲 • …", "专辑 • …").
+// `SEARCH_TYPE_TOKENS` carries both sets. Types the app has no destination
+// for (Profile / Episode / Podcast) are absent from that map and get skipped.
+const TOKEN_TO_GROUP: Record<string, SearchGroup> =
+  SEARCH_TYPE_TOKENS as Record<string, SearchGroup>;
 
 /** First subtitle token of a responsive row, e.g. "Song" / "Album" / "Artist". */
 function subtitleToken(mrli: YtNode): string {
@@ -250,12 +249,12 @@ function buildAllResults(query: string, sections: YtNode[]): SearchResults {
   for (const group of GROUP_ORDER) {
     const items = buckets.get(group);
     if (!items || items.length === 0) continue;
-    shelves.push({
-      id: `all-${group}`,
-      title: GROUP_TITLE[group],
-      items,
-      display: group === "song" ? "list" : "card",
-    });
+      shelves.push({
+        id: `all-${group}`,
+        title: GROUP_TITLE_KEY[group],
+        items,
+        display: group === "song" ? "list" : "card",
+      });
   }
 
   return { query, topResult, topResultAction, shelves };

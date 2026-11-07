@@ -27,6 +27,7 @@ import { LikeDislikeButtons } from "@/components/shared/like-buttons";
 import { SelectionToolbar } from "@/components/shared/selection-toolbar";
 import { useSelectionStore } from "@/lib/store/selection";
 import { useSettingsStore } from "@/lib/store/settings";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
 import { useTrackSourceStore } from "@/lib/store/track-source";
@@ -91,10 +92,11 @@ function formatPlays(text?: string): string {
 }
 
 function VideoSourceBadge() {
+  const t = useT();
   return (
     <span
-      title="Playing the video version"
-      aria-label="Video source"
+      title={t("entity.playingVideoVersion")}
+      aria-label={t("entity.videoSource")}
       className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm bg-brand/15 text-[10px] font-bold leading-none text-brand"
     >
       V
@@ -141,6 +143,7 @@ export function TrackList({
   virtualize = true,
   className,
 }: Props) {
+  const t = useT();
   const active = usePlaybackStore(currentTrack);
   const playing = usePlaybackStore((s) => s.playing);
   const activeDuration = usePlaybackStore((s) => s.duration);
@@ -307,7 +310,7 @@ export function TrackList({
 
   if (tracks.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No tracks to display.</p>
+      <p className="text-sm text-muted-foreground">{t("entity.noTracks")}</p>
     );
   }
 

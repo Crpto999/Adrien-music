@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { translate } from "@/lib/i18n";
 
 /**
  * Copy text to the clipboard. `navigator.clipboard` is the happy path;
@@ -29,6 +30,6 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 /** Copy a link and toast the outcome. */
 export async function copyLink(url: string): Promise<void> {
   const ok = await copyToClipboard(url);
-  if (ok) toast.success("Link copied to clipboard");
-  else toast.error("Couldn't copy the link");
+  if (ok) toast.success(translate("toast.linkCopied"));
+  else toast.error(translate("toast.couldNotCopyLink"));
 }

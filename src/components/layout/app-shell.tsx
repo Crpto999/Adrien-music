@@ -36,6 +36,7 @@ import { useDeepLinks } from "@/lib/use-deep-links";
 import { pickHighResThumbnail } from "@/components/shared/thumbnail";
 import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
 import { useLayoutStore } from "@/lib/store/layout";
+import { useT } from "@/lib/i18n";
 import { useSettingsDialog } from "@/lib/store/settings-dialog";
 import { useFullscreenStore } from "@/lib/store/fullscreen";
 import { usePremiumStatusSync } from "@/lib/store/premium";
@@ -54,6 +55,7 @@ import {
   useSessionRefreshedListener,
 } from "@/lib/store/accounts";
 import { useSessionStatusListener } from "@/lib/store/session-status";
+import { useProxySync } from "@/lib/proxy";
 
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -135,6 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useAccountMetaBackfill();
   useGlobalShortcuts();
   useCloseBehaviorSync();
+  useProxySync();
   useDiscordPresenceSync();
   useCacheAutoClean();
   usePlaybackNotifications();
@@ -470,6 +473,7 @@ function BackgroundCover() {
  * Double-click resets to the default width.
  */
 function SidebarResizeHandle() {
+  const t = useT();
   const { state } = useSidebar();
   const sidebarWidth = usePanelsStore((s) => s.sidebarWidth);
   const setSidebarWidth = usePanelsStore((s) => s.setSidebarWidth);
@@ -487,7 +491,7 @@ function SidebarResizeHandle() {
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize sidebar"
+      aria-label={t("sidebar.resizeSidebar")}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
       className="absolute top-(--titlebar-h) bottom-0 z-20 w-1.5 -translate-x-1/2 cursor-ew-resize touch-none select-none hover:bg-sidebar-border/70 active:bg-sidebar-border"
@@ -505,6 +509,7 @@ function SidebarResizeHandle() {
  * click resets to the default width.
  */
 function CardResizeHandle() {
+  const t = useT();
   const cardWidth = usePanelsStore((s) => s.cardWidth);
   const setCardWidth = usePanelsStore((s) => s.setCardWidth);
   const resetCardWidth = usePanelsStore((s) => s.resetCardWidth);
@@ -519,7 +524,7 @@ function CardResizeHandle() {
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize player card"
+      aria-label={t("sidebar.resizePlayerCard")}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
       className="fixed top-(--titlebar-h) bottom-2 z-20 w-1.5 translate-x-1/2 cursor-ew-resize touch-none select-none hover:bg-sidebar-border/70 active:bg-sidebar-border"

@@ -9,6 +9,7 @@ import type { ShelfItem } from "@/lib/innertube/types";
 import { syncLastfmLove } from "@/lib/lastfm/love";
 import type { LastfmTrackMeta } from "@/lib/lastfm/track";
 import { useDislikesStore } from "@/lib/store/dislikes";
+import { translate } from "@/lib/i18n";
 
 // Patch the cached liked-songs list optimistically. The server is the
 // source of truth, but `["liked-songs"]` is `enabled: false` in the
@@ -61,14 +62,14 @@ export async function toggleLiked({
     queryClient.setQueryData<ShelfItem[]>(["liked-songs"], (old) =>
       (old ?? []).filter((t) => t.id !== videoId),
     );
-    toast.success("Removed from Liked");
+    toast.success(translate("toast.removedFromLiked"));
   } else {
     queryClient.setQueryData<ShelfItem[]>(["liked-songs"], (old) => {
       const list = old ?? [];
       if (list.some((t) => t.id === videoId)) return list;
       return [makeLikedPlaceholder(videoId), ...list];
     });
-    toast.success("Added to Liked");
+    toast.success(translate("toast.addedToLiked"));
   }
   if (interruptedFetch) {
     void queryClient.invalidateQueries({
@@ -118,7 +119,7 @@ export async function toggleDisliked({
   if (wasDisliked) {
     await removeRating(videoId);
     dislikes.remove(videoId);
-    toast.success("Dislike removed");
+    toast.success(translate("toast.dislikeRemoved"));
     return;
   }
   await dislikeTrack(videoId);
@@ -133,5 +134,5 @@ export async function toggleDisliked({
       queryKey: ["library", "liked-songs-pages"],
     });
   }
-  toast.success("Disliked");
+  toast.success(translate("toast.disliked"));
 }

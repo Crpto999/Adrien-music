@@ -1,8 +1,10 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { proxyOptions } from "@/lib/proxy";
 import {
   authHeaders,
   captureSetCookies,
   readRuns,
+  acceptLanguageHeader,
   DESKTOP_UA,
   type YtNode,
 } from "./shared";
@@ -49,8 +51,9 @@ export async function fetchChannelList(): Promise<ChannelChoice[]> {
       ...auth,
       "User-Agent": DESKTOP_UA,
       Referer: "https://music.youtube.com/",
-      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Language": acceptLanguageHeader(),
     },
+    ...proxyOptions(),
   });
   // This page-level endpoint is the one that mints the post-login
   // LOGIN_INFO / SIDCC burst; echoing it into the jar is what keeps

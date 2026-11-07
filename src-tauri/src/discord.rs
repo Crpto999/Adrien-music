@@ -67,7 +67,7 @@ fn connect(inner: &mut Inner, application_id: &str) {
     let mut client = match DiscordIpcClient::new(application_id) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[discord] create client failed: {e}");
+            crate::log!("[discord] create client failed: {e}");
             inner.connected = false;
             inner.client = None;
             return;
@@ -79,7 +79,7 @@ fn connect(inner: &mut Inner, application_id: &str) {
             inner.client = Some(client);
         }
         Err(e) => {
-            eprintln!("[discord] connect failed: {e}");
+            crate::log!("[discord] connect failed: {e}");
             inner.connected = false;
             inner.client = None;
         }
@@ -241,7 +241,7 @@ pub fn discord_update(state: tauri::State<'_, DiscordState>, payload: PresencePa
             inner.last_sig = Some(sig);
         }
         Err(e) => {
-            eprintln!("[discord] set_activity failed: {e}");
+            crate::log!("[discord] set_activity failed: {e}");
             // Drop the client — the socket may have gone stale (Discord
             // restarted); the next update reconnects from scratch.
             inner.connected = false;

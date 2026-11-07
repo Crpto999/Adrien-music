@@ -103,6 +103,12 @@ pub async fn resolve_audio(
         cmd.arg("--extractor-args")
             .arg(format!("youtube:player_client={client}"));
     }
+    // Route yt-dlp's own traffic through the user's proxy. Without the
+    // `socks` feature in yt-dlp's own build this is still fine — the
+    // flag is understood for every scheme yt-dlp supports.
+    for arg in crate::proxy::ytdlp_proxy_args() {
+        cmd.arg(arg);
+    }
     cmd.arg(watch_url);
     cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -114,11 +120,11 @@ pub async fn resolve_audio(
     let out = match tokio::time::timeout(Duration::from_secs(60), cmd.output()).await {
         Ok(Ok(o)) => o,
         Ok(Err(e)) => {
-            eprintln!("[stream] spawn yt-dlp -J: {e}");
+            crate::log!("[stream] spawn yt-dlp -J: {e}");
             return Err(ResolveError { age_gated: false });
         }
         Err(_) => {
-            eprintln!("[stream] yt-dlp -J timed out");
+            crate::log!("[stream] yt-dlp -J timed out");
             return Err(ResolveError { age_gated: false });
         }
     };
@@ -134,7 +140,7 @@ pub async fn resolve_audio(
     match parse_resolved(&out.stdout) {
         Some(r) => Ok(r),
         None => {
-            eprintln!("[stream] yt-dlp -J gave no direct http URL with a known size");
+            crate::log!("[stream] yt-dlp -J gave no direct http URL with a known size");
             Err(ResolveError { age_gated: false })
         }
     }
@@ -248,7 +254,7 @@ pub async fn fill(
                         Ok(Some(b)) => {
                             let take = b.len().min((end + 1 - pos) as usize);
                             if let Err(e) = file.write_all(&b[..take]).await {
-                                eprintln!("[stream] write .part: {e}");
+                                crate::log!("[stream] write .part: {e}");
                                 return false;
                             }
                             pos += take as u64;
@@ -260,12 +266,12 @@ pub async fn fill(
                         }
                         Ok(None) => break,
                         Err(e) => {
-                            eprintln!("[stream] fill read at {pos}: {e}");
+                            crate::log!("[stream] fill read at {pos}: {e}");
                             break;
                         }
                     }
                 },
-                Err(e) => eprintln!("[stream] fill open at {pos}: {e}"),
+                Err(e) => crate::log!("[stream] fill open at {pos}: {e}"),
             }
             if pos > end {
                 break;
@@ -409,7 +415,7 @@ impl BodyCursor {
                     .is_err()
             {
                 // Filler is stuck: stop relying on it for this response.
-                eprintln!("[stream] filler stalled at {avail}; proxying the rest");
+                crate::log!("[stream] filler stalled at {avail}; proxying the rest");
                 self.file = None;
             }
         }
@@ -430,7 +436,7 @@ impl BodyCursor {
                 Err(e) => last = e,
             }
         }
-        eprintln!("[stream] upstream range {}-{end}: {last}", self.pos);
+        crate::log!("[stream] upstream range {}-{end}: {last}", self.pos);
         Err(std::io::Error::other(last))
     }
 }

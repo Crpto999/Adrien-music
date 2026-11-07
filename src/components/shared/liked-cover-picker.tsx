@@ -12,6 +12,7 @@ import {
   LIKED_COVER_ORDER,
 } from "@/components/shared/liked-cover";
 import { useLikedCoverStore } from "@/lib/store/liked-cover";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /** Side of the square the uploaded picture is baked down to. */
@@ -57,6 +58,7 @@ const OPTION =
  * a list of rows, and menu keyboard semantics would fight it.
  */
 export function LikedCoverPicker({ className }: { className?: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const preset = useLikedCoverStore((s) => s.preset);
   const custom = useLikedCoverStore((s) => s.custom);
@@ -70,7 +72,7 @@ export function LikedCoverPicker({ className }: { className?: string }) {
     try {
       setCustom(await toCoverDataUrl(file));
     } catch {
-      toast.error("Couldn't use that image");
+      toast.error(t("toast.couldNotUseImage"));
     }
   };
 
@@ -79,8 +81,8 @@ export function LikedCoverPicker({ className }: { className?: string }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label="Change cover"
-          title="Change cover"
+          aria-label={t("cover.changeCover")}
+          title={t("cover.changeCover")}
           className={cn(
             "absolute right-2 top-2 z-10 grid size-7 cursor-pointer place-items-center rounded-lg",
             "bg-w140 text-t2 backdrop-blur-[8px] transition-[opacity,background-color] duration-[160ms]",
@@ -103,17 +105,18 @@ export function LikedCoverPicker({ className }: { className?: string }) {
         className="w-[268px] p-2.5"
       >
         <div className="px-1 pb-2 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-t4">
-          Playlist cover
+          {t("cover.playlistCover")}
         </div>
 
         <div className="grid grid-cols-3 gap-1">
           {LIKED_COVER_ORDER.map((key) => {
             const on = !custom && preset === key;
+            const label = t(LIKED_COVERS[key].labelKey);
             return (
               <button
                 key={key}
                 type="button"
-                aria-label={`${LIKED_COVERS[key].label} cover`}
+                aria-label={t("cover.coverOption", { name: label })}
                 aria-pressed={on}
                 onClick={() => setPreset(key)}
                 className={cn(OPTION, on && "bg-w070 hover:bg-w070")}
@@ -126,7 +129,7 @@ export function LikedCoverPicker({ className }: { className?: string }) {
                 <span
                   className={cn("text-[10.5px]", on ? "text-t1" : "text-t6")}
                 >
-                  {LIKED_COVERS[key].label}
+                  {label}
                 </span>
               </button>
             );
@@ -151,7 +154,7 @@ export function LikedCoverPicker({ className }: { className?: string }) {
             className="flex cursor-pointer items-center gap-2.5 rounded-[9px] border border-dashed border-w180 bg-w060 px-2.5 py-2.5 text-[13px] font-medium text-t2 transition-colors duration-[140ms] hover:border-w300 hover:bg-w110"
           >
             <IconUpload className="size-[15px]" stroke={1.8} />
-            {custom ? "Replace image" : "Upload image"}
+            {custom ? t("cover.replaceImage") : t("cover.uploadImage")}
           </button>
           {custom ? (
             <button
@@ -160,7 +163,7 @@ export function LikedCoverPicker({ className }: { className?: string }) {
               className="flex cursor-pointer items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-[12.5px] text-t6 transition-colors duration-[140ms] hover:bg-w060 hover:text-t3"
             >
               <IconX className="size-3.5" stroke={1.9} />
-              Remove uploaded image
+              {t("cover.removeUploadedImage")}
             </button>
           ) : null}
         </div>

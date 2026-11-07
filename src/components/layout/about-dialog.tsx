@@ -31,6 +31,7 @@ import {
   useUpdateSource,
 } from "@/lib/update-source";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const REPO_URL = "https://github.com/ameenalasady/YTubic";
 // Fork note: use this fork's Discord (README badge) rather than upstream's.
@@ -40,23 +41,39 @@ const DISCORD_URL = "https://discord.gg/v7JGAWWWj";
 
 // Rendered column-first into a 4-row grid, so this order reads down the
 // left column and then down the right one.
-const CREDITS: { name: string; role: string; url: string }[] = [
-  { name: "Tauri", role: "app shell", url: "https://tauri.app" },
-  { name: "TanStack", role: "router + query", url: "https://tanstack.com" },
-  { name: "shadcn/ui", role: "components", url: "https://ui.shadcn.com" },
+const CREDITS: { name: string; roleKey: string; url: string }[] = [
+  { name: "Tauri", roleKey: "about.credit.appShell", url: "https://tauri.app" },
+  {
+    name: "TanStack",
+    roleKey: "about.credit.routerQuery",
+    url: "https://tanstack.com",
+  },
+  {
+    name: "shadcn/ui",
+    roleKey: "about.credit.components",
+    url: "https://ui.shadcn.com",
+  },
   {
     name: "yt-dlp",
-    role: "audio streaming",
+    roleKey: "about.credit.audioStreaming",
     url: "https://github.com/yt-dlp/yt-dlp",
   },
-  { name: "LRCLIB", role: "synced lyrics", url: "https://lrclib.net" },
+  {
+    name: "LRCLIB",
+    roleKey: "about.credit.syncedLyrics",
+    url: "https://lrclib.net",
+  },
   {
     name: "YouTube Music",
-    role: "synced lyrics",
+    roleKey: "about.credit.syncedLyrics",
     url: "https://music.youtube.com",
   },
-  { name: "Genius", role: "lyrics", url: "https://genius.com" },
-  { name: "Musixmatch", role: "lyrics", url: "https://www.musixmatch.com" },
+  { name: "Genius", roleKey: "about.credit.lyrics", url: "https://genius.com" },
+  {
+    name: "Musixmatch",
+    roleKey: "about.credit.lyrics",
+    url: "https://www.musixmatch.com",
+  },
 ];
 
 // Footer icon button — 38px, 10px radius, on the design's `--w060` fill.
@@ -72,6 +89,7 @@ export function AboutDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
+  const t = useT();
   const [version, setVersion] = useState<string>("");
   const [checking, setChecking] = useState(false);
   const phase = useUpdateStore((s) => s.phase);
@@ -116,51 +134,58 @@ export function AboutDialog({
       : null;
   const copyUpdateCommand = (command: string) => () => {
     void copyToClipboard(command).then((ok) => {
-      if (ok) toast.success("Update command copied");
-      else toast.error("Couldn't copy the command");
+      if (ok) toast.success(t("update.commandCopied"));
+      else toast.error(t("update.couldNotCopyCommand"));
     });
   };
   const updateLine =
     systemGuidance && phase !== "idle"
       ? {
           text: nextVersion
-            ? `Version ${nextVersion} available via ${systemGuidance.channel}`
-            : `Update available via ${systemGuidance.channel}`,
-          action: systemGuidance.actionLabel,
+                ? t("update.versionAvailableVia", {
+                version: nextVersion,
+                channel: t(systemGuidance.channelLabelKey),
+              })
+            : t("update.availableVia", {
+                channel: t(systemGuidance.channelLabelKey),
+              }),
+          action: t(systemGuidance.actionLabelKey),
           onClick:
             systemGuidance.command !== undefined
               ? copyUpdateCommand(systemGuidance.command)
               : link(RELEASES_URL),
         }
       : phase === "ready"
-      ? {
-          text: nextVersion ? `Version ${nextVersion} ready` : "Update ready",
-          action: "Restart",
-          onClick: () => void restartToUpdate(),
-        }
-      : phase === "available"
         ? {
             text: nextVersion
-              ? `Version ${nextVersion} available`
-              : "Update available",
-            action: "Download",
-            onClick: () => void downloadAvailableUpdate(),
+              ? t("update.versionReady", { version: nextVersion })
+              : t("update.ready"),
+            action: t("update.restart"),
+            onClick: () => void restartToUpdate(),
           }
-        : phase === "error"
+        : phase === "available"
           ? {
-              text: "Update failed",
-              action: "Retry",
+              text: nextVersion
+                ? t("update.versionAvailable", { version: nextVersion })
+                : t("update.available"),
+              action: t("update.download"),
               onClick: () => void downloadAvailableUpdate(),
             }
-          : phase === "installing"
-            ? { text: "Restarting to update…" }
-            : phase === "downloading"
-              ? {
-                  text: nextVersion
-                    ? `Downloading version ${nextVersion}…`
-                    : "Downloading update…",
-                }
-              : null;
+          : phase === "error"
+            ? {
+                text: t("update.failed"),
+                action: t("update.retry"),
+                onClick: () => void downloadAvailableUpdate(),
+              }
+            : phase === "installing"
+              ? { text: t("update.restartingToUpdate") }
+              : phase === "downloading"
+                ? {
+                    text: nextVersion
+                      ? t("update.downloadingVersion", { version: nextVersion })
+                      : t("update.downloading"),
+                  }
+                : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,7 +205,7 @@ export function AboutDialog({
         />
         <DialogClose className="absolute right-4 top-4 z-[2] grid size-7 cursor-pointer place-items-center rounded-lg border border-w070 bg-w030 text-t6 transition-colors duration-[140ms] hover:bg-w080 hover:text-t2">
           <IconX className="size-3" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t("common.close")}</span>
         </DialogClose>
 
         <div className="flex flex-col gap-4 px-7 pb-0 pt-7">
@@ -200,9 +225,11 @@ export function AboutDialog({
               </DialogTitle>
               <div className="flex items-center gap-2">
                 <span className="text-[13px] text-t5">
-                  {version ? `Version ${version}` : " "}
+                  {version ? t("about.version", { version }) : " "}
                   {version && IS_BETA_PLATFORM
-                    ? ` · beta for ${IS_MAC ? "macOS" : "Linux"}`
+                    ? ` · ${t("about.betaFor", {
+                        platform: IS_MAC ? "macOS" : "Linux",
+                      })}`
                     : ""}
                 </span>
               </div>
@@ -210,16 +237,14 @@ export function AboutDialog({
           </div>
 
           <DialogDescription className="text-[13.5px] leading-[1.55] text-t4 text-pretty">
-            Fast, responsive YouTube Music desktop client. Unofficial — not
-            affiliated with, endorsed by, or sponsored by Google or YouTube.
-            "YouTube" and "YouTube Music" are trademarks of Google LLC.
+            {t("about.description")}
           </DialogDescription>
 
           {IS_BETA_PLATFORM && (
             <p className="text-[13.5px] leading-[1.55] text-t4 text-pretty">
-              The {IS_MAC ? "macOS" : "Linux"} build is in beta. If something
-              breaks, please report it via the window menu (⋯ → Report an issue)
-              or on{" "}
+              {t("about.betaNotice", {
+                platform: IS_MAC ? "macOS" : "Linux",
+              })}{" "}
               <button
                 type="button"
                 onClick={link(`${REPO_URL}/issues`)}
@@ -234,10 +259,10 @@ export function AboutDialog({
           <div className="mt-1 flex flex-col gap-3 rounded-xl border border-w075 bg-w028 px-5 py-4">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-t5">
-                Powered by
+                {t("about.poweredBy")}
               </span>
               <span className="text-xs text-t6">
-                Free software ·{" "}
+                {t("about.freeSoftware")}{" "}
                 <button
                   type="button"
                   onClick={link(`${REPO_URL}/blob/main/LICENSE`)}
@@ -262,7 +287,7 @@ export function AboutDialog({
                   >
                     {c.name}
                   </button>
-                  {c.role}
+                  {t(c.roleKey)}
                 </li>
               ))}
             </ul>
@@ -278,7 +303,7 @@ export function AboutDialog({
               <>
                 <IconLoader2 className="size-3.5 animate-spin text-t6" />
                 <span className="text-[12.5px] text-t5">
-                  Checking for updates…
+                  {t("about.checkingForUpdates")}
                 </span>
               </>
             ) : updateLine ? (
@@ -307,7 +332,7 @@ export function AboutDialog({
                   stroke={2.4}
                 />
                 <span className="text-[12.5px] text-t5">
-                  You're on the latest version
+                  {t("about.upToDate")}
                 </span>
               </>
             )}

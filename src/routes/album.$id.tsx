@@ -9,6 +9,7 @@ import { EntityHeaderSkeleton } from "@/components/layout/entity-page-header";
 import { TrackRowSkeletonList } from "@/components/shared/skeletons";
 import { usePlaybackStore } from "@/lib/store/playback";
 import { ErrorCard } from "@/components/shared/error-card";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/album/$id")({
   component: AlbumPageView,
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/album/$id")({
 });
 
 function AlbumPageView() {
+  const t = useT();
   const { id } = Route.useParams();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["album", id],
@@ -29,7 +31,7 @@ function AlbumPageView() {
   if (error) {
     return (
       <ErrorCard
-        title="Couldn't load album"
+        title={t("entity.couldNotLoadAlbum")}
         message={(error as Error).message}
         onRetry={() => refetch()}
       />
@@ -57,7 +59,7 @@ function AlbumPageView() {
 
   const metadataParts = [
     data.releaseDate ?? data.year,
-    data.trackCount ? `${data.trackCount} songs` : undefined,
+    data.trackCount ? t("entity.songCount", { count: data.trackCount }) : undefined,
     data.duration,
   ].filter(Boolean) as string[];
 

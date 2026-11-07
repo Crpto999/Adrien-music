@@ -38,6 +38,8 @@ import type {
 } from "@/lib/innertube/types";
 import { ErrorCard } from "@/components/shared/error-card";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
+import { homeSectionKey } from "@/lib/i18n/home-sections";
 
 export const Route = createFileRoute("/artist/$id")({
   component: ArtistPageView,
@@ -49,6 +51,7 @@ export const Route = createFileRoute("/artist/$id")({
 });
 
 function ArtistPageView() {
+  const t = useT();
   const { id } = Route.useParams();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["artist", id],
@@ -58,7 +61,7 @@ function ArtistPageView() {
   if (error) {
     return (
       <ErrorCard
-        title="Couldn't load artist"
+        title={t("entity.couldNotLoadArtist")}
         message={(error as Error).message}
         onRetry={() => refetch()}
       />
@@ -71,7 +74,9 @@ function ArtistPageView() {
   // subscriber count lives on the Subscribe button instead.
   const subtitle =
     data.monthlyAudience ??
-    (data.subscribers ? `${data.subscribers} subscribers` : undefined);
+    (data.subscribers
+      ? t("entity.subscriberCount", { count: data.subscribers })
+      : undefined);
 
   return (
     <div className="flex flex-col gap-8 px-6 pb-6 pt-3">
@@ -80,7 +85,7 @@ function ArtistPageView() {
         subtitle={
           <>
             <span className="text-xs font-semibold uppercase tracking-wider text-foreground/60">
-              Artist
+              {t("entity.artist")}
             </span>
             {subtitle ? (
               <>
@@ -104,7 +109,7 @@ function ArtistPageView() {
         ) : undefined;
         const useTrackList =
           shelf.display === "list" ||
-          shelf.title.trim().toLowerCase() === "from your library";
+          homeSectionKey(shelf.title) === "from-your-library";
         return useTrackList ? (
           <ListShelf key={shelf.id} shelf={shelf} action={more} />
         ) : (
@@ -123,6 +128,7 @@ function ArtistPageView() {
  * web client's About card.
  */
 function AboutSection({ artist }: { artist: ArtistPage }) {
+  const t = useT();
   if (!artist.description?.trim()) return null;
 
   const stats: { value: string; label: string }[] = [];
@@ -134,16 +140,18 @@ function AboutSection({ artist }: { artist: ArtistPage }) {
       value,
       label: label
         ? label.charAt(0).toUpperCase() + label.slice(1)
-        : "Monthly audience",
+        : t("entity.monthlyAudience"),
     });
   }
   if (artist.subscribers) {
-    stats.push({ value: artist.subscribers, label: "Subscribers" });
+    stats.push({ value: artist.subscribers, label: t("entity.subscribers") });
   }
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="px-1 text-xl font-semibold tracking-tight">About</h2>
+      <h2 className="px-1 text-xl font-semibold tracking-tight">
+        {t("entity.about")}
+      </h2>
       <div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-surface p-4">
         {artist.description ? (
           <ExpandableText
@@ -182,6 +190,7 @@ const NARROW_ICON_ONLY = "@max-[615px]/hdr:w-9 @max-[615px]/hdr:px-0!";
 const NARROW_HIDDEN = "@max-[615px]/hdr:hidden";
 
 function ArtistActions({ artist }: { artist: ArtistPage }) {
+  const t = useT();
   const [pending, setPending] = useState<"shuffle" | "mix" | null>(null);
 
   const play = async (kind: "shuffle" | "mix", target?: WatchTarget) => {
@@ -199,7 +208,7 @@ function ArtistActions({ artist }: { artist: ArtistPage }) {
       if (tracks.length) {
         usePlaybackStore.getState().playShelfItems(tracks, 0);
       } else {
-        toast.error("Couldn't start playback - no tracks returned.");
+        toast.error(t("entity.couldNotStartPlayback"));
       }
     } catch (e) {
       toast.error(`Couldn't start playback: ${(e as Error).message}`);
@@ -220,15 +229,14 @@ function ArtistActions({ artist }: { artist: ArtistPage }) {
           ) : (
             <IconArrowsShuffle />
           )}
-          Shuffle
+          {t("action.shuffle")}
         </Button>
-      ) : null}
-      {artist.mix ? (
+      ) : null}      {artist.mix ? (
         <Button
           variant="secondary"
           onClick={() => play("mix", artist.mix)}
           disabled={pending !== null}
-          aria-label="Mix"
+          aria-label={t("action.mix")}
           className={NARROW_ICON_ONLY}
         >
           {pending === "mix" ? (
@@ -236,7 +244,7 @@ function ArtistActions({ artist }: { artist: ArtistPage }) {
           ) : (
             <IconRadio />
           )}
-          <span className={NARROW_HIDDEN}>Mix</span>
+          <span className={NARROW_HIDDEN}>{t("action.mix")}</span>
         </Button>
       ) : null}
       {artist.channelId ? (
@@ -251,7 +259,7 @@ function ArtistActions({ artist }: { artist: ArtistPage }) {
       <Button
         variant="outline"
         size="icon"
-        aria-label="Share"
+        aria-label={t("action.share")}
         onClick={() =>
           void copyLink(
             universalShareUrl(
@@ -278,6 +286,7 @@ function SubscribeButton({
   initialSubscribed: boolean;
   count?: string;
 }) {
+  const t = useT();
   const [subscribed, setSubscribed] = useState(initialSubscribed);
   const [pending, setPending] = useState(false);
 
@@ -298,8 +307,8 @@ function SubscribeButton({
       setSubscribed(!next);
       toast.error(
         next
-          ? "Couldn't subscribe - are you signed in?"
-          : "Couldn't unsubscribe - are you signed in?",
+          ? t("entity.couldNotSubscribe")
+          : t("entity.couldNotUnsubscribe"),
       );
     } finally {
       setPending(false);
@@ -316,11 +325,11 @@ function SubscribeButton({
       )}
       onClick={toggle}
       disabled={pending}
-      aria-label={subscribed ? "Subscribed" : "Subscribe"}
+      aria-label={subscribed ? t("entity.subscribed") : t("entity.subscribe")}
     >
       {subscribed ? <IconCheck /> : <IconUserPlus />}
       <span className={NARROW_HIDDEN}>
-        {subscribed ? "Subscribed" : "Subscribe"}
+        {subscribed ? t("entity.subscribed") : t("entity.subscribe")}
       </span>
       {count ? (
         <span
@@ -351,6 +360,7 @@ function ShelfMoreLink({
   shelf: Shelf;
   artist: ArtistPage;
 }) {
+  const t = useT();
   const more = shelf.more;
   if (!more) return null;
 
@@ -358,7 +368,7 @@ function ShelfMoreLink({
     "inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground";
   const label = (
     <>
-      More
+      {t("common.more")}
       <IconChevronRight className="size-4" />
     </>
   );
@@ -455,9 +465,9 @@ function ListShelf({
 }) {
   const tracks = shelf.items.filter((i) => i.kind === "song");
   if (tracks.length === 0) return null;
-  const normalizedTitle = shelf.title.trim().toLowerCase();
+  const sectionKey = homeSectionKey(shelf.title);
   const visibleTracks =
-    normalizedTitle === "from your library" ? tracks.slice(0, 5) : tracks;
+    sectionKey === "from-your-library" ? tracks.slice(0, 5) : tracks;
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3 px-1">
@@ -470,7 +480,7 @@ function ListShelf({
           rendered as lists (such as From your library) keep Duration. */}
       <TrackList
         tracks={visibleTracks}
-        showPlays={normalizedTitle === "top songs"}
+        showPlays={sectionKey === "top-songs"}
       />
     </section>
   );

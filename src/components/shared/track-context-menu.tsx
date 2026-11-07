@@ -70,6 +70,7 @@ import {
 } from "@/lib/innertube/mutations";
 import { toggleDisliked, toggleLiked } from "@/lib/like-actions";
 import { useSettingsStore } from "@/lib/store/settings";
+import { useT, translate } from "@/lib/i18n";
 import { usePlaybackStore } from "@/lib/store/playback";
 import { usePlaybackSettings } from "@/lib/store/playback-settings";
 import { armFadeInto } from "@/lib/fade-request";
@@ -185,9 +186,9 @@ export function useTrackMenuController(item: ShelfItem) {
       // possibly VL-prefixed id), so ["playlist", p.id] never matched and
       // the invalidation was a no-op. Prefix-match every open playlist page.
       await qc.invalidateQueries({ queryKey: ["playlist-pages"] });
-      toast.success(`Added to ${p.title}`);
+      toast.success(translate("toast.addedTo", { title: p.title }));
     } catch (e) {
-      toast.error(`Add failed: ${String(e)}`);
+      toast.error(translate("toast.addFailed", { error: String(e) }));
     }
   };
 
@@ -214,7 +215,7 @@ export function useTrackMenuController(item: ShelfItem) {
           })),
         };
       });
-      toast.success("Removed from playlist");
+      toast.success(translate("toast.removedFromPlaylist"));
     } catch (e) {
       toast.error(`Remove failed: ${String(e)}`);
     }
@@ -485,6 +486,7 @@ export function TrackMoreMenu({
   removal?: PlaylistRemovalContext;
   className?: string;
 }) {
+  const t = useT();
   const controller = useTrackMenuController(item);
 
   if (item.kind !== "song" && item.kind !== "video") return null;
@@ -497,7 +499,7 @@ export function TrackMoreMenu({
             variant="ghost"
             size="icon"
             className={className ?? "size-7"}
-            aria-label="More actions"
+            aria-label={t("common.moreActions")}
             onClick={(e) => e.stopPropagation()}
           >
             <IconDots className="size-4" />
@@ -539,6 +541,7 @@ export function NewPlaylistDialog({
   defaultTitle: string;
   videoIds: string[];
 }) {
+  const t = useT();
   const qc = useQueryClient();
   const [title, setTitle] = useState(defaultTitle);
   const [busy, setBusy] = useState(false);
@@ -548,17 +551,17 @@ export function NewPlaylistDialog({
   }, [open, defaultTitle]);
 
   const submit = async () => {
-    const t = title.trim();
-    if (!t || busy) return;
+    const name = title.trim();
+    if (!name || busy) return;
     setBusy(true);
     try {
-      await createPlaylistWithTracks(t, videoIds);
+      await createPlaylistWithTracks(name, videoIds);
       await qc.invalidateQueries({ queryKey: ["user-playlists"] });
       await qc.invalidateQueries({ queryKey: ["library"] });
-      toast.success(`Created "${t}"`);
+      toast.success(t("toast.playlistCreated", { name }));
       onOpenChange(false);
     } catch (e) {
-      toast.error(`Create failed: ${String(e)}`);
+      toast.error(t("toast.playlistCreateFailed", { error: String(e) }));
     } finally {
       setBusy(false);
     }
@@ -568,13 +571,12 @@ export function NewPlaylistDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New playlist</DialogTitle>
+          <DialogTitle>{t("action.newPlaylist")}</DialogTitle>
           <DialogDescription>
             {videoIds.length === 1
-              ? "The track will be added as the first entry."
-              : `The ${videoIds.length} tracks will be added in order.`}{" "}
-            Playlists are created as private — you can change that later on
-            music.youtube.com.
+              ? t("toast.playlistOneTrack")
+              : t("toast.playlistManyTracks", { count: videoIds.length })}{" "}
+            {t("toast.playlistPrivateHint")}
           </DialogDescription>
         </DialogHeader>
         <Input
@@ -584,7 +586,7 @@ export function NewPlaylistDialog({
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
-          placeholder="Playlist name"
+          placeholder={t("action.playlistName")}
           disabled={busy}
         />
         <DialogFooter>
@@ -593,11 +595,11 @@ export function NewPlaylistDialog({
             onClick={() => onOpenChange(false)}
             disabled={busy}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={submit} disabled={busy || !title.trim()}>
             {busy && <IconLoader2 className="animate-spin" />}
-            Create
+            {t("action.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

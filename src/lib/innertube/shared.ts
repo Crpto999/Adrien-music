@@ -1,6 +1,9 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { invoke } from "@tauri-apps/api/core";
 import { sessionReady } from "@/lib/session-gate";
+import { currentInnertubeLocale } from "@/lib/store/locale";
+import { proxyOptions } from "@/lib/proxy";
+import { COUNTER_TOKENS, hasToken } from "./locale-tokens";
 import type { ShelfItem, ShelfMore, Thumbnail } from "./types";
 
 export type YtNode = Record<string, any>;
@@ -52,11 +55,19 @@ function buildContext(anonymous = false): {
   user: unknown;
   request: unknown;
 } {
+  // The response language follows the user's UI language, so the app's
+  // own chrome and the content it renders agree with each other.
+  //
+  // `gl` (content region) is NOT the locale's country: InnerTube
+  // rejects `gl=CN` and `gl=MO` with HTTP 400 "Request contains an
+  // invalid argument" — verified against the live API. The locale table
+  // maps each language to a region the API actually accepts.
+  const { hl, gl } = currentInnertubeLocale();
   const client: Record<string, unknown> = {
     clientName: "WEB_REMIX",
     clientVersion: WEB_REMIX_CLIENT_VERSION,
-    hl: "en",
-    gl: "US",
+    hl,
+    gl,
     platform: "DESKTOP",
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36,gzip(gfe)",
@@ -85,10 +96,18 @@ const BASE_HEADERS: Record<string, string> = {
   Origin: "https://music.youtube.com",
   Referer: "https://music.youtube.com/",
   Accept: "*/*",
-  "Accept-Language": "en-US,en;q=0.9",
   "X-Origin": "https://music.youtube.com",
   "X-Goog-AuthUser": "0",
 };
+
+/**
+ * The `Accept-Language` header for the active locale. Sent alongside
+ * the context's `hl`, matching what the web client sends.
+ */
+export function acceptLanguageHeader(): string {
+  const { hl, gl } = currentInnertubeLocale();
+  return `${hl}-${gl},${hl};q=0.9`;
+}
 
 const YTM_ORIGIN = "https://music.youtube.com";
 
@@ -275,8 +294,14 @@ export async function innertubePost(
     : {};
   const res = await tauriFetch(url, {
     method: "POST",
-    headers: { ...BASE_HEADERS, ...visitorHeader, ...auth },
+    headers: {
+      ...BASE_HEADERS,
+      "Accept-Language": acceptLanguageHeader(),
+      ...visitorHeader,
+      ...auth,
+    },
     body: JSON.stringify({ context: buildContext(opts.anonymous), ...body }),
+    ...proxyOptions(),
   });
 
   // Before the error bail: Google rotates cookies on 4xx responses too.
@@ -638,9 +663,13 @@ export function readRuns(node: YtNode | undefined): string {
  *   - English/Russian month name tokens ("Apr 23", "12 апр.")
  *   - "X ago / назад", "yesterday / today", and their RU equivalents
  *   - common slash/dash date formats (3/12/24, 2024-04-23)
+ *   - Chinese dates ("2026年", "2025年7月22日", "3 天前", "昨天")
  * Reject pure numerics — those are play counts, not dates.
+ *
+ * Exported for unit tests: the locale table is the part most likely to
+ * need a tweak when YTM changes its date wording.
  */
-function looksLikeDate(text: string): boolean {
+export function looksLikeDate(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed) return false;
   if (/^\d{4}$/.test(trimmed)) {
@@ -649,11 +678,15 @@ function looksLikeDate(text: string): boolean {
   }
   if (/(?:\bago\b|назад)/i.test(trimmed)) return true;
   if (/^(?:yesterday|today|сегодня|вчера)$/i.test(trimmed)) return true;
-  if (
-    /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|янв|фев|мар|апр|мая|июн|июл|авг|сен|окт|ноя|дек)/i.test(
-      trimmed,
-    )
-  )
+  // Chinese relative dates: "昨天" / "今天" / "3 天前" / "2 小时前".
+  if (/^(?:昨天|今天|前天)$/.test(trimmed)) return true;
+  if (/\d\s*(?:天|小时|分钟|个月|年)前/.test(trimmed)) return true;
+  // Chinese absolute dates: "2026年" / "2025年7月22日" / "7月22日".
+  if (/^\d{4}年(?:\d{1,2}月)?(?:\d{1,2}日)?$/.test(trimmed)) return true;
+  if (/^\d{1,2}月\d{1,2}日$/.test(trimmed)) return true;
+  if (/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|янв|фев|мар|апр|мая|июн|июл|авг|сен|окт|ноя|дек)/i.test(
+    trimmed,
+  ))
     return true;
   if (/^\d{1,2}[/.]\d{1,2}[/.]\d{2,4}$/.test(trimmed)) return true;
   if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(trimmed)) return true;
@@ -879,14 +912,18 @@ export function mapResponsiveListItem(raw: YtNode): ShelfItem | null {
     if (!wholeText) continue;
     if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(wholeText)) continue;
     // Play counts come in two flavors:
-    //   - "1.2M plays" / "5,234 views" — explicit keyword in any locale.
+    //   - "1.2M plays" / "5,234 views" / "播放次数：2057万" — an explicit
+    //     keyword in any locale.
     //   - Bare number like "1,234,567" or "1.2M" — what artist Top Songs
     //     ships on WEB_REMIX (no "plays" suffix in the payload). Match a
     //     compact numeric/abbreviated form anchored at start to avoid
     //     pulling in "Sep 12, 2023" / "2 days ago" / channel names.
+    //   - Chinese abbreviated counts ("2057万", "1.3亿") carry no digit
+    //     anchor at all, so they need the keyword form above.
     const isCounter =
-      /plays|views|просл|просмотр|播放|观看/i.test(wholeText) ||
-      /^\d[\d\s.,]*\s*[KMBkmbКМБкмбТтт]*$/.test(wholeText);
+      hasToken(wholeText, COUNTER_TOKENS) ||
+      /^\d[\d\s.,]*\s*[KMBkmbКМБкмбТтт]*$/.test(wholeText) ||
+      /^\d+(?:\.\d+)?\s*[万亿]/.test(wholeText);
     if (isCounter) {
       if (!playCount) playCount = wholeText;
     } else if (looksLikeDate(wholeText) && !dateAdded) {

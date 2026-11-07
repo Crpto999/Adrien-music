@@ -8,6 +8,7 @@ import {
   Thumbnail,
 } from "@/components/shared/thumbnail";
 import { openCoverLightbox } from "@/lib/store/cover-lightbox";
+import { translate } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
   useEntityHeaderStore,
@@ -287,7 +288,9 @@ export function EntityPageHeader() {
         config.thumbnails.length > 0 ? (
           <button
             type="button"
-            aria-label={`Enlarge artwork for ${config.title}`}
+            aria-label={translate("entity.enlargeArtwork", {
+              title: config.title,
+            })}
             aria-haspopup="dialog"
             className="absolute inset-0 cursor-zoom-in rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             onClick={() => {

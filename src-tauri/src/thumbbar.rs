@@ -231,7 +231,7 @@ pub fn init(app: &AppHandle) {
         .and_then(|w| w.hwnd().ok())
         .map(|h| HWND(h.0 as *mut c_void))
     else {
-        eprintln!("[thumbbar] no main window HWND; skipping");
+        crate::log!("[thumbbar] no main window HWND; skipping");
         return;
     };
 
@@ -260,7 +260,7 @@ pub fn init(app: &AppHandle) {
 
     unsafe {
         if !SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0).as_bool() {
-            eprintln!("[thumbbar] failed to subclass the main window");
+            crate::log!("[thumbbar] failed to subclass the main window");
         }
     }
 
@@ -313,7 +313,7 @@ fn attach() {
     let icons = icons.or_else(|| build_icons(light, dpi));
     let list = icons.as_ref().and_then(|i| add_buttons(hwnd, i, flags));
     if list.is_some() {
-        eprintln!("[thumbbar] toolbar attached ({}px icons)", 16 * dpi / 96);
+        crate::log!("[thumbbar] toolbar attached ({}px icons)", 16 * dpi / 96);
     }
 
     leave(|st| {
@@ -337,19 +337,19 @@ fn add_buttons(hwnd: HWND, icons: &Icons, flags: Flags) -> Option<ITaskbarList3>
         match unsafe { CoCreateInstance(&TaskbarList as *const GUID, None, CLSCTX_INPROC_SERVER) } {
             Ok(l) => l,
             Err(e) => {
-                eprintln!("[thumbbar] CoCreateInstance(TaskbarList) failed: {e}");
+                crate::log!("[thumbbar] CoCreateInstance(TaskbarList) failed: {e}");
                 return None;
             }
         };
     if let Err(e) = unsafe { list.HrInit() } {
-        eprintln!("[thumbbar] HrInit failed: {e}");
+        crate::log!("[thumbbar] HrInit failed: {e}");
         return None;
     }
     let buttons = buttons(icons, flags);
     // ThumbBarAddButtons is one-shot per window per taskbar-list instance;
     // everything after this goes through ThumbBarUpdateButtons.
     if let Err(e) = unsafe { list.ThumbBarAddButtons(hwnd, &buttons) } {
-        eprintln!("[thumbbar] ThumbBarAddButtons failed: {e}");
+        crate::log!("[thumbbar] ThumbBarAddButtons failed: {e}");
         return None;
     }
     Some(list)
@@ -377,7 +377,7 @@ fn sync() {
 
     let buttons = buttons(&icons, flags);
     if let Err(e) = unsafe { list.ThumbBarUpdateButtons(hwnd, &buttons) } {
-        eprintln!("[thumbbar] ThumbBarUpdateButtons failed: {e}");
+        crate::log!("[thumbbar] ThumbBarUpdateButtons failed: {e}");
     }
 
     leave(|st| st.icons = Some(icons));
@@ -700,7 +700,7 @@ fn make_icon(glyph: &Glyph, size: u32, rgb: u32) -> Option<HICON> {
     let tree = match Tree::from_str(&svg, &usvg::Options::default()) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("[thumbbar] glyph parse failed: {e}");
+            crate::log!("[thumbbar] glyph parse failed: {e}");
             return None;
         }
     };

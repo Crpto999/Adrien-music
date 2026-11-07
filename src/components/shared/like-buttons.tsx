@@ -18,6 +18,7 @@ import { useTrackMetaStore } from "@/lib/store/track-meta";
 import { useDislikesStore } from "@/lib/store/dislikes";
 import { useSettingsStore } from "@/lib/store/settings";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 // Module-level memo of the liked-id Set. With ~5k liked tracks and ~100
 // LikeDislikeButtons on a single page, doing `(liked.data ?? []).some(...)`
@@ -61,6 +62,7 @@ export function LikeDislikeButtons({
   hideUnlessLiked,
   meta,
 }: Props) {
+  const t = useT();
   const qc = useQueryClient();
   const [busy, setBusy] = useState<"like" | "dislike" | null>(null);
   // Appearance -> Rating buttons: a heart, or thumbs up + thumbs down.
@@ -148,7 +150,7 @@ export function LikeDislikeButtons({
         className={cn(btnSize, buttonClassName)}
         onClick={onLike}
         disabled={busy !== null}
-        aria-label={isLiked ? "Remove from liked" : "Add to liked"}
+        aria-label={isLiked ? t("like.removeFromLiked") : t("like.addToLiked")}
         aria-pressed={isLiked}
       >
         <LikeIcon className={cn(iconSize, isLiked && "text-brand")} />
@@ -160,7 +162,7 @@ export function LikeDislikeButtons({
           className={cn(btnSize, buttonClassName)}
           onClick={onDislike}
           disabled={busy !== null}
-          aria-label={isDisliked ? "Remove dislike" : "Dislike"}
+          aria-label={isDisliked ? t("like.removeDislike") : t("like.dislike")}
           aria-pressed={isDisliked}
         >
           <DislikeIcon className={cn(iconSize, isDisliked && "text-t3")} />

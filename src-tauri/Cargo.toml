@@ -40,13 +40,22 @@ tauri-plugin-http = { version = "2", default-features = false, features = [
     "http2",
     "charset",
     "macos-system-configuration",
+    # SOCKS proxies (socks4 / socks4a / socks5 / socks5h) need reqwest's
+    # `socks` feature — without it reqwest rejects the scheme outright.
+    # See src/proxy.rs.
+    "socks",
 ] }
 tauri-plugin-store = "2"
 tauri-plugin-shell = "2"
 # rustls rather than native-tls: tauri-plugin-http already compiles reqwest
 # 0.12 with rustls, so native-tls only added a second TLS stack (OpenSSL on
 # Linux, plus hyper-tls/tokio-native-tls everywhere).
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls",
+    # Same reason as tauri-plugin-http above: our own reqwest clients
+    # (stream server, cover fetch) speak SOCKS too.
+    "socks",
+] }
 urlencoding = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "io-util", "process", "sync", "net"] }
 axum = "0.7"

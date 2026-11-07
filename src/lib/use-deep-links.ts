@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { listenDeepLinks } from "@/lib/deep-link";
 import { fetchRadio } from "@/lib/innertube/radio";
 import { usePlaybackStore } from "@/lib/store/playback";
+import { translate } from "@/lib/i18n";
 
 /** Route `ytubic://` links into the app: play a track or open a page. */
 export function useDeepLinks() {
@@ -55,5 +56,5 @@ async function playVideoId(videoId: string) {
   }
   // Bare fallback: the player resolves the stream from the id alone.
   playNow({ kind: "song", id: videoId, title: videoId, thumbnails: [] });
-  toast.message("Playing shared track");
+  toast.message(translate("toast.playingSharedTrack"));
 }
