@@ -202,6 +202,17 @@ The workflow builds the manifest itself, in a single job, rather than
 letting each platform leg write it — see
 `scripts/build-updater-manifest.py` for why that matters.
 
+After publishing, the workflow re-downloads the release and checks every
+signature against the public key in `src-tauri/tauri.conf.json`, the same
+way the updater will. A mismatch fails the release instead of reaching
+users. The same check runs locally:
+
+```bash
+pip install cryptography
+python scripts/verify-updater-signature.py <installer> <installer>.sig
+python scripts/verify-published-updater.py --tag v0.13.0 --repo owner/name
+```
+
 ## Project layout
 
 ```

@@ -121,11 +121,28 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the signature verifier's dependency
+        run: pip install cryptography
       - name: Rename assets and build the updater manifest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 scripts/build-updater-manifest.py \
+            --tag "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}"
+      - name: Verify the published signature
+        # Re-download what was just published and check it the same way
+        # the updater will: against the public key baked into
+        # src-tauri/tauri.conf.json. A mismatch here means every user
+        # would be told the update is corrupt, so the release fails
+        # before anyone can install it.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 scripts/verify-published-updater.py \
             --tag "${{ github.ref_name }}" \
             --repo "${{ github.repository }}"
 
