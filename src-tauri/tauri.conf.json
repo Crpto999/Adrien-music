@@ -48,9 +48,9 @@
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUwODdBRjc2NDYxRjIwMzQKUldRMElCOUdkcStINE9ZbDNCdG0wcTl1SkJ1ZW9wdjgzajRjNk1JaUdSTVkzSmZsdkh4M21GVWIK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4NDc3OTBDN0M3OUQxQUQKUldTdDBYbDhESGxIYUpxenFGRU9sZDB4eXlUZG1IY1NtM282VDFKS0ZsMlpwRlc0ZjdObmVoR3kK",
       "endpoints": [
-        "https://github.com/ameenalasady/YTubic/releases/latest/download/latest.json"
+        "https://github.com/Crpto999/Adrien-music/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "quiet"

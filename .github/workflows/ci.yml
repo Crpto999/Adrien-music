@@ -39,3 +39,17 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev
       - name: cargo test
         run: cargo test --lib --manifest-path src-tauri/Cargo.toml
+
+  # The release tooling is Python, and a wrong platform key in the
+  # updater manifest means the updater can't find the build for that
+  # machine -- so it gets the same treatment as the rest of the code.
+  release-tooling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test the updater manifest script
+        run: python -m unittest discover -s scripts -v
+

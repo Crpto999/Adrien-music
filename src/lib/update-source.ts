@@ -27,7 +27,7 @@ export type UpdateSource = {
 
 export const AUR_URL = "https://aur.archlinux.org/packages/ytubic";
 export const RELEASES_URL =
-  "https://github.com/ameenalasady/YTubic/releases";
+  "https://github.com/Crpto999/Adrien-music/releases";
 /** Refresh command for the given helper; unknown helpers fall back. */
 export function aurUpdateCmd(helper: string): string {
   const h =

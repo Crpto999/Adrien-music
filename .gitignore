@@ -32,3 +32,7 @@ src/routeTree.gen.ts
 # Rust / Tauri
 src-tauri/target/
 src-tauri/gen/
+
+# Python (release tooling)
+__pycache__/
+*.pyc

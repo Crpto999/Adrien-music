@@ -33,7 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 
-const REPO_URL = "https://github.com/ameenalasady/YTubic";
+const REPO_URL = "https://github.com/Crpto999/Adrien-music";
 // Fork note: use this fork's Discord (README badge) rather than upstream's.
 // Upstream's X + Donate links from e746966 are intentionally skipped — they
 // are the upstream author's personal links, not relevant to this fork.

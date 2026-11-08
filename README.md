@@ -27,7 +27,9 @@ Built as a reaction to the sluggish webview-wrapper experience — YTubic talks 
 
 ## What this fork adds
 
-This is a fork of [NUber-dev/YTubic](https://github.com/NUber-dev/YTubic). On top of the original, it adds:
+This is a fork of [NUber-dev/YTubic](https://github.com/NUber-dev/YTubic), via
+[ameenalasady/YTubic](https://github.com/ameenalasady/YTubic). On top of the
+original, it adds:
 
 - **No Premium gating** — drops upstream's YouTube Music Premium playback gate; streaming and caching are free for every account (the premium store is kept only for the sidebar's informational tier badge)
 - **Linux support** — native build with MPRIS media controls and Secret Service-encrypted cookie storage
@@ -145,6 +147,33 @@ pnpm build        # tsc + vite production build
 
 CI (`.github/workflows/ci.yml`) runs typecheck, lint, tests, build and
 `cargo check` on every push / PR.
+
+## Releasing
+
+The release workflow (`.github/workflows/release.yml`) builds Windows
+(x64 and ARM64), a universal macOS app and Linux packages on every
+`v*` tag, then publishes a **draft** release you review and publish by hand.
+
+```bash
+# Bump the version first — it lives in three places and they must agree:
+#   package.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json
+git tag v0.13.0 && git push origin v0.13.0
+```
+
+Two repository secrets have to be set for the in-app updater to work:
+
+- `TAURI_SIGNING_PRIVATE_KEY` — the minisign private key that signs the
+  updater artifacts. The matching public key is baked into
+  `src-tauri/tauri.conf.json` under `plugins.updater.pubkey`.
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — its passphrase (empty if the key
+  has none).
+
+Without them the bundles still build, but no `latest.json` is produced and
+the app cannot install an update.
+
+The workflow builds the manifest itself, in a single job, rather than
+letting each platform leg write it — see
+`scripts/build-updater-manifest.py` for why that matters.
 
 ## Project layout
 
