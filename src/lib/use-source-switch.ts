@@ -93,7 +93,11 @@ export function useSourceSwitch(track: QueueTrack) {
         return true;
       } catch (e) {
         if (!silent) {
-          toast.error(`Couldn't switch source: ${(e as Error).message}`);
+          toast.error(
+            translate("toast.sourceSwitchFailed", {
+              error: (e as Error).message,
+            }),
+          );
         }
         return false;
       } finally {

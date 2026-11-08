@@ -77,7 +77,9 @@ export function FeedView({
       <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
         {isFetching && !isLoading && !isFetchingNextPage ? (
-          <span className="text-xs text-muted-foreground">Updating…</span>
+          <span className="text-xs text-muted-foreground">
+            {translate("common.updating")}
+          </span>
         ) : null}
       </div>
 

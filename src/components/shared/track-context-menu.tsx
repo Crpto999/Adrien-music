@@ -151,7 +151,7 @@ export function useTrackMenuController(item: ShelfItem) {
         track: item,
       });
     } catch (e) {
-      toast.error(`Like failed: ${String(e)}`);
+      toast.error(translate("toast.likeFailed", { error: String(e) }));
     }
   };
   const runRemoveRating = async () => {
@@ -163,7 +163,7 @@ export function useTrackMenuController(item: ShelfItem) {
         track: item,
       });
     } catch (e) {
-      toast.error(`Remove failed: ${String(e)}`);
+      toast.error(translate("toast.removeFailed", { error: String(e) }));
     }
   };
   const runDislike = async () => {
@@ -176,7 +176,7 @@ export function useTrackMenuController(item: ShelfItem) {
         track: item,
       });
     } catch (e) {
-      toast.error(`Failed: ${String(e)}`);
+      toast.error(translate("toast.actionFailed", { error: String(e) }));
     }
   };
   const runAddToPlaylist = async (p: UserPlaylist) => {
@@ -217,7 +217,7 @@ export function useTrackMenuController(item: ShelfItem) {
       });
       toast.success(translate("toast.removedFromPlaylist"));
     } catch (e) {
-      toast.error(`Remove failed: ${String(e)}`);
+      toast.error(translate("toast.removeFailed", { error: String(e) }));
     }
   };
 
@@ -261,6 +261,7 @@ export function TrackMenuItems({
 }) {
   const store = usePlaybackStore.getState;
   const { Item, Separator, Sub, SubTrigger, SubContent } = primitives;
+  const t = useT();
   // With thumbs on every row the rating items would only repeat them.
   const thumbs = useSettingsStore((s) => s.ratingButtons === "both");
   const crossfadeSec = usePlaybackSettings((s) => s.crossfadeSec);
@@ -288,7 +289,7 @@ export function TrackMenuItems({
         }}
       >
         <IconPlayerPlayFilled />
-        Play
+        {t("trackMenu.play")}
       </Item>
       {crossfadeSec > 0 && somethingPlaying ? (
         <Item
@@ -301,16 +302,16 @@ export function TrackMenuItems({
           }}
         >
           <IconTransitionRightFilled />
-          Play with crossfade
+          {t("trackMenu.playWithCrossfade")}
         </Item>
       ) : null}
       <Item onSelect={() => store().enqueueNext(item)}>
         <IconPlayerTrackNextFilled />
-        Play next
+        {t("trackMenu.playNext")}
       </Item>
       <Item onSelect={() => store().enqueueEnd(item)}>
         <IconPlaylistAddFilled />
-        Add to queue
+        {t("trackMenu.addToQueue")}
       </Item>
       <Item
         onSelect={async () => {
@@ -323,7 +324,7 @@ export function TrackMenuItems({
         }}
       >
         <IconRadioFilled />
-        Start radio
+        {t("trackMenu.startRadio")}
       </Item>
 
       <Separator />
@@ -333,17 +334,17 @@ export function TrackMenuItems({
           {isLiked ? (
             <Item variant="destructive" onSelect={runRemoveRating}>
               <IconHeartOffFilled />
-              Remove from liked
+              {t("trackMenu.removeFromLiked")}
             </Item>
           ) : (
             <Item onSelect={runLike}>
               <IconHeartFilled />
-              Add to liked
+              {t("trackMenu.addToLiked")}
             </Item>
           )}
           <Item onSelect={runDislike}>
             <IconThumbDownFilled />
-            Not interested
+            {t("trackMenu.notInterested")}
           </Item>
         </>
       )}
@@ -354,21 +355,21 @@ export function TrackMenuItems({
           onFocus={primeUserPlaylists}
         >
           <IconPlaylist />
-          Add to playlist
+          {t("trackMenu.addToPlaylist")}
         </SubTrigger>
         <SubContent className="max-h-80 w-64 overflow-y-auto">
           {playlists.isFetching && !playlists.data ? (
             <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
               <IconLoader2 className="size-3 animate-spin" />
-              Loading…
+              {t("trackMenu.loadingPlaylists")}
             </div>
           ) : playlists.isError ? (
             <div className="px-2 py-1.5 text-sm text-muted-foreground">
-              Sign in to add to playlists.
+              {t("trackMenu.signInToAddPlaylists")}
             </div>
           ) : (playlists.data ?? []).length === 0 ? (
             <div className="px-2 py-1.5 text-sm text-muted-foreground">
-              No playlists yet.
+              {t("trackMenu.noPlaylistsYet")}
             </div>
           ) : (
             (playlists.data ?? []).map((p) => (
@@ -380,7 +381,7 @@ export function TrackMenuItems({
           <Separator />
           <Item onSelect={() => setNewPlaylistOpen(true)}>
             <IconPlus />
-            New playlist…
+            {t("trackMenu.newPlaylist")}
           </Item>
         </SubContent>
       </Sub>
@@ -391,7 +392,7 @@ export function TrackMenuItems({
           onSelect={() => runRemoveFromPlaylist(removal)}
         >
           <IconPlaylistXFilled />
-          Remove from playlist
+          {t("trackMenu.removeFromPlaylist")}
         </Item>
       ) : null}
 
@@ -408,7 +409,7 @@ export function TrackMenuItems({
           }}
         >
           <IconDiscFilled />
-          Go to album
+          {t("trackMenu.goToAlbum")}
         </Item>
       )}
 
@@ -418,7 +419,7 @@ export function TrackMenuItems({
           when it's installed and falls back to YouTube Music when it isn't. */}
       <Item onSelect={() => void copyLink(universalShareUrl("watch", item.id))}>
         <IconShare3Filled />
-        Share
+        {t("trackMenu.share")}
       </Item>
     </>
   );

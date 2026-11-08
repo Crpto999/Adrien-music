@@ -115,10 +115,10 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
         tracks.map((t) => t.id),
       );
       await qc.invalidateQueries({ queryKey: ["playlist-pages"] });
-      toast.success(`Added ${label} to ${p.title}`);
+      toast.success(translate("toast.addedToPlaylist", { label, title: p.title }));
       onClear();
     } catch (e) {
-      toast.error(`Add failed: ${String(e)}`);
+      toast.error(translate("toast.addFailed", { error: String(e) }));
     } finally {
       setBusy(false);
     }

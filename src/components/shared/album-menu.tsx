@@ -80,7 +80,7 @@ export function useAlbumMenuController(albumId: string, album?: AlbumPage) {
         staleTime: 5 * 60_000,
       });
     } catch (e) {
-      toast.error(`Couldn't load album: ${String(e)}`);
+      toast.error(translate("toast.albumLoadFailed", { error: String(e) }));
       return null;
     }
   };
@@ -111,7 +111,7 @@ export function useAlbumMenuController(albumId: string, album?: AlbumPage) {
     for (const t of [...items].reverse()) {
       usePlaybackStore.getState().enqueueNext(t);
     }
-    toast.success(`Playing next: ${a.title}`);
+    toast.success(translate("toast.playingNext", { title: a.title }));
   };
 
   const addToQueue = async () => {
@@ -175,6 +175,7 @@ export function AlbumMenuItems({
   const { Item, Separator } = primitives;
   const { play, playNext, addToQueue, startRadio, goToArtist, share } =
     controller;
+  const t = useT();
   const crossfadeSec = usePlaybackSettings((s) => s.crossfadeSec);
   const somethingPlaying = usePlaybackStore((s) => s.playing);
 
@@ -182,36 +183,36 @@ export function AlbumMenuItems({
     <>
       <Item onSelect={() => void play(false)}>
         <IconPlayerPlayFilled />
-        Play
+        {t("trackMenu.play")}
       </Item>
       {crossfadeSec > 0 && somethingPlaying ? (
         <Item onSelect={() => void play(false, true)}>
           <IconTransitionRightFilled />
-          Play with crossfade
+          {t("trackMenu.playWithCrossfade")}
         </Item>
       ) : null}
       <Item onSelect={() => void play(true)}>
         <IconArrowsShuffle />
-        Shuffle play
+        {t("trackMenu.shufflePlay")}
       </Item>
       <Item onSelect={() => void playNext()}>
         <IconPlayerTrackNextFilled />
-        Play next
+        {t("trackMenu.playNext")}
       </Item>
       <Item onSelect={() => void addToQueue()}>
         <IconPlaylistAddFilled />
-        Add to queue
+        {t("trackMenu.addToQueue")}
       </Item>
       <Item onSelect={() => void startRadio()}>
         <IconRadioFilled />
-        Start radio
+        {t("trackMenu.startRadio")}
       </Item>
 
       <Separator />
 
       <Item onSelect={() => void goToArtist()}>
         <IconUserFilled />
-        Go to artist
+        {t("trackMenu.goToArtist")}
       </Item>
 
       <Separator />
@@ -220,7 +221,7 @@ export function AlbumMenuItems({
           when it's installed and falls back to YouTube Music when it isn't. */}
       <Item onSelect={() => void share()}>
         <IconShare3Filled />
-        Share
+        {t("trackMenu.share")}
       </Item>
     </>
   );

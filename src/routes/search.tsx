@@ -488,7 +488,9 @@ function TopResultHero({
       if (tracks.length) store.playShelfItems(tracks, 0);
       else toast.error(t("entity.couldNotStartPlayback"));
     } catch (e) {
-      toast.error(`Couldn't start playback: ${(e as Error).message}`);
+      toast.error(
+        t("toast.playbackStartFailed", { error: (e as Error).message }),
+      );
     } finally {
       setPending(false);
     }

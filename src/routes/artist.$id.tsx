@@ -211,7 +211,9 @@ function ArtistActions({ artist }: { artist: ArtistPage }) {
         toast.error(t("entity.couldNotStartPlayback"));
       }
     } catch (e) {
-      toast.error(`Couldn't start playback: ${(e as Error).message}`);
+      toast.error(
+        t("toast.playbackStartFailed", { error: (e as Error).message }),
+      );
     } finally {
       setPending(null);
     }

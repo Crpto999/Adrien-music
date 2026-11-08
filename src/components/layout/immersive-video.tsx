@@ -3,7 +3,7 @@ import { IconLoader2 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { usePlaybackStore } from "@/lib/store/playback";
 import { videoUrlFor } from "@/lib/stream";
-import { useT } from "@/lib/i18n";
+import { translate, useT } from "@/lib/i18n";
 
 /** Beyond this the picture is re-seeked; below it the rate is nudged. */
 const HARD_SEEK_SEC = 0.6;
@@ -218,7 +218,12 @@ export function ImmersiveVideo({
     setSlots(next);
     setSwitching(null);
     promotingRef.current = false;
-    toast.error(`Couldn't load ${cur.q}p, staying on ${activeQ}p`);
+    toast.error(
+      translate("toast.couldNotLoadQuality", {
+        quality: cur.q,
+        activeQuality: activeQ,
+      }),
+    );
   };
 
   return (

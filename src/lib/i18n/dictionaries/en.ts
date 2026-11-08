@@ -110,6 +110,37 @@ export const en = {
     addToQueue: "Add to queue",
   },
 
+  /**
+    * The right-click / "more" menus on a track row and on an album
+    * card.
+    *
+    * A namespace of its own rather than a pile of top-level keys,
+    * because these two menus are rendered from one shared component
+    * that is used in half a dozen places — a flat `menu.play` would
+    * read as a global.
+    */
+  trackMenu: {
+    play: "Play",
+    playWithCrossfade: "Play with crossfade",
+    shufflePlay: "Shuffle play",
+    playNext: "Play next",
+    addToQueue: "Add to queue",
+    startRadio: "Start radio",
+    addToLiked: "Add to liked",
+    removeFromLiked: "Remove from liked",
+    notInterested: "Not interested",
+    addToPlaylist: "Add to playlist",
+    newPlaylist: "New playlist…",
+    loadingPlaylists: "Loading…",
+    signInToAddPlaylists: "Sign in to add to playlists.",
+    noPlaylistsYet: "No playlists yet.",
+    removeFromPlaylist: "Remove from playlist",
+    goToAlbum: "Go to album",
+    goToArtist: "Go to artist",
+    downloadCover: "Download cover",
+    share: "Share",
+  },
+
   cover: {
     classic: "Classic",
     clear: "Clear",
@@ -175,6 +206,9 @@ export const en = {
     sideCard: "Side card",
     bottomBar: "Bottom bar",
     floatingWindow: "Floating window",
+    fsCentered: "Centered",
+    fsWithLyrics: "With lyrics",
+    fsImmersive: "Immersive art",
     nowPlaying: "Now playing",
     currentlyPlaying: "Currently playing",
     noVideoVersionFound: "No video version found",
@@ -455,8 +489,11 @@ export const en = {
     logPathCopied: "Log path copied to clipboard",
     addedToQueue: "Added to queue: {title}",
     addedTo: "Added to {title}",
+    addedToPlaylist: "Added {label} to {title}",
     addFailed: "Add failed: {error}",
     playingNext: "Playing next: {title}",
+    albumLoadFailed: "Couldn't load album: {error}",
+    couldNotLoadQuality: "Couldn't load {quality}p, staying on {activeQuality}p",
     couldNotLoadVersionStillPlaying:
       "Couldn't load that version, still playing the current one",
     signedOut: "Signed out",
@@ -464,11 +501,14 @@ export const en = {
     signOutFailed: "Sign out failed: {error}",
     signOut: "Sign out failed",
     switchFailed: "Switch failed: {error}",
-    couldNotStartPlayback: "Couldn't start playback — no tracks returned.",
+    playbackStartFailed: "Couldn't start playback: {error}",
     coverSaved: "Cover saved",
     couldNotLoadVideo: "Couldn't load the video",
     couldNotUseImage: "Couldn't use that image",
     removedFromPlaylist: "Removed from playlist",
+    likeFailed: "Like failed: {error}",
+    removeFailed: "Remove failed: {error}",
+    actionFailed: "Action failed: {error}",
     playlistIsEmpty: "This playlist is empty",
     noArtistPage: "No artist page for this album",
     cacheFolderUpdated: "Cache folder updated",
@@ -496,6 +536,8 @@ export const en = {
     dislikeRemoved: "Dislike removed",
     disliked: "Disliked",
     coverSavedWithPath: "Cover saved",
+    coverSaveFailed: "Couldn't save cover: {error}",
+    sourceSwitchFailed: "Couldn't switch source: {error}",
     audioEngineReady: "Audio engine ready",
     couldNotDownloadYtdlp: "Couldn't download yt-dlp — playback won't work",
     couldNotCheckUpdates: "Couldn't check for updates",
@@ -622,9 +664,6 @@ export const en = {
       playerLayoutDesc: "Choose where the now-playing card lives.",
       fullscreenLayout: "Fullscreen player layout",
       fullscreenLayoutDesc: "How the now-playing screen fills the display.",
-      fsCentered: "Centered",
-      fsWithLyrics: "With lyrics",
-      fsImmersive: "Immersive art",
       interfaceFont: "Interface font",
       interfaceFontDesc:
         "Applies to the whole app. Track and artist names use it too.",

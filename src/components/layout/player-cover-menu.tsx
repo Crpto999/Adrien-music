@@ -75,7 +75,7 @@ export function PlayerCoverMenu({ track, children }: Props) {
         description: path,
       });
     } catch (e) {
-      toast.error(`Couldn't save cover: ${String(e)}`);
+      toast.error(translate("toast.coverSaveFailed", { error: String(e) }));
     } finally {
       setSaving(false);
     }
@@ -106,7 +106,7 @@ export function PlayerCoverMenu({ track, children }: Props) {
             ) : (
               <IconDownload />
             )}
-            Download cover
+            {translate("trackMenu.downloadCover")}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

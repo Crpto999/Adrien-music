@@ -673,7 +673,7 @@ function UserProfile() {
                 // First look at the session, typically the few seconds
                 // at launch while the keeper renews an old snapshot.
                 <IconLoader2
-                  aria-label={t("sidebar.connecting")}
+                  aria-label={t("sidebar.connect")}
                   className="ms-auto size-3.5 shrink-0 animate-spin text-t6 group-data-[collapsible=icon]:hidden"
                 />
               ) : null}

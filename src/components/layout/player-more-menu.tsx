@@ -178,7 +178,7 @@ function SourceMenuItems({ track }: { track: QueueTrack }) {
       setAlternate(track.videoId, target, altId);
       setSelected(track.videoId, target);
     } catch (e) {
-      toast.error(`Couldn't switch source: ${(e as Error).message}`);
+      toast.error(t("toast.sourceSwitchFailed", { error: (e as Error).message }));
     } finally {
       setBusy(null);
     }
