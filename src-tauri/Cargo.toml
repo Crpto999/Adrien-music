@@ -78,9 +78,6 @@ souvlaki = "0.7"
 # from Settings. See src/discord.rs. Set YTUBIC_DISCORD_APP_ID at build time
 # (or edit APP_ID) to the Application ID of a Discord app named "YTubic".
 discord-rich-presence = "0.2"
-# MD5 for Last.fm request signing (api_sig = md5 of sorted params + secret).
-# Tiny, single-purpose crate. See src/lastfm.rs.
-md5 = "0.7"
 # stream::unfold for the progressive /stream response body (progressive.rs).
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 

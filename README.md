@@ -34,7 +34,7 @@ original, it adds:
 - **No Premium gating** — drops upstream's YouTube Music Premium playback gate; streaming and caching are free for every account (the premium store is kept only for the sidebar's informational tier badge)
 - **Linux support** — native build with MPRIS media controls and Secret Service-encrypted cookie storage
 - **Discord Rich Presence** — shows what you're listening to on Discord
-- **Last.fm integration** — scrobbling, now-playing status, loved-tracks sync, and an account card
+- **Last.fm integration** — scrobbling, now-playing status, loved-tracks sync, and an account card (needs your own Last.fm API key — see [Last.fm](#lastfm-integration))
 - **Playback persistence** — resumes your last track at its saved playhead, and restores scroll position and the last-visited page on launch
 - **Persistent track cache** — cached tracks survive restarts, with real titles/artwork and a search box, bounded to a size limit
 - **Customizable layout** — resizable sidebar and side panel, home page section reordering, pin/hide playlists from the sidebar
@@ -114,6 +114,33 @@ guarantees; see the disclaimer above.
 YouTube periodically changes its streaming internals. yt-dlp usually ships a
 fix within days, and the app picks it up automatically (it self-updates its
 yt-dlp copy every ~3 days). Restarting the app forces the check.
+
+## Last.fm integration
+
+Scrobbling, now-playing status and loved-tracks sync are **off by default**
+and need your own Last.fm API key — the app ships none. Nothing is baked
+into the build; the key and secret live only in your local app storage.
+
+To set it up:
+
+1. Create a Last.fm API account at
+   [last.fm/api/account/create](https://www.last.fm/api/account/create).
+   The callback URL can be anything — the desktop app never uses it.
+2. Copy the **API key** and **shared secret** from the account page.
+3. In the app: Settings → Integrations → Last.fm, paste both, and press
+   Connect. Your browser opens to authorize; the app picks the session up
+   within a couple of seconds.
+
+Two switches then become available:
+
+- **Scrobble tracks** — reports what you play to your Last.fm profile. A
+  track counts once you have listened to half its length (or four minutes,
+  whichever comes first); anything under 30 seconds never counts.
+- **Sync loved tracks** — liking a track here also marks it as loved on
+  Last.fm, and unliking un-loves it.
+
+Scrobbles that fail because you were offline are queued locally and
+retried once the connection is back.
 
 ## Stack
 

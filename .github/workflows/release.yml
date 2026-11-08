@@ -81,11 +81,6 @@ jobs:
           # secret still SETS the env var (empty), which sends the bundler
           # down the certificate-import path and fails the build.
           APPLE_SIGNING_IDENTITY: "-"
-          # Baked into the build by src-tauri/build.rs. Add these as repo
-          # Actions secrets. If unset, the released build just ships with
-          # scrobbling disabled and nothing else breaks.
-          YTUBIC_LASTFM_API_KEY: ${{ secrets.YTUBIC_LASTFM_API_KEY }}
-          YTUBIC_LASTFM_API_SECRET: ${{ secrets.YTUBIC_LASTFM_API_SECRET }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "YTubic ${{ github.ref_name }}"
