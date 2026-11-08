@@ -187,16 +187,20 @@ The release workflow (`.github/workflows/release.yml`) builds Windows
 git tag v0.13.0 && git push origin v0.13.0
 ```
 
-Two repository secrets have to be set for the in-app updater to work:
+One repository secret has to be set for the in-app updater to work:
 
 - `TAURI_SIGNING_PRIVATE_KEY` — the minisign private key that signs the
   updater artifacts. The matching public key is baked into
   `src-tauri/tauri.conf.json` under `plugins.updater.pubkey`.
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — its passphrase (empty if the key
-  has none).
 
-Without them the bundles still build, but no `latest.json` is produced and
-the app cannot install an update.
+The key has no passphrase, so the workflow passes an empty password.
+It is spelled out in `release.yml` rather than read from a secret
+because it has to be *present* in the environment even when empty: the
+bundler decides whether to prompt for a password by whether the
+variable exists, and a missing variable makes it wait on stdin forever.
+
+Without the private key the bundles still build, but no `latest.json` is
+produced and the app cannot install an update.
 
 The workflow builds the manifest itself, in a single job, rather than
 letting each platform leg write it — see
