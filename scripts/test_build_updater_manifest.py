@@ -27,6 +27,9 @@ class FriendlyNameTest(unittest.TestCase):
             mod.friendly_name("adrify_0.13.0_x64-setup.exe", "0.13.0"),
             "adrify_0.13.0_Windows_x64_Setup.exe",
         )
+        # Windows is x64 only -- the ARM64 release leg was dropped, but
+        # the naming rule stays so a stray asset is still labelled
+        # correctly instead of being published as `Windows_x64`.
         self.assertEqual(
             mod.friendly_name("adrify_0.13.0_aarch64-setup.exe", "0.13.0"),
             "adrify_0.13.0_Windows_arm64_Setup.exe",
@@ -68,10 +71,6 @@ class PlatformKeysTest(unittest.TestCase):
             mod.platform_keys("adrify_0.13.0_x64-setup.exe"),
             ["windows-x86_64", "windows-x86_64-nsis"],
         )
-        self.assertEqual(
-            mod.platform_keys("adrify_0.13.0_aarch64-setup.exe"),
-            ["windows-aarch64", "windows-aarch64-nsis"],
-        )
 
     def test_universal_macos_covers_both_architectures(self):
         self.assertEqual(
@@ -106,10 +105,13 @@ class PlatformKeysTest(unittest.TestCase):
     def test_key_set_matches_a_real_release(self):
         """The keys the script produces must cover exactly the set the
         updater looks up -- the same set the published v0.13.0
-        manifest carried."""
+        manifest carried.
+
+        Windows is x64 only: the ARM64 release leg was dropped, so no
+        `windows-aarch64` entry is published and the updater never looks
+        for one."""
         names = [
             "adrify_0.13.0_x64-setup.exe",
-            "adrify_0.13.0_aarch64-setup.exe",
             "adrify_0.13.0_amd64.AppImage",
             "adrify_0.13.0_amd64.deb",
             "adrify-0.13.0-1.x86_64.rpm",
@@ -124,8 +126,6 @@ class PlatformKeysTest(unittest.TestCase):
             {
                 "windows-x86_64",
                 "windows-x86_64-nsis",
-                "windows-aarch64",
-                "windows-aarch64-nsis",
                 "linux-x86_64",
                 "linux-x86_64-appimage",
                 "linux-x86_64-deb",

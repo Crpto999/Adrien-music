@@ -1,4 +1,4 @@
-# Builds Windows (x64 and ARM64), Linux, and a universal macOS installer,
+# Builds Windows (x64), Linux, and a universal macOS installer,
 # then publishes a single draft GitHub Release
 # whenever a `v*` tag is pushed. Publish flow:
 #   git tag v0.1.0 && git push origin v0.1.0
@@ -28,13 +28,6 @@ jobs:
             os: windows-latest
             args: ""
             rust_targets: ""
-          # Cross-compiled on the x64 runner: the MSVC ARM64 toolchain ships
-          # with Visual Studio there, and NSIS bundles ARM64 fine. yt-dlp has
-          # no ARM64 build, but its x64 binary runs under Windows' emulation.
-          - name: Windows ARM64
-            os: windows-latest
-            args: "--target aarch64-pc-windows-msvc"
-            rust_targets: "aarch64-pc-windows-msvc"
           - name: macOS Universal
             os: macos-latest
             args: "--target universal-apple-darwin"

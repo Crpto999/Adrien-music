@@ -63,7 +63,6 @@ list_assets = manifest_builder.list_assets
 # platforms this project publishes.
 RUST_TARGET_TO_PLATFORM = {
     "x86_64-pc-windows-msvc": ("windows-x86_64", "windows-x86_64-nsis"),
-    "aarch64-pc-windows-msvc": ("windows-aarch64", "windows-aarch64-nsis"),
     "x86_64-apple-darwin": ("darwin-x86_64", "darwin-x86_64-app"),
     "aarch64-apple-darwin": ("darwin-aarch64", "darwin-aarch64-app"),
     "x86_64-unknown-linux-gnu": ("linux-x86_64", "linux-x86_64-appimage"),
@@ -77,8 +76,10 @@ def candidate_keys():
     machine = platform.machine().lower()
 
     if system == "windows":
-        arch = "aarch64" if machine in ("arm64", "aarch64") else "x86_64"
-        return [f"windows-{arch}", f"windows-{arch}-nsis"]
+        # Windows is published for x64 only, so a Windows-on-ARM machine
+        # looks for the x86_64 entry -- the same one an emulated install
+        # would use.
+        return ["windows-x86_64", "windows-x86_64-nsis"]
     if system == "darwin":
         arch = "aarch64" if machine in ("arm64", "aarch64") else "x86_64"
         return [f"darwin-{arch}", f"darwin-{arch}-app"]

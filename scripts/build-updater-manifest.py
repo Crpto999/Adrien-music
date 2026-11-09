@@ -148,6 +148,12 @@ def friendly_name(name: str, version: str) -> str:
     The bundler names its output per-packager (`_x64-setup.exe`,
     `_amd64.deb`, `-1.x86_64.rpm`), which doesn't tell a visitor which
     file is for which OS. Anything we don't recognise keeps its name.
+
+    Windows is x64 only: the ARM64 leg of the release matrix was dropped,
+    so no `aarch64` Windows installer is ever published. The Linux ARM
+    rules stay, because those packages are built outside this workflow
+    (AUR and friends) and a stray ARM asset should still get a sensible
+    name rather than be published as `Windows_x64`.
     """
     rules = [
         ("*_aarch64-setup.exe", f"adrify_{version}_Windows_arm64_Setup.exe"),

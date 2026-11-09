@@ -66,8 +66,7 @@ original, it adds:
 
 Download the latest installer from the [Releases](../../releases) page and run it.
 
-- **Windows 10/11:** run the `.exe` NSIS installer. Pick the `x64` build, or
-  the `arm64` one on a Windows on ARM device.
+- **Windows 10/11:** run the `.exe` NSIS installer (the `x64` build).
 - **macOS 10.15+ (beta):** open the universal `.dmg`; the same build supports
   Apple Silicon and Intel. Login cookies are encrypted with a Keychain-backed
   key.
@@ -178,7 +177,7 @@ CI (`.github/workflows/ci.yml`) runs typecheck, lint, tests, build and
 ## Releasing
 
 The release workflow (`.github/workflows/release.yml`) builds Windows
-(x64 and ARM64), a universal macOS app and Linux packages on every
+(x64), a universal macOS app and Linux packages on every
 `v*` tag, then publishes a **draft** release you review and publish by hand.
 
 ```bash
