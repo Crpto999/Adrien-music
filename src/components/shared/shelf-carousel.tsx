@@ -1,6 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ShelfCard } from "@/components/shared/shelf-card";
-import { cn } from "@/lib/utils";
 import type { Shelf } from "@/lib/innertube/types";
 
 type Props = {
@@ -140,25 +139,14 @@ export function ShelfCarousel({ shelf, action }: Props) {
         ref={scrollRef}
         className="shelf-scroll shelf-edge-fade flex min-w-0 gap-2 overflow-x-auto overflow-y-hidden pb-1"
       >
-        {shelf.items.map((item) => {
-          // Video covers keep the cover height equal to a square (album)
-          // card by widening the slot to 16/9 — preserves the video
-          // aspect without making the row visually uneven.
-          const isVideo = item.kind === "video";
-          return (
-            <div
-              key={`${item.kind}:${item.id}`}
-              className={cn(
-                "shrink-0",
-                isVideo
-                  ? "w-[calc(11rem*16/9)] md:w-[calc(12rem*16/9)] lg:w-[calc(13rem*16/9)]"
-                  : "w-44 md:w-48 lg:w-52",
-              )}
-            >
-              <ShelfCard item={item} />
-            </div>
-          );
-        })}
+        {shelf.items.map((item) => (
+          <div
+            key={`${item.kind}:${item.id}`}
+            className="w-44 shrink-0 md:w-48 lg:w-52"
+          >
+            <ShelfCard item={item} />
+          </div>
+        ))}
       </div>
     </section>
   );

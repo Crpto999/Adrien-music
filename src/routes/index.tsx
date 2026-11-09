@@ -62,6 +62,7 @@ function HomePage() {
   );
 
   const order = useHomeSectionsStore((s) => s.order);
+  const hidden = useHomeSectionsStore((s) => s.hidden);
   const customized = useHomeSectionsStore((s) => s.customized);
   const registerSections = useHomeSectionsStore((s) => s.register);
 
@@ -75,10 +76,15 @@ function HomePage() {
     registerSections(shelves.map((s) => homeSectionKey(s.title)));
   }, [shelves, registerSections]);
 
-  const displayShelves = useMemo(
-    () => (customized ? sortShelvesByOrder(shelves, order) : shelves),
-    [shelves, order, customized],
-  );
+  const displayShelves = useMemo(() => {
+    // Shielded sections are dropped from the feed entirely. The check
+    // runs before the sort so a hidden section never occupies a slot
+    // in the visible list either.
+    const visible = hidden.length
+      ? shelves.filter((s) => !hidden.includes(homeSectionKey(s.title)))
+      : shelves;
+    return customized ? sortShelvesByOrder(visible, order) : visible;
+  }, [shelves, order, hidden, customized]);
 
   // Reset back to a fresh first page. A plain refetch replays every
   // loaded page's cursor, including continuation tokens rehydrated from

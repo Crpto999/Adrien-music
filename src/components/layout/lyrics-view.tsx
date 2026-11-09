@@ -22,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { Lyrics, TimedLine } from "@/lib/lyrics/types";
+import type { Lyrics, TimedLine, WordSpan } from "@/lib/lyrics/types";
 import {
   SOURCE_LABELS,
   SOURCE_ORDER,
@@ -37,6 +37,14 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const PREF_KEY = "ytm:lyrics-source";
+
+/**
+ * The sources that only apply to a track from their own platform.
+ *
+ * They are keyed on the platform's own track id, so a YouTube track has
+ * nothing for them to answer about.
+ */
+const CN_SOURCES: LyricsSource[] = ["netease", "migu", "kugou", "qq"];
 
 type Pref = LyricsSource | "auto";
 /** "none" means the source answered and has nothing. "error" means it never
@@ -74,6 +82,15 @@ export type LyricsViewState = {
   setPref: (p: Pref) => void;
   best: LyricsSource | null;
   availability: Record<LyricsSource, Availability>;
+  /**
+   * The sources worth showing for this track.
+   *
+   * The Chinese platforms are keyed on the platform's own track id, so
+   * they only apply to a track that came from that platform. Listing
+   * them for a YouTube track would put three permanently-grey rows in
+   * the menu — noise that says nothing.
+   */
+  sources: LyricsSource[];
   /** Master on/off, mirrored from the persisted `ytm-settings` store —
    *  shared across the side card and the floating window. */
   enabled: boolean;
@@ -111,7 +128,7 @@ export function useLyricsView(track: QueueTrack | undefined): LyricsViewState {
   const enabled = useSettingsStore((s) => s.lyricsEnabled);
   const setEnabled = useSettingsStore((s) => s.setLyricsEnabled);
 
-  const { queries, best, isLoading, failed, isRetrying, retryFailed } =
+  const { queries, displayLyrics, best, isLoading, failed, isRetrying, retryFailed } =
     useLyricsSources(track, !!track && enabled);
 
   const availability = useMemo(() => {
@@ -132,7 +149,28 @@ export function useLyricsView(track: QueueTrack | undefined): LyricsViewState {
   }, [queries]);
 
   const activeSource: LyricsSource | null = pref === "auto" ? best : pref;
-  const active = activeSource ? (queries[activeSource].data ?? null) : null;
+  // The displayed lyrics are the Simplified-Chinese ones — the
+  // conversion happens once, in the sources hook, so every source is
+  // shown in the same script.
+  const active = activeSource ? (displayLyrics[activeSource] ?? null) : null;
+
+  // The Chinese platforms only apply to a track that came from one of
+  // them: they are keyed on the platform's own track id, so there is
+  // nothing to ask them about a YouTube track.
+  const sources = useMemo(() => {
+    const provider = track?.provider;
+    const cn: LyricsSource[] =
+      provider === "netease"
+        ? ["netease"]
+        : provider === "migu"
+          ? ["migu"]
+          : provider === "kugou"
+            ? ["kugou"]
+            : provider === "qq"
+              ? ["qq"]
+              : [];
+    return SOURCE_ORDER.filter((s) => cn.includes(s) || !CN_SOURCES.includes(s));
+  }, [track?.provider]);
 
   return {
     active,
@@ -142,6 +180,7 @@ export function useLyricsView(track: QueueTrack | undefined): LyricsViewState {
     setPref,
     best,
     availability,
+    sources,
     enabled,
     setEnabled,
     failed,
@@ -493,7 +532,15 @@ function TimedLyrics({
                     : "scale-100 text-muted-foreground/70",
               )}
             >
-              {line.text || "♪"}
+              {line.words && line.words.length > 0 ? (
+                <KaraokeLine
+                  words={line.words}
+                  position={position}
+                  active={isActive}
+                />
+              ) : (
+                line.text || "♪"
+              )}
             </button>
           );
         })}
@@ -523,14 +570,62 @@ function TimedLyrics({
   );
 }
 
+/**
+ * A line of word-by-word lyrics, highlighted word by word.
+ *
+ * Only the active line highlights: the words that have been sung are
+ * bright, the word being sung is bright too, and the rest sit at the
+ * line's dimmed colour. The inactive lines keep the plain text — the
+ * line-level highlight is enough there, and per-word state on
+ * twenty dim lines would be noise.
+ *
+ * The word currently being sung is decided by the player's position
+ * against the word's own span, so the highlight tracks the audio
+ * rather than a timer.
+ */
+function KaraokeLine({
+  words,
+  position,
+  active,
+}: {
+  words: WordSpan[];
+  position: number;
+  active: boolean;
+}) {
+  return (
+    <span>
+      {words.map((word, i) => {
+        // A word that has finished is sung; the one being sung right
+        // now is the next one that has not.
+        const sung = position >= word.end;
+        const singing = active && !sung && position >= word.start;
+        return (
+          <span
+            key={i}
+            className={cn(
+              "transition-colors duration-200",
+              active && (sung || singing)
+                ? "text-foreground"
+                : active
+                  ? "text-muted-foreground/55"
+                  : "text-current",
+            )}
+          >
+            {word.text}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 function PlainLyrics({
   text,
   large = false,
 }: {
   text: string;
   large?: boolean;
-}) {
-  return (
+}) {  return (
     <div
       className={cn(
         "lyrics-mask app-scroll h-full overflow-y-auto whitespace-pre-wrap px-2 pt-0 pb-12 font-medium leading-relaxed text-foreground/90",
@@ -598,7 +693,7 @@ export function LyricsSourceButton({
             </span>
           </DropdownMenuRadioItem>
           <DropdownMenuSeparator />
-          {SOURCE_ORDER.map((s) => {
+          {state.sources.map((s) => {
             const a = availability[s];
             const dot =
               a === "lrc"

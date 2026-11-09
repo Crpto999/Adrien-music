@@ -17,6 +17,8 @@ import type { LastfmTrackMeta } from "@/lib/lastfm/track";
 import { useTrackMetaStore } from "@/lib/store/track-meta";
 import { useDislikesStore } from "@/lib/store/dislikes";
 import { useSettingsStore } from "@/lib/store/settings";
+import { useNeteaseLikedIds } from "@/lib/providers/netease-liked";
+import type { ProviderId } from "@/lib/providers/types";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 
@@ -51,7 +53,12 @@ type Props = {
   hideUnlessLiked?: boolean;
   /** Title/artist metadata so a like can be mirrored to Last.fm's loved
    *  tracks. Optional — falls back to the play-time track-meta store. */
-  meta?: LastfmTrackMeta;
+  meta?: LastfmTrackMeta & {
+    /** The platform the track lives on, when it is not YouTube. */
+    provider?: ProviderId;
+    /** That platform's own id for the track. */
+    providerTrackId?: string;
+  };
 };
 
 export function LikeDislikeButtons({
@@ -81,7 +88,20 @@ export function LikeDislikeButtons({
     staleTime: 60 * 60 * 1000,
     retry: false,
   });
-  const isLiked = getLikedIdsSet(liked.data).has(videoId);
+
+  // A NetEase row's heart belongs to the NetEase account, so its
+  // filled state comes from the account's own collection rather than
+  // the app's YouTube liked list — which knows nothing about a NetEase
+  // song id.
+  const isNetease =
+    (meta as { provider?: ProviderId } | undefined)?.provider === "netease";
+  const neteaseLiked = useNeteaseLikedIds(isNetease);
+  const neteaseSongId =
+    (meta as { providerTrackId?: string } | undefined)?.providerTrackId ?? "";
+
+  const isLiked = isNetease
+    ? (neteaseLiked.data?.includes(neteaseSongId) ?? false)
+    : getLikedIdsSet(liked.data).has(videoId);
 
   const btnSize = compact ? "size-7" : "size-9";
   const iconSize = compact ? "size-3.5" : "size-4";

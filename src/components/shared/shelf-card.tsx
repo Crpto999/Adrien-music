@@ -147,9 +147,8 @@ export function ShelfCard({ item, className }: Props) {
     item.album ??
     "";
 
-  const isVideo = item.kind === "video";
   // Entity artwork shares the rounded-square treatment of its detail
-  // header; song/video thumbnails keep the tighter default corners.
+  // header; song thumbnails keep the tighter default corners.
   const isEntity =
     item.kind === "artist" || item.kind === "album" || item.kind === "playlist";
   const radiusClass = isEntity ? "rounded-lg" : "rounded-md";
@@ -161,13 +160,11 @@ export function ShelfCard({ item, className }: Props) {
   // ever changes on an explicit hide/show.
   const hidden = useIsHidden(item.id);
 
-  // Songs, videos and albums carry an artist list — link each artist to
+  // Songs and albums carry an artist list — link each artist to
   // their page. Everything else (playlists, artist tiles) keeps the plain
   // subtitle text. (Fork: clickable artists, 1c5bf40.)
   const linkArtists =
-    (item.kind === "song" ||
-      item.kind === "video" ||
-      item.kind === "album") &&
+    (item.kind === "song" || item.kind === "album") &&
     !!item.artists?.length;
 
   // Liked songs wears the cover the user picked on its page, not the
@@ -189,12 +186,7 @@ export function ShelfCard({ item, className }: Props) {
   // re-enable pointer events and sit above it (see the overlay note).
   const body = (
     <div className="pointer-events-none relative z-10 flex flex-col gap-2">
-      <div
-        className={cn(
-          "relative w-full",
-          isVideo ? "aspect-video" : "aspect-square",
-        )}
-      >
+      <div className="relative w-full aspect-square">
         {isLiked ? (
           <LikedCover className={cn("size-full", radiusClass)} />
         ) : (
@@ -202,7 +194,7 @@ export function ShelfCard({ item, className }: Props) {
             thumbnails={item.thumbnails}
             alt={item.title}
             className={cn("size-full", radiusClass)}
-            targetSize={isVideo ? 480 : 256}
+            targetSize={256}
             highRes
           />
         )}
@@ -213,13 +205,6 @@ export function ShelfCard({ item, className }: Props) {
             radiusClass,
           )}
         />
-        {isVideo && item.duration ? (
-          // No backdrop-blur: WebKitGTK re-blurs a backdrop-filter every
-          // scroll frame, so a shelf of these tanks the page.
-          <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-md bg-black/65 px-1.5 py-1 text-[11px] font-medium leading-none text-white">
-            {formatDuration(item.duration)}
-          </span>
-        ) : null}
         {hoverPlay}
         {hidden ? (
           <>
@@ -377,15 +362,6 @@ export function ShelfCard({ item, className }: Props) {
       </div>
     </TrackContextMenu>
   );
-}
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60)
-    .toString()
-    .padStart(2, "0");
-  return h > 0 ? `${h}:${m.toString().padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
 
 /**

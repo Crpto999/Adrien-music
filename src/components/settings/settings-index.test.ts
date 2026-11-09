@@ -55,7 +55,6 @@ describe("searchSettings", () => {
 
   it("finds rows by their extra keywords and by tab name", () => {
     expect(titles("scrobble")).toContain("settings.integrations.lastfm");
-    expect(titles("1440p")).toContain("settings.appearance.videoQuality");
     expect(titles("integrations")).toEqual(
       expect.arrayContaining([
         "settings.integrations.lastfm",

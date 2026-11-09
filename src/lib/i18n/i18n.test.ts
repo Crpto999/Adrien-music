@@ -73,7 +73,6 @@ describe("translate", () => {
     expect(translate("nav.home", undefined, "en")).toBe("Home");
     expect(translate("nav.home", undefined, "zh-CN")).toBe("首页");
   });
-
   it("interpolates parameters", () => {
     expect(translate("search.resultsFor", { query: "abc" }, "en")).toContain(
       "abc",
@@ -96,6 +95,51 @@ describe("translate", () => {
 
   it("exposes a hook with the same signature", () => {
     expect(typeof useT).toBe("function");
+  });
+});
+
+/**
+ * Every translation key the app asks for must exist.
+ *
+ * A missing key does not throw — `translate` returns the key itself —
+ * so a typo like `t("providers.neteaseDaily")` instead of
+ * `t("settings.providers.neteaseDaily")` renders the raw key in the
+ * UI and nothing else complains. This walks the source and checks every
+ * key against the dictionary.
+ */
+describe("translation keys used in the app", () => {
+  const sources = import.meta.glob("../../**/*.{ts,tsx}", {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>;
+
+  it("finds every key the app asks for", () => {
+    const missing: string[] = [];
+    let scanned = 0;
+
+    for (const [file, source] of Object.entries(sources)) {
+      // Skip the test files themselves — they mention keys on purpose.
+      if (file.includes(".test.")) continue;
+      scanned += 1;
+
+      // `t("...")` and `translate("...")`, in both quote styles.
+      const pattern = /\b(?:t|translate)\(\s*["'`]([\w.]+)["'`]/g;
+      for (const match of source.matchAll(pattern)) {
+        const key = match[1];
+        // A key that is not in the dictionary and is not itself a
+        // dictionary path is a typo. The check is "does it resolve",
+        // which is exactly what `translate` does.
+        if (translate(key, undefined, "en") === key) {
+          missing.push(`${file}: ${key}`);
+        }
+      }
+    }
+
+    expect(missing).toEqual([]);
+    // The walk has to actually cover the app, or the test proves
+    // nothing. The app is a couple of hundred files.
+    expect(scanned).toBeGreaterThan(50);
   });
 });
 

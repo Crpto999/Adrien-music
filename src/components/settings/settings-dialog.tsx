@@ -13,6 +13,7 @@ import {
   IconHomeFilled,
   IconPlayerPlayFilled,
   IconPuzzleFilled,
+  IconRouter,
   IconX,
 } from "@tabler/icons-react";
 import {
@@ -38,6 +39,7 @@ import { PlaybackTab } from "@/components/settings/playback-tab";
 import { AppearanceTab } from "@/components/settings/appearance-tab";
 import { HomeTab } from "@/components/settings/home-tab";
 import { StorageTab } from "@/components/settings/storage-tab";
+import { SourcesTab } from "@/components/settings/sources-tab";
 import { IntegrationsTab } from "@/components/settings/integrations-tab";
 import {
   useSettingsDialog,
@@ -68,6 +70,11 @@ const TABS: {
   },
   // Fork addition: Home-section ordering lives in its own tab (8982ce0).
   { id: "home", labelKey: "settings.tabs.home", icon: IconHomeFilled },
+  {
+    id: "sources",
+    labelKey: "settings.tabs.sources",
+    icon: IconRouter,
+  },
   { id: "storage", labelKey: "settings.tabs.storage", icon: IconDatabaseFilled },
   {
     id: "integrations",
@@ -272,6 +279,7 @@ export function SettingsDialog() {
             {!searching && tab === "playback" && <PlaybackTab />}
             {!searching && tab === "appearance" && <AppearanceTab />}
             {!searching && tab === "home" && <HomeTab />}
+            {!searching && tab === "sources" && <SourcesTab />}
             {!searching && tab === "storage" && <StorageTab />}
             {!searching && tab === "integrations" && <IntegrationsTab />}
           </div>

@@ -191,13 +191,6 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   },
   {
     tab: "appearance",
-    titleKey: "settings.appearance.videoQuality",
-    descriptionKey: "settings.appearance.videoQualityDesc",
-    id: "video-quality",
-    keywords: "720p 1080p 1440p resolution hd",
-  },
-  {
-    tab: "appearance",
     titleKey: "settings.appearance.ratingButtons",
     descriptionKey: "settings.appearance.ratingButtonsDesc",
     id: "rating-buttons",
@@ -231,7 +224,16 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     titleKey: "settings.home.sectionOrder",
     descriptionKey: "settings.home.sectionOrderDesc",
     id: "section-order",
-    keywords: "home page sort arrange",
+    keywords: "home page sort arrange reorder hide shield visibility 隐藏 屏蔽 顺序",
+  },
+
+  // Sources
+  {
+    tab: "sources",
+    titleKey: "settings.providers.priority",
+    descriptionKey: "settings.providers.priorityDesc",
+    id: "provider-priority",
+    keywords: "provider priority order source 音源 优先级 顺序 来源",
   },
 
   // Storage
@@ -288,6 +290,14 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     id: "love-liked-tracks",
     page: "lastfm",
     keywords: "heart favourite favorite lastfm",
+  },
+  {
+    tab: "integrations",
+    titleKey: "settings.integrations.netease",
+    descriptionKey: "settings.integrations.neteaseDesc",
+    id: "netease",
+    page: "netease",
+    keywords: "netease 网易云 sign in login daily recommend 推荐 会员",
   },
   {
     tab: "integrations",

@@ -55,7 +55,18 @@ reqwest = { version = "0.12", default-features = false, features = [
     # Same reason as tauri-plugin-http above: our own reqwest clients
     # (stream server, cover fetch) speak SOCKS too.
     "socks",
+    # The unblock pool posts JSON bodies to a few third-party APIs.
+    "json",
 ] }
+# NetEase's eapi endpoint takes an AES-128-ECB encrypted payload, with
+# an MD5 digest of the URL and payload spliced into the plaintext. The
+# algorithm is the platform's published protocol, implemented here from
+# its specification rather than pulled from a third-party client.
+aes = "0.8"
+ecb = { version = "0.1", features = ["alloc"] }
+# MD5 for the eapi payload digest — the platform's own signing scheme,
+# not a security choice on our side.
+md-5 = "0.10"
 urlencoding = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "io-util", "process", "sync", "net"] }
 axum = "0.7"

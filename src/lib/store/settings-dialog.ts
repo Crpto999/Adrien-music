@@ -1,10 +1,16 @@
 import { create } from "zustand";
 
 export type SettingsTab =
-  "general" | "playback" | "appearance" | "home" | "storage" | "integrations";
+  | "general"
+  | "playback"
+  | "appearance"
+  | "home"
+  | "sources"
+  | "storage"
+  | "integrations";
 
 /** The drill-in pages of the Integrations tab. */
-export type IntegrationPage = "lastfm" | "discord";
+export type IntegrationPage = "lastfm" | "discord" | "netease";
 
 type State = {
   open: boolean;
@@ -35,4 +41,19 @@ export const useSettingsDialog = create<State>()((set) => ({
 /** Open the settings popup, optionally on a specific tab. */
 export function openSettings(tab?: SettingsTab): void {
   useSettingsDialog.setState(tab ? { open: true, tab } : { open: true });
+}
+
+/**
+ * Open the settings popup on a drill-in page of the Integrations tab.
+ *
+ * Used by the sign-in CTAs that live outside the settings window — the
+ * NetEase shelf's prompt, for one — so the user lands on the exact row
+ * they need rather than having to find it.
+ */
+export function openSettingsIntegration(page: IntegrationPage): void {
+  useSettingsDialog.setState({
+    open: true,
+    tab: "integrations",
+    integrationPage: page,
+  });
 }

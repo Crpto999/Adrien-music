@@ -40,6 +40,7 @@ import { LikeDislikeButtons } from "@/components/shared/like-buttons";
 import { ArtistLinks } from "@/components/shared/artist-links";
 import { EntityLink } from "@/components/shared/entity-link";
 import { PlayerMoreMenu } from "@/components/layout/player-more-menu";
+import { SourceIndicator } from "@/components/layout/source-indicator";
 import { PlayerCoverMenu } from "@/components/layout/player-cover-menu";
 import {
   NowPlayingCover,
@@ -640,6 +641,7 @@ export function PlayerBar({
           a router). */}
       <div className="flex items-center gap-2 px-3 pt-2 pb-3">
         <div className="flex min-w-0 flex-1 items-center gap-0.5">
+          <SourceIndicator track={track} />
           <LyricsSourceButton state={lyricsState} />
           <QueueToggleButton
             open={queueOpen}

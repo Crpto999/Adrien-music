@@ -24,7 +24,6 @@
 export const SEARCH_TYPE_TOKENS: Record<string, string> = {
   // English
   Song: "song",
-  Video: "video",
   Album: "album",
   Single: "album",
   EP: "album",
@@ -32,7 +31,6 @@ export const SEARCH_TYPE_TOKENS: Record<string, string> = {
   Playlist: "playlist",
   // Simplified Chinese
   歌曲: "song",
-  视频: "video",
   专辑: "album",
   单曲: "album",
   音乐人: "artist",

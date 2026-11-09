@@ -15,6 +15,8 @@ export default tseslint.config(
       "src/routeTree.gen.ts",
       "node_modules",
       "scripts",
+      // Scratch scripts for probing live APIs. Not part of the app.
+      ".agent-tools",
       // Detached worktrees checked out by Claude Code: copies of the
       // same files, which would double every finding.
       ".claude",

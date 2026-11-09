@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ProviderId } from "@/lib/providers/types";
 
 /**
  * The Rust side runs a tiny axum server on a random localhost port that
@@ -44,16 +45,32 @@ export async function streamUrlFor(videoId: string): Promise<string> {
 }
 
 /**
- * URL of the muted picture for a track's video (immersive fullscreen
- * "Video" mode). The server downloads it on first request, so the first
- * load takes a few seconds; it is kept for the session only.
+ * The stream URL for a track on a given provider.
+ *
+ * YouTube keeps its original route (`/stream/:videoId`) because the
+ * yt-dlp path is the app's oldest and most exercised code; the other
+ * providers get their own prefix. NetEase resolves its own song id
+ * to a CDN URL and serves the bytes through the same progressive
+ * machinery, so the `<audio>` element sees the same kind of response
+ * whichever provider is behind it.
  */
-export async function videoUrlFor(
-  videoId: string,
-  quality: number,
+export async function streamUrlForProvider(
+  provider: ProviderId,
+  trackId: string,
 ): Promise<string> {
   const base = await getStreamBaseUrl();
-  return `${base}/video/${encodeURIComponent(videoId)}?q=${quality}`;
+  const id = encodeURIComponent(trackId);
+  if (provider === "youtube") return `${base}/stream/${id}`;
+  if (provider === "netease") return `${base}/stream/netease/${id}`;
+  // The Chinese platforms share one route: Migu, Kugou and QQ Music all
+  // resolve to a direct CDN URL that the same progressive machinery
+  // serves, so they only differ by the platform segment.
+  if (provider === "migu" || provider === "kugou" || provider === "qq") {
+    return `${base}/stream/cn/${provider}/${id}`;
+  }
+  // A provider without its own route yet: fall back to the generic
+  // one rather than producing a URL that 404s.
+  return `${base}/stream/${id}`;
 }
 
 const prefetched = new Set<string>();
@@ -68,19 +85,40 @@ const prefetched = new Set<string>();
  * .webm existence), so re-firing is cheap but still skippable.
  */
 export async function prefetchStream(videoId: string): Promise<void> {
-  if (prefetched.has(videoId)) return;
-  prefetched.add(videoId);
+  await prefetchStreamFor("youtube", videoId);
+}
+
+/**
+ * Warm the disk cache for a track on a given provider.
+ *
+ * The memo key is the provider-qualified id: a NetEase song id and a
+ * YouTube video id live in different namespaces and would otherwise
+ * share a slot.
+ */
+export async function prefetchStreamFor(
+  provider: ProviderId,
+  trackId: string,
+): Promise<void> {
+  const key = `${provider}:${trackId}`;
+  if (prefetched.has(key)) return;
+  prefetched.add(key);
   try {
     const base = await getStreamBaseUrl();
     // Fire-and-forget — server returns 200/202 immediately and caches
     // bytes in the background. fetch() only rejects on network errors, so an
     // HTTP 4xx/5xx (yt-dlp spawn/extractor failure) resolves normally — drop
     // the warm mark on an error status so the id is retried later.
-    const res = await fetch(`${base}/prefetch/${encodeURIComponent(videoId)}`);
-    if (!res.ok) prefetched.delete(videoId);
+    const path =
+      provider === "netease"
+        ? `/prefetch/netease/${encodeURIComponent(trackId)}`
+        : provider === "migu" || provider === "kugou" || provider === "qq"
+          ? `/prefetch/cn/${provider}/${encodeURIComponent(trackId)}`
+          : `/prefetch/${encodeURIComponent(trackId)}`;
+    const res = await fetch(`${base}${path}`);
+    if (!res.ok) prefetched.delete(key);
   } catch {
     // If it fails we'll just fall through to on-demand fetch later.
-    prefetched.delete(videoId);
+    prefetched.delete(key);
   }
 }
 

@@ -35,7 +35,6 @@ import {
   useSettingsStore,
   type FullscreenLayout,
   type RatingButtons,
-  type VideoQuality,
 } from "@/lib/store/settings";
 
 // Segments carry the very glyphs the setting switches between.
@@ -78,8 +77,6 @@ export function AppearanceTab() {
   const setWindowGlowCover = useSettingsStore((s) => s.setWindowGlowCover);
   const windowGlowSize = useSettingsStore((s) => s.windowGlowSize);
   const setWindowGlowSize = useSettingsStore((s) => s.setWindowGlowSize);
-  const videoQuality = useSettingsStore((s) => s.videoQuality);
-  const setVideoQuality = useSettingsStore((s) => s.setVideoQuality);
 
   return (
     <TabPane>
@@ -193,23 +190,6 @@ export function AppearanceTab() {
               disabled={!windowGlow}
               aria-label={t("settings.appearance.glowSize")}
               className="w-[150px]"
-            />
-          }
-        />
-        <SettingRow
-          icon={IconPhotoFilled}
-          settingId="video-quality"
-          title={t("settings.appearance.videoQuality")}
-          description={t("settings.appearance.videoQualityDesc")}
-          control={
-            <SegmentedControl
-              value={String(videoQuality)}
-              onChange={(v) => setVideoQuality(Number(v) as VideoQuality)}
-              options={[
-                { value: "720", label: "720p" },
-                { value: "1080", label: "1080p" },
-                { value: "1440", label: "1440p" },
-              ]}
             />
           }
         />

@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 import { usePlaybackStore } from "@/lib/store/playback";
-import { useTrackSourceStore, type SourceKind } from "@/lib/store/track-source";
 import type { PlaybackState } from "@/lib/store/playback";
+import type { ProviderId } from "@/lib/providers/types";
 
 /**
  * Cross-window playback bridge between the main window (audio engine
@@ -10,9 +10,9 @@ import type { PlaybackState } from "@/lib/store/playback";
  * (state mirror).
  *
  *  Main side  (mounted inside `AppShell` while `mode === "floating"`):
- *    - subscribes to the playback / track-source stores and broadcasts
- *      a serializable snapshot via `playback:state` / `track-source:state`
- *    - listens for `playback:action` / `track-source:action` events
+ *    - subscribes to the playback store and broadcasts
+ *      a serializable snapshot via `playback:transport` / `playback:queue`
+ *    - listens for `playback:action` events
  *      (sent by the floating window's overridden store actions) and
  *      dispatches them against its local store, which then drives the
  *      audio engine and triggers the next state broadcast
@@ -113,11 +113,13 @@ type PlaybackAction =
   | { type: "playNow"; track: unknown; extras?: unknown }
   | { type: "playShelfItems"; items: unknown[]; startIndex: number }
   | { type: "enqueueNext"; track: unknown }
-  | { type: "enqueueEnd"; track: unknown };
-
-type TrackSourceAction =
-  | { type: "setSelected"; id: string; selected: SourceKind }
-  | { type: "setAlternate"; knownId: string; kind: SourceKind; altId: string };
+  | { type: "enqueueEnd"; track: unknown }
+  | {
+      type: "setTrackProvider";
+      index: number;
+      provider: string;
+      providerTrackId: string;
+    };
 
 export function FloatingPlayerSync() {
   // Outbound: stream state changes to the floating window. Split into
@@ -133,20 +135,13 @@ export function FloatingPlayerSync() {
         void emit("playback:queue", buildQueueSnapshot(curr));
       }
     });
-    const unsubT = useTrackSourceStore.subscribe((s) => {
-      void emit("track-source:state", { byVideoId: s.byVideoId });
-    });
     // Initial broadcast — covers the case where the floating window
     // already exists when this sender mounts.
     const initial = usePlaybackStore.getState();
     void emit("playback:transport", buildTransportSnapshot(initial));
     void emit("playback:queue", buildQueueSnapshot(initial));
-    void emit("track-source:state", {
-      byVideoId: useTrackSourceStore.getState().byVideoId,
-    });
     return () => {
       unsubP();
-      unsubT();
     };
   }, []);
 
@@ -224,6 +219,12 @@ export function FloatingPlayerSync() {
           case "setAutoRadio":
             store.setAutoRadio(a.on);
             break;
+          case "setTrackProvider":
+            store.setTrackProvider(a.index, {
+              provider: a.provider as ProviderId,
+              providerTrackId: a.providerTrackId,
+            });
+            break;
           // Serialized ShelfItem/QueueTrack objects; the store methods
           // accept both shapes and pull only the fields they need.
           case "playNow":
@@ -243,28 +244,10 @@ export function FloatingPlayerSync() {
     );
 
     register(
-      listen<TrackSourceAction>("track-source:action", (e) => {
-        const a = e.payload;
-        const store = useTrackSourceStore.getState();
-        switch (a.type) {
-          case "setSelected":
-            store.setSelected(a.id, a.selected);
-            break;
-          case "setAlternate":
-            store.setAlternate(a.knownId, a.kind, a.altId);
-            break;
-        }
-      }),
-    );
-
-    register(
       listen("playback:request-snapshot", () => {
         const s = usePlaybackStore.getState();
         void emit("playback:transport", buildTransportSnapshot(s));
         void emit("playback:queue", buildQueueSnapshot(s));
-        void emit("track-source:state", {
-          byVideoId: useTrackSourceStore.getState().byVideoId,
-        });
       }),
     );
 
@@ -300,17 +283,6 @@ export function FloatingPlayerSyncReceiver() {
       listen<QueueSnapshot>("playback:queue", (e) => {
         usePlaybackStore.setState(e.payload);
       }),
-    );
-
-    register(
-      listen<{ byVideoId: Record<string, unknown> }>(
-        "track-source:state",
-        (e) => {
-          useTrackSourceStore.setState({
-            byVideoId: e.payload.byVideoId as never,
-          });
-        },
-      ),
     );
 
     // Ask the main window for the latest snapshot — covers the case

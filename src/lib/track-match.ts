@@ -22,7 +22,16 @@ export function findActiveIndex(
   currentDuration?: number,
 ): number {
   if (!current) return -1;
-  const exact = tracks.findIndex((t) => t.id === current.videoId);
+  const exact = tracks.findIndex(
+    (t) =>
+      t.id === current.videoId ||
+      // A row from another provider carries that provider's own id,
+      // while the queue entry holds the synthetic `provider_id` form.
+      // Comparing the pair finds the row the queue entry came from.
+      (!!t.provider &&
+        t.provider === current.provider &&
+        t.providerTrackId === current.providerTrackId),
+  );
   if (exact >= 0) return exact;
 
   const title = normalizeTitle(current.title);
@@ -32,7 +41,7 @@ export function findActiveIndex(
   let found = -1;
   for (let i = 0; i < tracks.length; i++) {
     const t = tracks[i];
-    if (t.kind !== "song" && t.kind !== "video") continue;
+    if (t.kind !== "song") continue;
     if (normalizeTitle(t.title) !== title) continue;
     if (!artistsOverlap(t.artists, current.artists)) continue;
     const sameAlbum =

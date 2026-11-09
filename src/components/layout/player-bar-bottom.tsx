@@ -42,6 +42,7 @@ import {
 } from "@/components/layout/player-bar";
 import { PlayerMoreMenu } from "@/components/layout/player-more-menu";
 import { PlayerCoverMenu } from "@/components/layout/player-cover-menu";
+import { SourceIndicator } from "@/components/layout/source-indicator";
 import {
   NowPlayingCover,
 } from "@/components/shared/now-playing-cover";
@@ -275,6 +276,10 @@ export function PlayerBarBottom({
               buttonClassName={playerIconButton}
             />
           ) : null}
+          {/* Which provider is serving the audio, and a way to switch to
+              another one that carries the same recording. The control
+              reads its list from the cache, so opening it is instant. */}
+          <SourceIndicator track={track} variant="icon" />
           <LyricsPopover state={lyricsState} />
           <QueuePopover />
           <VolumeControl />

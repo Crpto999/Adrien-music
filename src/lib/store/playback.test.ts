@@ -274,3 +274,111 @@ describe("playback prev()", () => {
     expect(usePlaybackStore.getState().pendingSeek).toBe(0);
   });
 });
+
+describe("setTrackProvider", () => {
+  beforeEach(() => setup({}));
+
+  it("swaps the provider and the provider's own id", () => {
+    setup({
+      queue: [
+        { ...track("yt123"), provider: "youtube", providerTrackId: "yt123" },
+      ],
+      index: 0,
+    });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(0, { provider: "netease", providerTrackId: "185709" });
+
+    const t = usePlaybackStore.getState().queue[0];
+    expect(t.provider).toBe("netease");
+    expect(t.providerTrackId).toBe("185709");
+  });
+
+  it("rewrites the videoId to the provider's own namespace", () => {
+    // A stale YouTube id would make the storage tab and the media
+    // session describe the wrong file.
+    setup({
+      queue: [
+        { ...track("yt123"), provider: "youtube", providerTrackId: "yt123" },
+      ],
+      index: 0,
+    });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(0, { provider: "netease", providerTrackId: "185709" });
+
+    expect(usePlaybackStore.getState().queue[0].videoId).toBe("netease_185709");
+  });
+
+  it("keeps the queue slot's identity — title, artist and position", () => {
+    setup({
+      queue: [
+        {
+          ...track("yt123"),
+          title: "起风了",
+          provider: "youtube",
+          providerTrackId: "yt123",
+        },
+      ],
+      index: 0,
+    });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(0, { provider: "netease", providerTrackId: "185709" });
+
+    const s = usePlaybackStore.getState();
+    expect(s.index).toBe(0);
+    expect(s.queue[0].title).toBe("起风了");
+    expect(s.queue.length).toBe(1);
+  });
+
+  it("marks the current track as loading so the stream re-resolves", () => {
+    setup({
+      queue: [
+        { ...track("yt123"), provider: "youtube", providerTrackId: "yt123" },
+      ],
+      index: 0,
+      status: "ready",
+      streamUrl: "http://127.0.0.1:1234/stream/yt123",
+    });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(0, { provider: "netease", providerTrackId: "185709" });
+
+    const s = usePlaybackStore.getState();
+    expect(s.status).toBe("loading");
+    expect(s.streamUrl).toBeUndefined();
+  });
+
+  it("leaves a track that is not playing alone", () => {
+    // A queued-but-not-current track has no stream to re-resolve, so
+    // changing its provider must not disturb playback.
+    setup({
+      queue: [
+        { ...track("a"), provider: "youtube", providerTrackId: "a" },
+        { ...track("b"), provider: "youtube", providerTrackId: "b" },
+      ],
+      index: 0,
+      status: "ready",
+      streamUrl: "http://127.0.0.1:1234/stream/a",
+    });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(1, { provider: "netease", providerTrackId: "185709" });
+
+    const s = usePlaybackStore.getState();
+    expect(s.status).toBe("ready");
+    expect(s.streamUrl).toBe("http://127.0.0.1:1234/stream/a");
+    expect(s.queue[1].provider).toBe("netease");
+  });
+
+  it("ignores an out-of-range index", () => {
+    setup({ queue: [track("a")], index: 0, status: "ready" });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(5, { provider: "netease", providerTrackId: "185709" });
+
+    expect(usePlaybackStore.getState().queue[0].provider).toBeUndefined();
+    expect(usePlaybackStore.getState().status).toBe("ready");
+  });
+});

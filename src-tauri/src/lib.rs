@@ -44,6 +44,10 @@ mod thumbbar;
 // upstream 8cdb647.
 #[cfg(windows)]
 mod webview_permissions;
+mod netease;
+mod netease_auth;
+mod cnproviders;
+mod unblock;
 mod update_source;
 mod ytdlp;
 
@@ -392,7 +396,11 @@ fn account_cookies_path(app: &tauri::AppHandle, id: &str) -> PathBuf {
 /// a second webview on the same user-data folder with different args, so a
 /// mismatch makes `open_player_window` fail and the floating player never
 /// appears.
-const APP_WEBVIEW_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,HardwareMediaKeyHandling,MediaSessionService --autoplay-policy=no-user-gesture-required"; // Ported from upstream 148246f: WebAudio graph built before first click must not stay suspended.
+///
+/// The NetEase sign-in window reuses this constant too, so that every
+/// webview in the app speaks to WebView2 with one and the same set of
+/// arguments.
+pub(crate) const APP_WEBVIEW_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,HardwareMediaKeyHandling,MediaSessionService --autoplay-policy=no-user-gesture-required"; // Ported from upstream 148246f: WebAudio graph built before first click must not stay suspended.
 
 /// Legacy single-account path — kept only for migration. New code
 /// should resolve cookies via `active_cookies_path`.
@@ -528,6 +536,18 @@ fn generate_account_id() -> String {
     // Unix-nanos is monotone within a process; a stray clock skew on
     // another machine isn't a concern (account ids stay local).
     format!("acct-{:x}", nanos)
+}
+
+/// A fresh, unique id for a one-shot login session (the NetEase
+/// sign-in webview's profile directory).
+///
+/// The NetEase flow needs an id that cannot collide with a *previous*
+/// attempt, so it cannot share the `acct-` prefix the account index
+/// uses — those ids are written to a file the user can see, and this
+/// one is not an account.
+pub(crate) fn generate_session_id() -> String {
+    let nanos = time::OffsetDateTime::now_utc().unix_timestamp_nanos();
+    format!("sess-{:x}", nanos)
 }
 
 /// Read the encrypted cookie jar for the active account and decrypt
@@ -1326,6 +1346,20 @@ async fn read_cookie_header(app: &tauri::AppHandle, host: &str) -> String {
         parts.push(format!("{}={}", fields[5], fields[6]));
     }
     parts.join("; ")
+}
+
+/// The NetEase session cookie, if the user has signed in to NetEase.
+///
+/// `MUSIC_U` is the cookie the NetEase client uses to identify the
+/// account; the official player endpoint reads it to decide what the
+/// account may play. Absent a signed-in account this returns `None`,
+/// and the app falls back to the third-party unblock pool.
+///
+/// The credential lives in its own store (`netease_auth`), not in the
+/// YouTube jar: the two accounts are independent, and NetEase's must
+/// survive a YouTube sign-out.
+pub(crate) async fn netease_cookie(app: &tauri::AppHandle) -> Option<String> {
+    netease_auth::cookie_header(app).await
 }
 
 #[tauri::command]
@@ -3415,238 +3449,380 @@ async fn stream_handler(
     resp
 }
 
-/// Session-only video files kept in the ephemeral pool; older ones are
-/// deleted as new ones finish so watching clips all day cannot fill the disk.
-const VIDEO_CACHE_KEEP: usize = 4;
 
-/// Requested picture height from `?q=`: 720, 1080 or 1440 (default 720).
-fn video_quality(req: &Request) -> u32 {
-    let q = req.uri().query().unwrap_or("");
-    for kv in q.split('&') {
-        let mut it = kv.splitn(2, '=');
-        if it.next() == Some("q") {
-            return match it.next().unwrap_or("") {
-                "1080" => 1080,
-                "1440" => 1440,
-                _ => 720,
-            };
-        }
+/// GET /stream/netease/:song_id — serve a NetEase track.
+///
+/// The track is resolved to a direct CDN URL (official endpoint first,
+/// third-party unblock pool second — see `netease::resolve_audio`) and
+/// then served through the same progressive path YouTube uses: the
+/// filler downloads into a `.part` file in ranged chunks while the
+/// element's Range requests are answered straight from it.
+///
+/// The cache file is named `<provider>_<id>` so a NetEase song and a
+/// YouTube video can never collide on disk — the ids come from
+/// different namespaces (numbers vs. 11-character base64-ish strings),
+/// and the prefix makes that explicit rather than incidental.
+async fn netease_stream_handler(
+    AxumState(srv): AxumState<StreamServer>,
+    Path(song_id): Path<String>,
+    req: Request,
+) -> Response {
+    if !song_id.chars().all(|c| c.is_ascii_digit()) || song_id.is_empty() {
+        return (StatusCode::BAD_REQUEST, "invalid song id").into_response();
     }
-    720
-}
 
-/// yt-dlp format selector for a picture height. H.264 is preferred up to
-/// 1080p (hardware-decoded); above that only VP9/AV1 exist, and VP9 is
-/// tried before AV1, which can be software-decoded and heavy.
-fn video_format(height: u32) -> String {
-    let h = height;
-    if h > 1080 {
-        format!(
-            "bestvideo[height<={h}][vcodec^=vp9][protocol^=http]/bestvideo[height<={h}][protocol^=http]/bestvideo[height<={h}]/best[height<={h}]"
-        )
-    } else {
-        format!(
-            "bestvideo[height<={h}][vcodec^=avc1][protocol^=http]/bestvideo[height<={h}][protocol^=http]/bestvideo[height<={h}]/best[height<={h}]"
-        )
-    }
-}
+    let cache_key = format!("netease_{song_id}");
+    let t0 = std::time::Instant::now();
+    let final_path = srv.cache_dir.join(format!("{cache_key}.webm"));
 
-/// Sniff the container of a cached video file (MP4 vs WebM).
-async fn sniff_video_mime(path: &std::path::Path) -> &'static str {
-    let mut buf = [0u8; 16];
-    if let Ok(mut f) = tokio::fs::File::open(path).await {
-        let _ = f.read(&mut buf).await;
-    }
-    if &buf[4..8] == b"ftyp" {
-        "video/mp4"
-    } else {
-        "video/webm"
-    }
-}
+    let range_hdr = req
+        .headers()
+        .get(axum::http::header::RANGE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
 
-/// Delete all but the `keep` most recently written `*.video.mp4` files.
-async fn prune_video_cache(dir: &std::path::Path, keep: usize) {
-    let mut files: Vec<(std::time::SystemTime, PathBuf)> = Vec::new();
-    let mut rd = match tokio::fs::read_dir(dir).await {
-        Ok(rd) => rd,
-        Err(_) => return,
-    };
-    while let Ok(Some(entry)) = rd.next_entry().await {
-        let path = entry.path();
-        let is_video = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n.ends_with(".video.mp4"))
-            .unwrap_or(false);
-        if !is_video {
-            continue;
-        }
-        let modified = entry
-            .metadata()
+    if final_path.exists() {
+        let mut resp = ServeFile::new(&final_path)
+            .oneshot(req)
             .await
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .unwrap_or(std::time::UNIX_EPOCH);
-        files.push((modified, path));
+            .map(|r| r.into_response())
+            .unwrap_or_else(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("serve: {e}"),
+                )
+                    .into_response()
+            });
+        if resp.status().is_success() || resp.status() == StatusCode::PARTIAL_CONTENT {
+            resp.headers_mut().insert(
+                axum::http::header::CONTENT_TYPE,
+                axum::http::header::HeaderValue::from_static("audio/mpeg"),
+            );
+        }
+        return resp;
     }
-    if files.len() <= keep {
-        return;
+
+    // Resolve first: without a direct URL and a known size there is
+    // nothing to serve, and the element should get a clear error
+    // rather than a hang.
+    let Some(resolved) = netease::resolve_audio(&srv.app, &song_id).await else {
+        log!("[stream] netease {song_id}: no playable URL");
+        return (StatusCode::BAD_GATEWAY, "netease: no playable url").into_response();
+    };
+    log!(
+        "[stream] netease {song_id}: resolved {} bytes ({})",
+        resolved.size,
+        resolved.mime
+    );
+
+    let state = {
+        let mut map = srv.downloads.lock().await;
+        let key = format!("n:{cache_key}");
+        if let Some(s) = map.get(&key) {
+            s.clone()
+        } else {
+            let s = Arc::new(DownloadState::new());
+            map.insert(key.clone(), s.clone());
+            drop(map);
+            spawn_netease_filler(
+                resolved.clone(),
+                cache_key.clone(),
+                srv.cache_dir.clone(),
+                key.clone(),
+                srv.clone(),
+                s.clone(),
+            );
+            s
+        }
+    };
+
+    // The filler publishes the resolved URL as soon as it starts, so
+    // the wait below is short — but bounded, so a stalled CDN cannot
+    // hang the element forever.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+    loop {
+        let notified = state.notify.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if state.resolved.get().is_some() || state.complete.load(Ordering::Acquire) {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return (StatusCode::GATEWAY_TIMEOUT, "download timeout").into_response();
+        }
+        let _ = tokio::time::timeout(Duration::from_secs(5), notified).await;
     }
-    files.sort_by(|a, b| b.0.cmp(&a.0)); // newest first
-    for (_, path) in files.into_iter().skip(keep) {
-        let _ = tokio::fs::remove_file(path).await;
-    }
+
+    let part_path = srv.cache_dir.join(format!("{cache_key}.part"));
+    let part = tokio::fs::File::open(&part_path).await.ok();
+    let range = (!range_hdr.is_empty()).then_some(range_hdr.as_str());
+    let resp = progressive::respond(
+        range,
+        &resolved,
+        state.clone(),
+        part,
+        proxy::media_client(),
+    );
+    log!(
+        "[stream] netease {song_id}: responding {} ({:.2}s)",
+        resp.status(),
+        t0.elapsed().as_secs_f32()
+    );
+    resp
 }
 
-/// Download the picture (video-only, up to 720p) for the immersive
-/// fullscreen "Video" mode. Same mechanics as `spawn_downloader`, but the
-/// result always lands in the session-only pool as `<id>.video.mp4`, never
-/// in the persistent track cache.
-fn spawn_video_downloader(
-    video_id: String,
+/// Fill the cache file for a NetEase track, in ranged chunks.
+///
+/// The NetEase CDN answers `Range` requests and reports the exact
+/// length, so the same filler the YouTube path uses works unchanged.
+///
+/// `cache_key` is `<provider>_<song id>` — it is derived from the song
+/// id rather than the CDN URL, because the URL carries a signed token
+/// that changes on every resolve, so keying the cache on it would
+/// never hit.
+fn spawn_netease_filler(
+    resolved: progressive::ResolvedAudio,
+    cache_key: String,
     target_dir: PathBuf,
     map_key: String,
     srv: StreamServer,
     state: Arc<DownloadState>,
-    height: u32,
 ) {
     let downloads = srv.downloads.clone();
     tokio::spawn(async move {
-        let url = format!("https://www.youtube.com/watch?v={video_id}");
-        let part_path = target_dir.join(format!("{video_id}.{height}p.video.part"));
-        let final_path = target_dir.join(format!("{video_id}.{height}p.video.mp4"));
         let _ = tokio::fs::create_dir_all(&target_dir).await;
-        let _ = tokio::fs::remove_file(&part_path).await;
+        let part_path = target_dir.join(format!("{cache_key}.part"));
+        let final_path = target_dir.join(format!("{cache_key}.webm"));
+        let _ = tokio::fs::remove_file(&part_path).await; // clean stale
 
-        let program = ytdlp::program(&srv.ytdlp_bin);
+        let part_file = tokio::fs::File::create(&part_path).await.ok();
 
-        // H.264 first (hardware-decoded everywhere), then any other
-        // progressive video-only stream, then a combined format as a last
-        // resort. The element is muted, so audio in the file is harmless.
-        let video_format = video_format(height);
-        let mut attempt =
-            download_attempt(&program, &url, &part_path, &video_format, None, &state).await;
+        let success = if let Some(file) = part_file {
+            let _ = state.resolved.set(resolved.clone());
+            state.notify.notify_waiters();
+            let http = proxy::media_client();
+            progressive::fill(&http, &resolved, file, &state).await
+                && state.downloaded.load(Ordering::Acquire) == resolved.size
+        } else {
+            false
+        };
 
-        if !attempt.ok && attempt.age_gated {
-            if let Some(cookies) = write_temp_cookies(&srv.app).await {
-                attempt = download_attempt(
-                    &program,
-                    &url,
-                    &part_path,
-                    &video_format,
-                    Some(cookies.path()),
-                    &state,
-                )
-                .await;
-            }
-        }
-
-        let success = attempt.ok;
-        const MIN_VIDEO_BYTES: u64 = 256 * 1024;
-        let part_size = tokio::fs::metadata(&part_path)
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0);
-        if success && part_size >= MIN_VIDEO_BYTES {
+        if success {
             if let Err(e) = tokio::fs::rename(&part_path, &final_path).await {
-                log!("[video] rename: {e}");
+                log!("[stream] netease rename: {e}");
                 let _ = tokio::fs::remove_file(&part_path).await;
-            } else {
-                log!("[video] cached {video_id} ({part_size} bytes)");
-                prune_video_cache(&target_dir, VIDEO_CACHE_KEEP).await;
             }
         } else {
-            log!("[video] download failed or too small for {video_id} ({part_size} bytes)");
             let _ = tokio::fs::remove_file(&part_path).await;
         }
-
         state.complete.store(true, Ordering::Release);
         state.notify.notify_waiters();
 
         if success {
-            let downloads_evict = downloads.clone();
-            let key = map_key.clone();
-            tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_secs(60)).await;
-                downloads_evict.lock().await.remove(&key);
-            });
-        } else {
-            downloads.lock().await.remove(&map_key);
+            // Keep the persistent cache under its configured size cap.
+            let limit = srv.cache_limit.load(Ordering::Relaxed);
+            enforce_cache_limit(srv.cache_dir.clone(), limit, AUDIO_CACHE_EXTENSIONS).await;
         }
+
+        // Evict from the in-memory map after a grace period so a brief
+        // re-play stays in RAM, then falls back to the on-disk copy.
+        let downloads_evict = downloads.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            downloads_evict.lock().await.remove(&map_key);
+        });
     });
 }
 
-/// GET /video/:video_id — the muted picture for the immersive fullscreen
-/// "Video" mode. Downloaded in full on first request (like /stream), then
-/// served from disk with Range support.
-async fn video_handler(
+/// GET /stream/cn/:platform/:track_id — serve a track from Migu, Kugou
+/// or QQ Music.
+///
+/// The three platforms share one handler because they share one shape:
+/// a platform id, a track id, and a direct CDN URL that the resolution
+/// produces. The bytes are then served through the same progressive
+/// path YouTube and NetEase use, so the `<audio>` element sees the same
+/// kind of response whichever provider is behind it.
+///
+/// The cache file is named `<platform>_<id>`, so a Kugou hash and a
+/// QQ mid can never collide on disk.
+async fn cn_stream_handler(
     AxumState(srv): AxumState<StreamServer>,
-    Path(video_id): Path<String>,
+    Path((platform, track_id)): Path<(String, String)>,
     req: Request,
 ) -> Response {
-    if !sanitize_video_id(&video_id) {
-        return (StatusCode::BAD_REQUEST, "invalid videoId").into_response();
+    if !matches!(platform.as_str(), "migu" | "kugou" | "qq") {
+        return (StatusCode::BAD_REQUEST, "unknown platform").into_response();
+    }
+    if track_id.is_empty() || track_id.len() > 64 {
+        return (StatusCode::BAD_REQUEST, "invalid track id").into_response();
+    }
+    // The ids are alphanumeric (a QQ mid, a Kugou hash) or digits (a
+    // Migu content id). Nothing else is accepted, which keeps the
+    // cache key safe as a filename.
+    if !track_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return (StatusCode::BAD_REQUEST, "invalid track id").into_response();
     }
 
-    let height = video_quality(&req);
-    let target_dir = srv.ephemeral_dir.clone();
-    let map_key = format!("v:{video_id}:{height}");
-    let final_path = target_dir.join(format!("{video_id}.{height}p.video.mp4"));
+    let cache_key = format!("{platform}_{track_id}");
+    let t0 = std::time::Instant::now();
+    let final_path = srv.cache_dir.join(format!("{cache_key}.webm"));
 
-    if !final_path.exists() {
-        let state = {
-            let mut map = srv.downloads.lock().await;
-            if let Some(s) = map.get(&map_key) {
-                s.clone()
-            } else {
-                let s = Arc::new(DownloadState::new());
-                map.insert(map_key.clone(), s.clone());
-                drop(map);
-                spawn_video_downloader(
-                    video_id.clone(),
-                    target_dir.clone(),
-                    map_key.clone(),
-                    srv.clone(),
-                    s.clone(),
-                    height,
-                );
-                s
-            }
+    let range_hdr = req
+        .headers()
+        .get(axum::http::header::RANGE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    if final_path.exists() {
+        let mut resp = ServeFile::new(&final_path)
+            .oneshot(req)
+            .await
+            .map(|r| r.into_response())
+            .unwrap_or_else(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("serve: {e}"),
+                )
+                    .into_response()
+            });
+        if resp.status().is_success() || resp.status() == StatusCode::PARTIAL_CONTENT {
+            resp.headers_mut().insert(
+                axum::http::header::CONTENT_TYPE,
+                axum::http::header::HeaderValue::from_static("audio/mpeg"),
+            );
+        }
+        return resp;
+    }
+
+    // Resolve first: without a direct URL and a known size there is
+    // nothing to serve, and the element should get a clear error
+    // rather than a hang.
+    let Some(resolved) = cnproviders::resolve(&platform, &track_id).await else {
+        log!("[stream] {platform} {track_id}: no playable URL");
+        return (StatusCode::BAD_GATEWAY, "no playable url").into_response();
+    };
+    log!(
+        "[stream] {platform} {track_id}: resolved {} bytes ({})",
+        resolved.size,
+        resolved.mime
+    );
+
+    let state = {
+        let mut map = srv.downloads.lock().await;
+        let key = format!("c:{cache_key}");
+        if let Some(s) = map.get(&key) {
+            s.clone()
+        } else {
+            let s = Arc::new(DownloadState::new());
+            map.insert(key.clone(), s.clone());
+            drop(map);
+            spawn_cn_filler(
+                resolved.clone(),
+                cache_key.clone(),
+                srv.cache_dir.clone(),
+                key.clone(),
+                srv.clone(),
+                s.clone(),
+            );
+            s
+        }
+    };
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+    loop {
+        let notified = state.notify.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if state.resolved.get().is_some() || state.complete.load(Ordering::Acquire) {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return (StatusCode::GATEWAY_TIMEOUT, "download timeout").into_response();
+        }
+        let _ = tokio::time::timeout(Duration::from_secs(5), notified).await;
+    }
+
+    let part_path = srv.cache_dir.join(format!("{cache_key}.part"));
+    let part = tokio::fs::File::open(&part_path).await.ok();
+    let range = (!range_hdr.is_empty()).then_some(range_hdr.as_str());
+    let resp = progressive::respond(
+        range,
+        &resolved,
+        state.clone(),
+        part,
+        proxy::media_client(),
+    );
+    log!(
+        "[stream] {platform} {track_id}: responding {} ({:.2}s)",
+        resp.status(),
+        t0.elapsed().as_secs_f32()
+    );
+    resp
+}
+
+/// Fill the cache file for a track from one of the Chinese platforms.
+///
+/// The CDNs answer `Range` requests and report the exact length, so the
+/// same filler the YouTube and NetEase paths use works unchanged.
+///
+/// `cache_key` is `<platform>_<track id>` — it is derived from the
+/// track id rather than the CDN URL, because the URL carries a signed
+/// token that changes on every resolve, so keying the cache on it would
+/// never hit.
+fn spawn_cn_filler(
+    resolved: progressive::ResolvedAudio,
+    cache_key: String,
+    target_dir: PathBuf,
+    map_key: String,
+    srv: StreamServer,
+    state: Arc<DownloadState>,
+) {
+    let downloads = srv.downloads.clone();
+    tokio::spawn(async move {
+        let _ = tokio::fs::create_dir_all(&target_dir).await;
+        let part_path = target_dir.join(format!("{cache_key}.part"));
+        let final_path = target_dir.join(format!("{cache_key}.webm"));
+        let _ = tokio::fs::remove_file(&part_path).await; // clean stale
+
+        let part_file = tokio::fs::File::create(&part_path).await.ok();
+
+        let success = if let Some(file) = part_file {
+            let _ = state.resolved.set(resolved.clone());
+            state.notify.notify_waiters();
+            let http = proxy::media_client();
+            progressive::fill(&http, &resolved, file, &state).await
+                && state.downloaded.load(Ordering::Acquire) == resolved.size
+        } else {
+            false
         };
 
-        // Video files are an order of magnitude bigger than audio: allow
-        // more time before giving up.
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(300);
-        while !state.complete.load(Ordering::Acquire) {
-            if tokio::time::Instant::now() >= deadline {
-                log!("[video] {video_id}: TIMEOUT after 300s");
-                return (StatusCode::GATEWAY_TIMEOUT, "download timeout").into_response();
+        if success {
+            if let Err(e) = tokio::fs::rename(&part_path, &final_path).await {
+                log!("[stream] {cache_key} rename: {e}");
+                let _ = tokio::fs::remove_file(&part_path).await;
             }
-            let notified = state.notify.notified();
-            tokio::pin!(notified);
-            let _ = tokio::time::timeout(Duration::from_secs(5), notified).await;
+        } else {
+            let _ = tokio::fs::remove_file(&part_path).await;
+        }
+        state.complete.store(true, Ordering::Release);
+        state.notify.notify_waiters();
+
+        if success {
+            let limit = srv.cache_limit.load(Ordering::Relaxed);
+            enforce_cache_limit(srv.cache_dir.clone(), limit, AUDIO_CACHE_EXTENSIONS).await;
         }
 
-        if !final_path.exists() {
-            return (StatusCode::BAD_GATEWAY, "download failed").into_response();
-        }
-    }
-
-    let sniffed_ct = sniff_video_mime(&final_path).await;
-    let mut resp = ServeFile::new(&final_path)
-        .oneshot(req)
-        .await
-        .map(|r| r.into_response())
-        .unwrap_or_else(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("serve: {e}")).into_response()
+        let downloads_evict = downloads.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            downloads_evict.lock().await.remove(&map_key);
         });
-    if resp.status().is_success() || resp.status() == StatusCode::PARTIAL_CONTENT {
-        resp.headers_mut().insert(
-            axum::http::header::CONTENT_TYPE,
-            axum::http::HeaderValue::from_static(sniffed_ct),
-        );
-    }
-    resp
+    });
 }
 
 /// GET /cover/:filename — serve a cached cover image. Files are placed
@@ -3732,6 +3908,142 @@ async fn prefetch_handler(
         state
     };
     spawn_downloader(video_id, target_dir, map_key, srv.clone(), state);
+    StatusCode::ACCEPTED
+}
+
+/// GET /prefetch/netease/:song_id — fire-and-forget cache warmer for a
+/// NetEase track.
+///
+/// The YouTube prefetcher spawns yt-dlp; this one resolves the song id
+/// to a direct CDN URL and lets the same progressive filler cache it.
+/// A song the platform will not serve is simply not prefetched — the
+/// caller learns nothing from a 502 here, because it never waits for
+/// this response.
+async fn netease_prefetch_handler(
+    AxumState(srv): AxumState<StreamServer>,
+    Path(song_id): Path<String>,
+) -> StatusCode {
+    if song_id.is_empty() || !song_id.chars().all(|c| c.is_ascii_digit()) {
+        return StatusCode::BAD_REQUEST;
+    }
+
+    let cache_key = format!("netease_{song_id}");
+    let final_path = srv.cache_dir.join(format!("{cache_key}.webm"));
+    if final_path.exists() {
+        return StatusCode::OK;
+    }
+
+    let Some(resolved) = netease::resolve_audio(&srv.app, &song_id).await else {
+        return StatusCode::BAD_GATEWAY;
+    };
+
+    let map_key = format!("n:{cache_key}");
+    let state = {
+        let mut map = srv.downloads.lock().await;
+        if map.contains_key(&map_key) {
+            return StatusCode::ACCEPTED;
+        }
+        let state = Arc::new(DownloadState::new());
+        map.insert(map_key.clone(), state.clone());
+        drop(map);
+        spawn_netease_filler(
+            resolved,
+            cache_key,
+            srv.cache_dir.clone(),
+            map_key,
+            srv.clone(),
+            state.clone(),
+        );
+        state
+    };
+
+    // The filler publishes the resolved URL as soon as it starts; wait
+    // briefly so the download is genuinely under way before answering.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let notified = state.notify.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if state.resolved.get().is_some() {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(200), notified).await;
+    }
+    StatusCode::ACCEPTED
+}
+
+/// GET /prefetch/cn/:platform/:track_id — fire-and-forget cache warmer
+/// for a Migu, Kugou or QQ Music track.
+///
+/// Same shape as the NetEase prefetcher: resolve the track to a direct
+/// CDN URL, then let the progressive filler cache it in the background.
+/// A track the platform will not serve is simply not prefetched — the
+/// caller learns nothing from a 502 here, because it never waits for
+/// this response.
+async fn cn_prefetch_handler(
+    AxumState(srv): AxumState<StreamServer>,
+    Path((platform, track_id)): Path<(String, String)>,
+) -> StatusCode {
+    if !matches!(platform.as_str(), "migu" | "kugou" | "qq") {
+        return StatusCode::BAD_REQUEST;
+    }
+    if track_id.is_empty()
+        || track_id.len() > 64
+        || !track_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return StatusCode::BAD_REQUEST;
+    }
+
+    let cache_key = format!("{platform}_{track_id}");
+    let final_path = srv.cache_dir.join(format!("{cache_key}.webm"));
+    if final_path.exists() {
+        return StatusCode::OK;
+    }
+
+    let Some(resolved) = cnproviders::resolve(&platform, &track_id).await else {
+        return StatusCode::BAD_GATEWAY;
+    };
+
+    let map_key = format!("cn:{cache_key}");
+    let state = {
+        let mut map = srv.downloads.lock().await;
+        if map.contains_key(&map_key) {
+            return StatusCode::ACCEPTED;
+        }
+        let state = Arc::new(DownloadState::new());
+        map.insert(map_key.clone(), state.clone());
+        drop(map);
+        spawn_cn_filler(
+            resolved,
+            cache_key,
+            srv.cache_dir.clone(),
+            map_key,
+            srv.clone(),
+            state.clone(),
+        );
+        state
+    };
+
+    // The filler publishes the resolved URL as soon as it starts; wait
+    // briefly so the download is genuinely under way before answering.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let notified = state.notify.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if state.resolved.get().is_some() {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(200), notified).await;
+    }
     StatusCode::ACCEPTED
 }
 
@@ -3830,8 +4142,11 @@ async fn start_stream_server(
 
     let routes = Router::new()
         .route("/stream/:video_id", get(stream_handler))
-        .route("/video/:video_id", get(video_handler))
+        .route("/stream/netease/:song_id", get(netease_stream_handler))
+        .route("/stream/cn/:platform/:track_id", get(cn_stream_handler))
         .route("/prefetch/:video_id", get(prefetch_handler))
+        .route("/prefetch/netease/:song_id", get(netease_prefetch_handler))
+        .route("/prefetch/cn/:platform/:track_id", get(cn_prefetch_handler))
         .route("/cover/:filename", get(cover_serve_handler))
         .with_state(server);
     let app = Router::new()
@@ -3996,6 +4311,7 @@ pub fn run() {
         .manage(CloseBehavior::default())
         .manage(JarWriteLock::default())
         .manage(discord::DiscordState::default())
+        .manage(Arc::new(unblock::Pool::default()))
         .invoke_handler(tauri::generate_handler![
             ensure_ytdlp,
             check_ytdlp_update,
@@ -4043,6 +4359,32 @@ pub fn run() {
             discord::discord_set_config,
             discord::discord_update,
             discord::discord_clear,
+            unblock::unblock_pool_status,
+            unblock::unblock_pool_config,
+            unblock::unblock_pool_set_config,
+            unblock::unblock_pool_probe,
+            unblock::unblock_pool_set_enabled,
+            unblock::unblock_pool_restore,
+            unblock::unblock_pool_restore_all,
+            unblock::unblock_resolve,
+            unblock::unblock_stream_url,
+            netease::netease_search,
+            netease::netease_privileges,
+            netease::netease_stream_url,
+            netease::netease_daily_recommend,
+            netease::netease_lyric,
+            netease::netease_liked,
+            netease::netease_liked_ids,
+            netease::netease_resolve,
+            netease::netease_set_like,
+            netease_auth::netease_start_login,
+            netease_auth::netease_logout,
+            netease_auth::netease_session,
+            cnproviders::migu_search_cmd,
+            cnproviders::kugou_search_cmd,
+            cnproviders::qq_search_cmd,
+            cnproviders::cn_resolve,
+            cnproviders::cn_lyric,
             update_source::update_source,
         ])
         .on_window_event(|window, event| {
@@ -4139,7 +4481,17 @@ pub fn run() {
             // thread, which souvlaki requires and where the main window's
             // HWND is available.
             media::init(app.handle());
-            // Linux/KDE: a host-owned MPRIS player so the taskbar tooltip gets
+            // The third-party unblock pool: restore the persisted health
+            // records and start the periodic probe loop. Both are cheap
+            // and off the main thread.
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let pool = handle.state::<Arc<unblock::Pool>>().inner().clone();
+                    pool.load(&handle);
+                    unblock::spawn_probe_task(handle);
+                });
+            }            // Linux/KDE: a host-owned MPRIS player so the taskbar tooltip gets
             // media controls (see mpris.rs). No-op on other desktops.
             #[cfg(target_os = "linux")]
             mpris::init(app.handle());

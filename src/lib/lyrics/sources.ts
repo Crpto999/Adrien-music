@@ -4,20 +4,39 @@ import { fetchLrclibLyrics } from "@/lib/lyrics/lrclib";
 import { fetchMusixmatchLyrics } from "@/lib/lyrics/musixmatch";
 import { fetchGeniusLyrics } from "@/lib/lyrics/genius";
 import { fetchYtMusicLyrics } from "@/lib/lyrics/ytmusic";
+import { fetchCnLyrics } from "@/lib/lyrics/cn";
+import { fetchNeteaseLyrics } from "@/lib/lyrics/netease";
 import { shouldRetryLyricsQuery } from "@/lib/lyrics/http";
 import { cleanTrackTitle, lyricsArtist } from "@/lib/track-meta";
+import { toSimplified } from "@/lib/chinese";
 import type { Lyrics } from "@/lib/lyrics/types";
 import { usePlaybackStore, type QueueTrack } from "@/lib/store/playback";
 
-export type LyricsSource = "ytmusic" | "lrclib" | "musixmatch" | "genius";
+export type LyricsSource =
+  | "ytmusic"
+  | "netease"
+  | "migu"
+  | "kugou"
+  | "qq"
+  | "lrclib"
+  | "musixmatch"
+  | "genius";
 
 /**
  * Preference order. YouTube Music leads because it is the only source
  * matched by videoId rather than by text, so it cannot return a different
- * song. The rest follow as fallbacks for the tracks it has nothing for.
+ * song. The Chinese platforms follow for the same reason — they are
+ * keyed on the platform's own track id — and they are asked first among
+ * the id-keyed sources because a Chinese track's words are far more
+ * likely to be right on a Chinese platform than on a text-matching one.
+ * The rest follow as fallbacks for the tracks they have nothing for.
  */
 export const SOURCE_ORDER: LyricsSource[] = [
   "ytmusic",
+  "netease",
+  "migu",
+  "kugou",
+  "qq",
   "lrclib",
   "musixmatch",
   "genius",
@@ -25,6 +44,10 @@ export const SOURCE_ORDER: LyricsSource[] = [
 
 export const SOURCE_LABELS: Record<LyricsSource, string> = {
   ytmusic: "YouTube Music",
+  netease: "NetEase Cloud Music",
+  migu: "Migu Music",
+  kugou: "Kugou Music",
+  qq: "QQ Music",
   lrclib: "LRCLIB",
   musixmatch: "Musixmatch",
   genius: "Genius",
@@ -58,6 +81,23 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
   const trackTitle = useMemo(
     () => (track ? cleanTrackTitle(track.title) : undefined),
     [track],
+  );
+
+  // The lookup strings are sent in Simplified Chinese.
+  //
+  // The lyrics databases are indexed the way the platforms' catalogues
+  // are written — mostly Simplified, some Traditional — so a
+  // Traditional title has to be searched for in Simplified to find
+  // anything. The *displayed* lyrics are converted the other way in
+  // each source's own fetcher, so what the user reads is always
+  // Simplified regardless of which database answered.
+  const lookupTitle = useMemo(
+    () => (trackTitle ? toSimplified(trackTitle) : undefined),
+    [trackTitle],
+  );
+  const lookupArtist = useMemo(
+    () => (artistName ? toSimplified(artistName) : undefined),
+    [artistName],
   );
 
   // The real duration, once the audio element knows it. Used only when the
@@ -94,21 +134,55 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
     retry: shouldRetryLyricsQuery,
   });
 
+  // The Chinese platforms answer about *their own* track id, so a query
+  // only makes sense for a track that actually came from one of them.
+  // A track playing from YouTube has no Migu id to ask about.
+  const cnProvider = track?.provider;
+  const cnTrackId = track?.providerTrackId;
+  const cnEnabled =
+    !!track &&
+    enabled &&
+    (cnProvider === "migu" || cnProvider === "kugou" || cnProvider === "qq") &&
+    !!cnTrackId;
+
+  // NetEase's own lyrics, keyed on the platform's song id. This is the
+  // source that matters for the daily recommendation: those picks are
+  // NetEase records, so the platform has exactly the right words for
+  // them.
+  //
+  // A pick that NetEase will not serve is redirected to another
+  // provider, and the NetEase id survives the redirection in
+  // `discoveredTrackId` — the words did not change with the audio
+  // source, so the lyrics must not change either.
+  const neteaseSongId =
+    track?.provider === "netease"
+      ? track.providerTrackId
+      : track?.discoveredOn === "netease"
+        ? track.discoveredTrackId
+        : undefined;
+  const netease = useQuery({
+    queryKey: ["lyrics", "netease", LOOKUP_VERSION, neteaseSongId],
+    queryFn: ({ signal }) => fetchNeteaseLyrics(neteaseSongId, signal),
+    enabled: !!track && enabled && !!neteaseSongId,
+    staleTime: ONE_HOUR,
+    retry: shouldRetryLyricsQuery,
+  });
+
   const lrclib = useQuery({
     queryKey: [
       "lyrics",
       "lrclib",
       LOOKUP_VERSION,
-      trackTitle,
-      artistName,
+      lookupTitle,
+      lookupArtist,
       track?.album,
       duration,
     ],
     queryFn: ({ signal }) =>
       fetchLrclibLyrics(
         {
-          title: trackTitle!,
-          artist: artistName,
+          title: lookupTitle!,
+          artist: lookupArtist!,
           album: track?.album,
           duration,
         },
@@ -120,12 +194,18 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
   });
 
   const musixmatch = useQuery({
-    queryKey: ["lyrics", "musixmatch", LOOKUP_VERSION, trackTitle, artistName],
+    queryKey: [
+      "lyrics",
+      "musixmatch",
+      LOOKUP_VERSION,
+      lookupTitle,
+      lookupArtist,
+    ],
     queryFn: ({ signal }) =>
       fetchMusixmatchLyrics(
         {
-          title: trackTitle!,
-          artist: artistName,
+          title: lookupTitle!,
+          artist: lookupArtist!,
         },
         signal,
       ),
@@ -135,12 +215,18 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
   });
 
   const genius = useQuery({
-    queryKey: ["lyrics", "genius", LOOKUP_VERSION, trackTitle, artistName],
+    queryKey: [
+      "lyrics",
+      "genius",
+      LOOKUP_VERSION,
+      lookupTitle,
+      lookupArtist,
+    ],
     queryFn: ({ signal }) =>
       fetchGeniusLyrics(
         {
-          title: trackTitle!,
-          artist: artistName,
+          title: lookupTitle!,
+          artist: lookupArtist!,
         },
         signal,
       ),
@@ -149,23 +235,89 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
     retry: shouldRetryLyricsQuery,
   });
 
+  // The Chinese platforms answer about *their own* track id, so a query
+  // only makes sense for a track that actually came from one of them.
+  // A track playing from YouTube has no Migu id to ask about.
+  const migu = useQuery({
+    queryKey: ["lyrics", "migu", LOOKUP_VERSION, cnTrackId],
+    queryFn: ({ signal }) => fetchCnLyrics("migu", cnTrackId, signal),
+    enabled: cnEnabled && cnProvider === "migu",
+    staleTime: ONE_HOUR,
+    retry: shouldRetryLyricsQuery,
+  });
+
+  const kugou = useQuery({
+    queryKey: ["lyrics", "kugou", LOOKUP_VERSION, cnTrackId],
+    queryFn: ({ signal }) => fetchCnLyrics("kugou", cnTrackId, signal),
+    enabled: cnEnabled && cnProvider === "kugou",
+    staleTime: ONE_HOUR,
+    retry: shouldRetryLyricsQuery,
+  });
+
+  const qq = useQuery({
+    queryKey: ["lyrics", "qq", LOOKUP_VERSION, cnTrackId],
+    queryFn: ({ signal }) => fetchCnLyrics("qq", cnTrackId, signal),
+    enabled: cnEnabled && cnProvider === "qq",
+    staleTime: ONE_HOUR,
+    retry: shouldRetryLyricsQuery,
+  });
+
   const queries: Record<LyricsSource, UseQueryResult<Lyrics | null>> = {
     ytmusic,
+    netease,
+    migu,
+    kugou,
+    qq,
     lrclib,
     musixmatch,
     genius,
   };
 
+  // Everything the user reads is in Simplified Chinese.
+  //
+  // The sources disagree: YouTube Music serves whatever the uploader
+  // typed (often Traditional, from a Taiwanese or Hong Kong upload),
+  // while the Chinese platforms serve the mainland catalogue's own
+  // Simplified text. Converting once, here, means every source is
+  // displayed the same way — and the panel never mixes two scripts in
+  // the middle of a song.
+  //
+  // The dependencies are the sources' own data, not the `queries`
+  // object: that object is rebuilt on every render, so a memo that
+  // depended on it would recompute every time and never cache
+  // anything.
+  const displayLyrics = useMemo(() => {
+    const out = {} as Record<LyricsSource, Lyrics | null>;
+    out.ytmusic = toSimplifiedLyrics(ytmusic.data ?? null);
+    out.netease = toSimplifiedLyrics(netease.data ?? null);
+    out.migu = toSimplifiedLyrics(migu.data ?? null);
+    out.kugou = toSimplifiedLyrics(kugou.data ?? null);
+    out.qq = toSimplifiedLyrics(qq.data ?? null);
+    out.lrclib = toSimplifiedLyrics(lrclib.data ?? null);
+    out.musixmatch = toSimplifiedLyrics(musixmatch.data ?? null);
+    out.genius = toSimplifiedLyrics(genius.data ?? null);
+    return out;
+  }, [
+    ytmusic.data,
+    netease.data,
+    migu.data,
+    kugou.data,
+    qq.data,
+    lrclib.data,
+    musixmatch.data,
+    genius.data,
+  ]);
+
   let best: LyricsSource | null = null;
   for (const s of SOURCE_ORDER) {
-    if (queries[s].data?.kind === "timed") {
+    if (displayLyrics[s]?.kind === "timed") {
       best = s;
       break;
     }
   }
   if (!best) {
     for (const s of SOURCE_ORDER) {
-      if (queries[s].data?.kind === "plain") {
+      if (displayLyrics[s]?.kind === "plain") {
         best = s;
         break;
       }
@@ -191,5 +343,34 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
     for (const s of failed) void queries[s].refetch();
   };
 
-  return { queries, best, isLoading, failed, isRetrying, retryFailed };
+  return {
+    queries,
+    displayLyrics,
+    best,
+    isLoading,
+    failed,
+    isRetrying,
+    retryFailed,
+  };
+}
+
+/**
+ * Convert a lyric set to Simplified Chinese.
+ *
+ * Only the text is converted — the timings are untouched, and the
+ * source's name is kept as it was so the panel still says where the
+ * words came from.
+ */
+function toSimplifiedLyrics(lyrics: Lyrics | null): Lyrics | null {
+  if (!lyrics) return null;
+  if (lyrics.kind === "plain") {
+    return { ...lyrics, text: toSimplified(lyrics.text) };
+  }
+  return {
+    ...lyrics,
+    lines: lyrics.lines.map((line) => ({
+      ...line,
+      text: toSimplified(line.text),
+    })),
+  };
 }

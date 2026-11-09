@@ -55,11 +55,8 @@ describe("classifyAllRow", () => {
     expect(r?.item.id).toBe("vid123");
   });
 
-  it("re-kinds a video row (mapper defaults watch rows to song)", () => {
-    const r = classifyAllRow(row("Video", { videoId: "vidABC" }));
-    expect(r?.group).toBe("video");
-    expect(r?.item.kind).toBe("video");
-    expect(r?.item.id).toBe("vidABC");
+  it("skips a video row (the app no longer has a video destination)", () => {
+    expect(classifyAllRow(row("Video", { videoId: "vidABC" }))).toBeNull();
   });
 
   it("maps albums and treats Single / EP as albums", () => {
@@ -125,7 +122,6 @@ describe("classifyAllRow", () => {
     // Tokens verified against live zh-CN search responses.
     const cases: [string, string][] = [
       ["歌曲", "song"],
-      ["视频", "video"],
       ["专辑", "album"],
       ["单曲", "album"],
       ["音乐人", "artist"],
@@ -223,7 +219,7 @@ describe("mapTopResultCard", () => {
     expect(item?.id).toBe("4NRXx6U8ABQ");
   });
 
-  it("distinguishes a music-video top result via its subtitle token", () => {
+  it("treats a music-video top result as a song (no video destination)", () => {
     const item = mapTopResultCard(
       card({
         title: "Blinding Lights (Official Video)",
@@ -231,7 +227,7 @@ describe("mapTopResultCard", () => {
         onTap: { watchEndpoint: { videoId: "4NRXx6U8ABQ" } },
       }),
     );
-    expect(item?.kind).toBe("video");
+    expect(item?.kind).toBe("song");
   });
 });
 

@@ -15,7 +15,6 @@ import {
   currentTrack,
   initFloatingPlaybackBridge,
 } from "@/lib/store/playback";
-import { initFloatingTrackSourceBridge } from "@/lib/store/track-source";
 import { useLayoutStore } from "@/lib/store/layout";
 import { useSettingsStore } from "@/lib/store/settings";
 import { cn } from "@/lib/utils";
@@ -28,7 +27,6 @@ import { ThemeProvider } from "@/lib/theme";
 // can actually act on them. Done at module-eval time so this runs before
 // any of the components below subscribe.
 initFloatingPlaybackBridge();
-initFloatingTrackSourceBridge();
 
 /**
  * Frontend entrypoint when the same bundle is loaded in the standalone

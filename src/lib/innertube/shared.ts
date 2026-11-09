@@ -806,18 +806,6 @@ export function mapTwoRowItem(raw: YtNode): ShelfItem | null {
 
   if (watchEndpoint?.videoId) {
     id = watchEndpoint.videoId;
-    // Music videos vs. song cards: YT returns 16:9 thumbnails for videos
-    // and 1:1 for songs. The watchEndpoint itself doesn't tell us which,
-    // but the thumbnail aspect ratio is a reliable signal.
-    const widest = thumbnails.reduce(
-      (m, t) => ((t.width ?? 0) > (m?.width ?? 0) ? t : m),
-      thumbnails[0],
-    );
-    const ratio =
-      widest && widest.width && widest.height
-        ? widest.width / widest.height
-        : 1;
-    kind = ratio > 1.4 ? "video" : "song";
   } else if (browseEndpoint?.browseId) {
     id = browseEndpoint.browseId;
     const pageType =

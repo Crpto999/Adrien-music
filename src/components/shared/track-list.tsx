@@ -30,7 +30,7 @@ import { useSettingsStore } from "@/lib/store/settings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
-import { useTrackSourceStore } from "@/lib/store/track-source";
+import { shelfItemQueueId } from "@/lib/providers/queue";
 import type { ShelfItem } from "@/lib/innertube/types";
 import { ExplicitBadge } from "@/components/shared/explicit-badge";
 
@@ -47,6 +47,20 @@ type Props = {
   /** Enables "Remove from playlist" on rows; set only by an editable
    *  (user-owned) playlist page. */
   removal?: PlaylistRemovalContext;
+  /**
+   * Replace the default "play this row" behaviour.
+   *
+   * The default builds the queue from the rows and starts at the
+   * clicked one. A list whose rows come from another provider needs
+   * something else: the source has to be resolved *before* the track
+   * starts, because a platform that will not serve a record has to be
+   * swapped for one that will — and that takes a round trip. So the
+   * page hands in its own handler and takes over the click.
+   *
+   * The rows still handle their own selection and the rest of the
+   * menu; only the "start playing from here" step is replaced.
+   */
+  onPlayIndex?: (index: number) => void;
   /**
    * Render all rows directly instead of windowing them. For short
    * secondary lists (e.g. playlist Suggestions): the virtualizer anchors
@@ -91,19 +105,6 @@ function formatPlays(text?: string): string {
   return String(n);
 }
 
-function VideoSourceBadge() {
-  const t = useT();
-  return (
-    <span
-      title={t("entity.playingVideoVersion")}
-      aria-label={t("entity.videoSource")}
-      className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm bg-brand/15 text-[10px] font-bold leading-none text-brand"
-    >
-      V
-    </span>
-  );
-}
-
 /** Row height without the 2px gap below it. */
 export const TRACK_ROW_HEIGHT = ROW_SIZE - 2;
 
@@ -140,6 +141,7 @@ export function TrackList({
   hideAlbum = false,
   showPlays = false,
   removal,
+  onPlayIndex,
   virtualize = true,
   className,
 }: Props) {
@@ -153,7 +155,6 @@ export function TrackList({
     () => findActiveIndex(tracks, active, activeDuration),
     [tracks, active, activeDuration],
   );
-  const sourcePrefs = useTrackSourceStore((s) => s.byVideoId);
 
   // Multi-select, by row index. Shift- or Ctrl/Cmd-click toggles a row;
   // holding Shift (or Ctrl) and sweeping the pointer across rows selects
@@ -334,12 +335,12 @@ export function TrackList({
               isActive={idx === activeIndex}
               activeVideoId={idx === activeIndex ? active?.videoId : undefined}
               playing={playing}
-              videoSourceSelected={sourcePrefs[t.id]?.selected === "video"}
               removal={removal}
               selected={selected.has(idx)}
               onSweepStart={onSweepStart}
               onSweepEnter={onSweepEnter}
               onPlainClick={onPlainClick}
+              onPlayIndex={onPlayIndex}
             />
           </div>
         ))}
@@ -413,12 +414,12 @@ export function TrackList({
                   idx === activeIndex ? active?.videoId : undefined
                 }
                 playing={playing}
-                videoSourceSelected={sourcePrefs[t.id]?.selected === "video"}
-                removal={removal}
+                  removal={removal}
                 selected={selected.has(idx)}
                 onSweepStart={onSweepStart}
                 onSweepEnter={onSweepEnter}
                 onPlainClick={onPlainClick}
+                onPlayIndex={onPlayIndex}
               />
             </div>
           );
@@ -443,12 +444,13 @@ type RowProps = {
    *  the row by it. */
   activeVideoId?: string;
   playing: boolean;
-  videoSourceSelected: boolean;
   removal?: PlaylistRemovalContext;
   selected: boolean;
   onSweepStart: (idx: number) => void;
   onSweepEnter: (idx: number) => void;
   onPlainClick: (idx: number) => void;
+  /** Replaces the default "start playing from this row" behaviour. */
+  onPlayIndex?: (index: number) => void;
 };
 
 /** The accent disc with a check that marks a selected row. */
@@ -471,16 +473,16 @@ const TrackRow = memo(function TrackRow({
   isActive,
   activeVideoId,
   playing,
-  videoSourceSelected,
   removal,
   selected,
   onSweepStart,
   onSweepEnter,
   onPlainClick,
+  onPlayIndex,
 }: RowProps) {
   const row = (
     <li
-      data-videoid={activeVideoId ?? t.id}
+      data-videoid={activeVideoId ?? shelfItemQueueId(t)}
       data-selected={selected || undefined}
       style={{ gridTemplateColumns: gridTemplate }}
       className={cn(
@@ -510,6 +512,7 @@ const TrackRow = memo(function TrackRow({
         onPlainClick(idx);
         const store = usePlaybackStore.getState();
         if (isActive) store.toggle();
+        else if (onPlayIndex) onPlayIndex(idx);
         else store.playShelfItems(tracks, idx);
       }}
       onKeyDown={(e) => {
@@ -517,6 +520,7 @@ const TrackRow = memo(function TrackRow({
           e.preventDefault();
           const store = usePlaybackStore.getState();
           if (isActive) store.toggle();
+          else if (onPlayIndex) onPlayIndex(idx);
           else store.playShelfItems(tracks, idx);
         }
       }}
@@ -603,7 +607,6 @@ const TrackRow = memo(function TrackRow({
             {t.title}
           </span>
           {t.explicit ? <ExplicitBadge /> : null}
-          {videoSourceSelected ? <VideoSourceBadge /> : null}
         </div>
       </div>
 

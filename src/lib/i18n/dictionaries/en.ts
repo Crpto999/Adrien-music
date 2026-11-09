@@ -90,6 +90,8 @@ export const en = {
     removeFromQueue: "Remove from queue",
     playAlbum: "Play album",
     playPlaylist: "Play playlist",
+    moveUp: "Move up",
+    moveDown: "Move down",
     goToSettings: "Go to Settings",
     refresh: "Refresh",
     signIn: "Sign in",
@@ -194,12 +196,8 @@ export const en = {
     playbackError: "Playback error: {error}",
     source: "Source",
     song: "Song",
-    video: "Video",
     cover: "Cover",
     coverSaved: "Cover saved",
-    couldNotLoadVideo: "Couldn't load the video",
-    videoQuality: "Video quality",
-    playbackSource: "Playback source",
     fullScreenLayout: "Full screen layout",
     layout: "Layout",
     sideCard: "Side card",
@@ -210,11 +208,6 @@ export const en = {
     fsImmersive: "Immersive art",
     nowPlaying: "Now playing",
     currentlyPlaying: "Currently playing",
-    noVideoVersionFound: "No video version found",
-    noSongVersionFound: "No song version found",
-    noVideoAvailable: "No video available for this track",
-    loadingQuality: "Loading {quality}p…",
-    loadingVideo: "Loading video…",
   },
 
   queue: {
@@ -381,7 +374,6 @@ export const en = {
     filterAlbums: "Albums",
     filterArtists: "Artists",
     filterPlaylists: "Playlists",
-    filterVideos: "Videos",
   },
 
   library: {
@@ -443,8 +435,6 @@ export const en = {
     playlistIsEmpty: "This playlist is empty",
     noArtistPage: "No artist page for this album",
     noTracks: "No tracks to display.",
-    playingVideoVersion: "Playing the video version",
-    videoSource: "Video source",
     explicit: "Explicit",
     artist: "Artist",
     songCount: "{count} songs",
@@ -503,7 +493,6 @@ export const en = {
     switchFailed: "Switch failed: {error}",
     playbackStartFailed: "Couldn't start playback: {error}",
     coverSaved: "Cover saved",
-    couldNotLoadVideo: "Couldn't load the video",
     couldNotUseImage: "Couldn't use that image",
     removedFromPlaylist: "Removed from playlist",
     likeFailed: "Like failed: {error}",
@@ -533,6 +522,17 @@ export const en = {
       "Playlists are created as private — you can change that later on music.youtube.com.",
     removedFromLiked: "Removed from Liked",
     addedToLiked: "Added to Liked",
+    neteaseLiked: "Hearted on NetEase too",
+    neteaseUnliked: "Unhearted on NetEase too",
+    neteaseLikeNoMatch:
+      "Couldn't find “{title}” in the NetEase library, so the heart wasn't mirrored",
+    neteaseLikeFailed: "Couldn't mirror the heart to NetEase: {detail}",
+    youtubeLiked: "Hearted on YouTube Music too",
+    youtubeUnliked: "Unhearted on YouTube Music too",
+    youtubeLikeNoMatch:
+      "Couldn't find “{title}” on YouTube Music, so the heart wasn't mirrored",
+    youtubeLikeFailed: "Couldn't mirror the heart to YouTube Music: {detail}",
+    likeFailedNoId: "Couldn't heart this track — it has no id on its own platform",
     dislikeRemoved: "Dislike removed",
     disliked: "Disliked",
     coverSavedWithPath: "Cover saved",
@@ -558,6 +558,7 @@ export const en = {
       playback: "Playback",
       appearance: "Appearance",
       home: "Home",
+      sources: "Sources",
       storage: "Storage",
       integrations: "Integrations",
     },
@@ -652,9 +653,6 @@ export const en = {
         "Tint the window glow with the current cover's dominant color.",
       glowSize: "Glow size",
       glowSizeDesc: "How far the window glow reaches into the window.",
-      videoQuality: "Video quality",
-      videoQualityDesc:
-        "Picture quality for Video mode in immersive fullscreen. Higher takes longer to load the first time.",
       ratingButtons: "Rating buttons",
       ratingButtonsDesc:
         "Show a single heart, or separate like and dislike buttons.",
@@ -672,7 +670,64 @@ export const en = {
     home: {
       sectionOrder: "Section order",
       sectionOrderDesc:
-        "Drag to reorder the sections shown on the Home page.",
+        "Drag to reorder the sections shown on the Home page, and hide the ones you never want to see.",
+      hideSection: "Hide this section",
+      showSection: "Show this section",
+      dropToHide: "Drop here to hide this section",
+      shielded: "Hidden sections",
+      restore: "Show",
+    },
+    sources: {
+      unblockPool: "Unblock pool",
+      unblockPoolDesc: "{alive} of {total} endpoints are answering right now.",
+      probeNow: "Test now",
+      probing: "Testing…",
+      probeDone: "Endpoints tested",
+      probeSummary: "{count} endpoint(s) are working.",
+      autoProbe: "Test automatically",
+      autoProbeDesc: "Re-test the pool every {minutes} minutes.",
+      failureThreshold: "Failure limit",
+      failureThresholdDesc:
+        "Drop an endpoint from the pool after {count} consecutive failures.",
+      probeSong: "Test song",
+      probeSongDesc:
+        "The NetEase song id used to test the endpoints. A track the platform has withdrawn probes every endpoint as 'alive, no link' — pick one behind the membership wall to see which endpoints can actually unlock a track.",
+      restoreAll: "Restore all",
+      restoreAllDesc: "{count} removed endpoint(s) can be put back.",
+      restore: "Restore",
+      endpoints: "Endpoints",
+      refreshing: "Refreshing…",
+      loading: "Loading…",
+      empty: "No endpoints yet.",
+      removed: "removed",
+      tier: "{tier}",
+      healthOk: "working",
+      healthDegraded: "alive, no link",
+      healthDown: "unreachable",
+      healthUnknown: "not tested",
+    },    providers: {
+      priority: "Source priority",
+      priorityDesc:
+        "The order sources are tried in when a track can be played from more than one of them.",
+      priorityHint:
+        "YouTube is first by default: it has no membership gate, so a track it carries plays for anyone. Put NetEase first if your account has a membership — the stream is lossless there. Migu, Kugou and QQ Music all search and play anonymously; their paid tracks go through the third-party resolver pool.",
+      neteaseDaily: "Daily picks",
+      neteaseDailyCount: "{count} tracks",
+      neteaseDailySubtitle:
+        "The daily playlist NetEase Cloud Music picked for your account today.",
+      neteaseDailySignIn:
+        "Sign in to NetEase Cloud Music to see the daily playlist it picks for you every day.",
+      neteaseSignInAction: "Open NetEase",
+      noPlayableSource:
+        "\"{title}\" is not available from any of your sources right now.",
+      playingFrom: "Playing from {provider}",
+      discoveredOn: "Found on {provider}",
+      currentSource: "Current source",
+      switchSource: "Switch source",
+      searchingSources: "Looking for other sources…",
+      noOtherSource: "No other source has this track.",
+      switchedTo: "Now playing from {source}.",
+      switchFailed: "{source} could not play this track.",
     },
     storage: {
       cacheFolder: "Cache folder",
@@ -751,6 +806,11 @@ export const en = {
       apiKey: "Your Last.fm API key",
       apiSecret: "Your Last.fm shared secret",
       notConnected: "Not connected",
+      netease: "NetEase Cloud Music",
+      neteaseDesc:
+        "Sign in to NetEase to get the daily picks in your sidebar, and to play your own lossless catalogue.",
+      neteaseSignedInHint:
+        "Signed in. The sidebar now has a Daily picks entry with the playlist NetEase chooses for you each day, and NetEase serves your account's own catalogue — including lossless.",
       discord: "Discord Rich Presence",
       discordDesc:
         "Show what you're playing on your Discord profile. Talks directly to your local Discord app.",
@@ -806,7 +866,6 @@ export const en = {
     song: "Songs",
     artist: "Artists",
     album: "Albums & singles",
-    video: "Videos",
     playlist: "Community playlists",
   },
 };

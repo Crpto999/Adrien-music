@@ -9,6 +9,25 @@ export type TimedLine = {
   start: number;
   end?: number;
   text: string;
+  /**
+   * The words of this line, each with its own timing — the
+   * word-by-word ("逐字") form. Present only for the sources that
+   * have it; a plain LRC line has no word timings.
+   */
+  words?: WordSpan[];
+};
+
+/**
+ * One word within a line, with the span of time it is sung over.
+ *
+ * `start` and `end` are seconds from the beginning of the track, and
+ * they are absolute rather than relative to the line — so a word's
+ * span can be compared with the player's position directly.
+ */
+export type WordSpan = {
+  text: string;
+  start: number;
+  end: number;
 };
 
 export type Lyrics =

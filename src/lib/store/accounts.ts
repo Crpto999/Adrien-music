@@ -12,7 +12,6 @@ import { usePlaybackStore } from "@/lib/store/playback";
 import { usePinnedPlaylistsStore } from "@/lib/store/pinned-playlists";
 import { usePremiumStore } from "@/lib/store/premium";
 import { useSearchHistory } from "@/lib/store/search-history";
-import { useTrackSourceStore } from "@/lib/store/track-source";
 
 export type AccountSummary = {
   id: string;
@@ -205,9 +204,8 @@ export function useAccountsChangedListener(): void {
       usePlaybackStore.getState().stopPlayback();
 
       // 3. Other per-account local state: typed search history,
-      //    per-track Song↔Video preferences, cached Premium status.
+      //    cached Premium status.
       useSearchHistory.getState().clear();
-      useTrackSourceStore.setState({ byVideoId: {} });
       usePremiumStore.setState({ status: null });
 
       // 4. In-memory caches that wrap network state.

@@ -20,7 +20,6 @@ import {
   IconThumbDownFilled,
   IconThumbUp,
   IconThumbUpFilled,
-  IconVideoOff,
 } from "@tabler/icons-react";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
@@ -34,12 +33,9 @@ import { ArtworkOutline } from "@/components/shared/artwork-outline";
 import { ArtistLinks } from "@/components/shared/artist-links";
 import { EntityLink } from "@/components/shared/entity-link";
 import { getLikedIdsSet } from "@/components/shared/like-buttons";
+import { useNeteaseLikedIds } from "@/lib/providers/netease-liked";
 import { Thumbnail } from "@/components/shared/thumbnail";
 import { LyricsBody, useLyricsView } from "@/components/layout/lyrics-view";
-import { ImmersiveVideo } from "@/components/layout/immersive-video";
-import { QualitySwitch, SourceSwitch } from "@/components/layout/source-switch";
-import { useSourceSwitch } from "@/lib/use-source-switch";
-import { resolveStreamId, useTrackSourceStore } from "@/lib/store/track-source";
 import {
   PlaybackTime,
   ProgressSlider,
@@ -49,6 +45,7 @@ import {
   useITunesCover,
 } from "@/components/layout/player-bar";
 import { PlayerMoreMenu } from "@/components/layout/player-more-menu";
+import { SourceIndicator } from "@/components/layout/source-indicator";
 import { QueuePopover } from "@/components/layout/queue-panel";
 import { LyricsSourceButton } from "@/components/layout/lyrics-view";
 import { useT } from "@/lib/i18n";
@@ -181,39 +178,17 @@ function FullscreenView({ track }: { track: QueueTrack }) {
   const slideTo =
     origin === "bottom" ? { y: "100%" } : { x: "100%" };
 
-  // Song / Video in the immersive layout. Video is sticky: once chosen,
-  // each new track looks up its video and follows, until Song is picked.
-  const wantsVideo = useSettingsStore((s) => s.fullscreenVideo);
-  const setWantsVideo = useSettingsStore((s) => s.setFullscreenVideo);
-  const videoQuality = useSettingsStore((s) => s.videoQuality);
-  const setVideoQuality = useSettingsStore((s) => s.setVideoQuality);
-  const source = useSourceSwitch(track);
-  const streamId = useTrackSourceStore((s) =>
-    resolveStreamId(track.videoId, s.byVideoId),
-  );
-  const [failedId, setFailedId] = useState<string | null>(null);
-  const showVideo =
-    immersive && source.selected === "video" && failedId !== streamId;
-  const { switchTo } = source;
-  useEffect(() => {
-    if (immersive && wantsVideo && source.selected !== "video") {
-      void switchTo("video", true);
-    }
-    // Only a new track, layout or choice should trigger a lookup.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [immersive, wantsVideo, track.videoId, source.selected]);
   // The cover layouts wash the art out under a heavy blur. Immersive
   // keeps it sharp in the middle and blurs only the top and bottom bands
   // (below), where the chrome and the title sit. Light theme brightens
   // instead of darkening.
-  const filter =
-    immersive && !showVideo
-      ? light
-        ? "saturate(1.05) brightness(1.05)"
-        : "saturate(1.18) brightness(0.72)"
-      : light
-        ? "blur(46px) saturate(0.95) brightness(1.34)"
-        : "blur(46px) saturate(1.3) brightness(0.62)";
+  const filter = immersive
+    ? light
+      ? "saturate(1.05) brightness(1.05)"
+      : "saturate(1.18) brightness(0.72)"
+    : light
+      ? "blur(46px) saturate(0.95) brightness(1.34)"
+      : "blur(46px) saturate(1.3) brightness(0.62)";
 
   return (
     <TooltipProvider delayDuration={800} skipDelayDuration={0}>
@@ -268,21 +243,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
             overrideHighRes={iTunesCover}
           />
         </div>
-        {showVideo ? (
-          <ImmersiveVideo
-            key={streamId}
-            videoId={streamId}
-            quality={videoQuality}
-            onFail={(reason) => {
-              setFailedId(streamId);
-              console.error("[video] failed:", streamId, reason);
-              toast.error(t("player.couldNotLoadVideo"), {
-                description: reason,
-              });
-            }}
-          />
-        ) : null}
-        {immersive && !showVideo ? (
+        {immersive ? (
           <>
             {/* Blur bands: strongest at the edges, gone by mid-height. */}
             <div
@@ -351,27 +312,6 @@ function FullscreenView({ track }: { track: QueueTrack }) {
                 );
               })}
             </div>
-            {immersive ? (
-              <SourceSwitch
-                value={source.selected}
-                busy={source.busy}
-                videoUnavailable={source.unavailable}
-                onChange={(v) => {
-                  setWantsVideo(v === "video");
-                  setFailedId(null);
-                  void source.switchTo(v);
-                }}
-              />
-            ) : null}
-            {showVideo ? (
-              <QualitySwitch value={videoQuality} onChange={setVideoQuality} />
-            ) : null}
-            {immersive && !showVideo && source.unavailable ? (
-              <div className="flex h-9 items-center gap-2 rounded-[10px] border border-w080 bg-w070 px-3 text-[12px] font-medium text-(--fs-txt2) backdrop-blur-xl">
-                <IconVideoOff className="size-3.5" />
-                No video available for this track
-              </div>
-            ) : null}
             <div className="flex-1" />
           </div>
 
@@ -420,7 +360,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
               <span
                 className={cn(
                   "font-bold leading-[1.02] tracking-[-0.035em] text-(--fs-title) transition-[font-size] duration-300 [text-wrap:pretty]",
-                  showVideo ? "text-[34px]" : "text-[56px]",
+                  "text-[56px]",
                 )}
               >
                 {track.title}
@@ -452,14 +392,13 @@ function FullscreenView({ track }: { track: QueueTrack }) {
                 <VolumeControl className={chip} />
               </div>
               <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
-                {/* Fork note: SourceToggle omitted — song/video picker lives in the player menu (0209432). */}
+                {/* Which provider is serving the audio, and a way to
+                    switch to another one that carries the same
+                    recording. */}
+                <SourceIndicator track={track} variant="chip" />
                 <LyricsSourceButton state={lyricsState} className={chip} />
                 <QueuePopover className={chip} />
-                <PlayerMoreMenu
-                  track={track}
-                  includeSource={false}
-                  className={chip}
-                />
+                <PlayerMoreMenu track={track} className={chip} />
               </div>
 
               <Button
@@ -561,7 +500,16 @@ function LikePill({ track }: { track: QueueTrack }) {
     staleTime: 60 * 60 * 1000,
     retry: false,
   });
-  const isLiked = getLikedIdsSet(liked.data).has(track.videoId);
+
+  // A NetEase track's heart belongs to the NetEase account, so its
+  // filled state comes from the account's own collection rather than
+  // the app's YouTube liked list — which knows nothing about a NetEase
+  // song id.
+  const isNetease = track.provider === "netease";
+  const neteaseLiked = useNeteaseLikedIds(isNetease);
+  const isLiked = isNetease
+    ? (neteaseLiked.data?.includes(track.providerTrackId ?? "") ?? false)
+    : getLikedIdsSet(liked.data).has(track.videoId);
   const [busy, setBusy] = useState(false);
 
   const run = async (action: () => Promise<void>) => {

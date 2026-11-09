@@ -5,6 +5,8 @@ import type { ShelfItem, Thumbnail } from "@/lib/innertube/types";
 import { isFloatingPlayerWindow } from "@/lib/floating-player";
 import { usePlaybackSettings } from "./playback-settings";
 import { safeLocalStorage } from "./safe-storage";
+import type { ProviderId, ProviderRef } from "@/lib/providers/types";
+import { syntheticQueueId } from "@/lib/providers/queue";
 
 export type QueueTrack = {
   videoId: string;
@@ -18,6 +20,38 @@ export type QueueTrack = {
   thumbnails: Thumbnail[];
   /** Original duration from browse responses, may be undefined until /player resolves. */
   duration?: number;
+  /**
+   * The provider this track is being played from.
+   *
+   * Absent means YouTube — the app's original source, and the one the
+   * persisted queue was written against. `videoId` remains the
+   * YouTube-side id even for other providers, so every existing
+   * lookup keyed on it keeps working.
+   */
+  provider?: ProviderId;
+  /**
+   * That provider's own id for the track — a NetEase song id, for
+   * example. Only set when it differs from `videoId`.
+   */
+  providerTrackId?: string;
+  /**
+   * The provider the track was *discovered* on, when that differs from
+   * the one it plays from. A NetEase daily-recommendation track served
+   * by YouTube is discovered on NetEase and plays from YouTube — worth
+   * showing, because the two are different recordings of the same song.
+   */
+  discoveredOn?: ProviderId;
+  /**
+   * The id the track had on its origin provider, when it no longer
+   * plays from there.
+   *
+   * A NetEase daily pick that NetEase will not serve is redirected to
+   * YouTube, and the NetEase song id goes with the redirection — but
+   * the platform's own lyrics are still the right words for that
+   * song, and they are keyed on the NetEase id. Without this the pick
+   * would lose its lyrics the moment it was upgraded.
+   */
+  discoveredTrackId?: string;
 };
 
 export type RepeatMode = "off" | "all" | "one";
@@ -74,6 +108,13 @@ export type PlaybackState = {
   enqueueNext: (track: QueueTrack | ShelfItem) => void;
   enqueueEnd: (track: QueueTrack | ShelfItem) => void;
   appendToQueue: (tracks: (QueueTrack | ShelfItem)[]) => void;
+  /**
+   * Move a queue slot to a different provider.
+   *
+   * Used by the source switcher: the same recording on another
+   * platform is a different file, and the user picks which one plays.
+   */
+  setTrackProvider: (index: number, ref: ProviderRef) => void;
   removeAt: (index: number) => void;
   moveTrack: (from: number, to: number) => void;
   /** Drop everything after the current track; it keeps playing. */
@@ -107,8 +148,28 @@ export type PlaybackState = {
 
 function shelfItemToTrack(item: ShelfItem | QueueTrack): QueueTrack | null {
   if ("videoId" in item) return item;
-  if (item.kind !== "song" && item.kind !== "video") return null;
-  return {
+  if (item.kind !== "song") return null;
+  // A row from another provider (the NetEase daily picks) carries that
+  // provider's own id. It has to become the queue's `videoId` in the
+  // synthetic `provider_id` form, because the YouTube-side id is what
+  // the rest of the app treats as "this track's id" — and a NetEase
+  // song id would be meaningless there.
+  const provider = item.provider;
+  if (provider && provider !== "youtube") {
+    const providerTrackId = item.providerTrackId ?? item.id;
+    return {
+      videoId: syntheticQueueId(provider, providerTrackId),
+      title: item.title,
+      subtitle: item.subtitle,
+      artists: item.artists,
+      album: item.album,
+      albumId: item.albumId,
+      thumbnails: item.thumbnails,
+      duration: item.duration,
+      provider,
+      providerTrackId,
+    };
+  }  return {
     videoId: item.id,
     title: item.title,
     subtitle: item.subtitle,
@@ -270,7 +331,7 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
     const playableOffset =
       items
         .slice(0, startIndex + 1)
-        .filter((i) => i.kind === "song" || i.kind === "video").length - 1;
+        .filter((i) => i.kind === "song").length - 1;
     get().setQueue(tracks, Math.max(0, playableOffset));
   },
 
@@ -299,6 +360,57 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
     }
     if (!mapped.length) return;
     set((s) => ({ queue: [...s.queue, ...mapped] }));
+  },
+
+  /**
+   * Move a queue slot to a different provider.
+   *
+   * The slot keeps its identity — the title, the artist and its
+   * position in the queue belong to the user, not to the provider —
+   * but the provider and that provider's own id change, which is what
+   * the audio engine watches to re-resolve the stream.
+   *
+   * The `videoId` changes too, and it has to: for a non-YouTube
+   * provider it is the synthetic `provider_providerTrackId` form, and
+   * a stale YouTube id would make the storage tab and the media
+   * session describe the wrong file.
+   */
+  setTrackProvider: (index: number, ref: ProviderRef) => {
+    set((s) => {
+      if (index < 0 || index >= s.queue.length) return s;
+      const current = s.queue[index];
+      const videoId =
+        ref.provider === "youtube"
+          ? ref.providerTrackId
+          : syntheticQueueId(ref.provider, ref.providerTrackId);
+      const next = s.queue.slice();
+      next[index] = {
+        ...current,
+        videoId,
+        provider: ref.provider,
+        providerTrackId: ref.providerTrackId,
+        // The track is moving away from the provider it was found on,
+        // so that provider's id has to be remembered: it is the key
+        // the platform's own lyrics are filed under.
+        ...(current.provider === ref.provider
+          ? {}
+          : {
+              discoveredOn: current.discoveredOn ?? current.provider,
+              discoveredTrackId:
+                current.discoveredTrackId ?? current.providerTrackId,
+            }),
+      };
+      const isCurrent = index === s.index;
+      return {
+        queue: next,
+        // The current track's stream has to be re-resolved, and the
+        // player has to show the track as loading rather than keep
+        // playing the old provider's audio under the new label.
+        ...(isCurrent
+          ? { status: "loading" as LoadStatus, streamUrl: undefined }
+          : {}),
+      };
+    });
   },
 
   removeAt: (i) => {
@@ -639,5 +751,16 @@ export function initFloatingPlaybackBridge(): void {
       sendAction({ type: "enqueueNext", track: track as unknown }),
     enqueueEnd: (track) =>
       sendAction({ type: "enqueueEnd", track: track as unknown }),
+    // The source switcher has to reach the authoritative store: the
+    // floating window has no audio engine, so a local change would
+    // only repaint the floater while the main window kept playing the
+    // old provider's stream.
+    setTrackProvider: (index, ref) =>
+      sendAction({
+        type: "setTrackProvider",
+        index,
+        provider: ref.provider,
+        providerTrackId: ref.providerTrackId,
+      }),
   });
 }

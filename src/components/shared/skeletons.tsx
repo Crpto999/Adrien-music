@@ -19,17 +19,11 @@ import { cn } from "@/lib/utils";
  *   ShelfCard: text-sm title (~20px), text-xs subtitle (~16px), gap-0.5 between them
  */
 
-/** Matches `ShelfCard`'s real geometry (shared/shelf-card.tsx); videos
- *  get the same 16:9 thumbnail the real video card uses. */
-export function ShelfCardSkeleton({ video = false }: { video?: boolean } = {}) {
+/** Matches `ShelfCard`'s real geometry (shared/shelf-card.tsx). */
+export function ShelfCardSkeleton() {
   return (
     <div className="flex flex-col gap-2 rounded-lg p-2">
-      <Skeleton
-        className={cn(
-          "w-full rounded-md",
-          video ? "aspect-video" : "aspect-square",
-        )}
-      />
+      <Skeleton className="aspect-square w-full rounded-md" />
       <div className="flex flex-col gap-0.5">
         <Skeleton className="h-5 w-3/4" />
         <Skeleton className="h-4 w-1/2" />

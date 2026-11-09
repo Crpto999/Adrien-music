@@ -59,6 +59,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getLikedIdsSet } from "@/components/shared/like-buttons";
+import { useNeteaseLikedIds } from "@/lib/providers/netease-liked";
 import { fetchVariedRadio } from "@/lib/innertube/radio-variety";
 import { fetchLikedSongs } from "@/lib/innertube/library";
 import {
@@ -137,9 +138,18 @@ export function useTrackMenuController(item: ShelfItem) {
   // O(1) lookup via shared id-set memo (see like-buttons.tsx for the
   // module-level memo). Avoids the per-render N×M scan we'd otherwise
   // get on long playlists.
+  //
+  // A NetEase row's heart belongs to the NetEase account, so its state
+  // comes from the account's own collection — the app's YouTube liked
+  // list knows nothing about a NetEase song id.
+  const isNetease = item.provider === "netease";
+  const neteaseLiked = useNeteaseLikedIds(isNetease);
   const isLiked = useMemo(
-    () => getLikedIdsSet(liked.data).has(item.id),
-    [liked.data, item.id],
+    () =>
+      isNetease
+        ? (neteaseLiked.data?.includes(item.providerTrackId ?? "") ?? false)
+        : getLikedIdsSet(liked.data).has(item.id),
+    [isNetease, neteaseLiked.data, liked.data, item.id, item.providerTrackId],
   );
 
   const runLike = async () => {
@@ -442,7 +452,7 @@ type Props = {
 export function TrackContextMenu({ item, children, context, removal }: Props) {
   const controller = useTrackMenuController(item);
 
-  if (item.kind !== "song" && item.kind !== "video") {
+  if (item.kind !== "song") {
     return <>{children}</>;
   }
 
@@ -490,7 +500,7 @@ export function TrackMoreMenu({
   const t = useT();
   const controller = useTrackMenuController(item);
 
-  if (item.kind !== "song" && item.kind !== "video") return null;
+  if (item.kind !== "song") return null;
 
   return (
     <>

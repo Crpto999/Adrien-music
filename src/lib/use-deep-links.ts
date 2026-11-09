@@ -38,7 +38,7 @@ async function playVideoId(videoId: string) {
     const seed = tracks.find((x) => x.id === videoId);
     if (seed) {
       const rest = tracks
-        .filter((x) => x !== seed && (x.kind === "song" || x.kind === "video"))
+        .filter((x) => x !== seed && x.kind === "song")
         .map((x) => ({
           videoId: x.id,
           title: x.title,

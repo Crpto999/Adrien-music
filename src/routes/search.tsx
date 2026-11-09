@@ -65,7 +65,7 @@ export const Route = createFileRoute("/search")({
     q: typeof search.q === "string" ? search.q : undefined,
     filter:
       typeof search.filter === "string" &&
-      ["all", "songs", "videos", "albums", "artists", "playlists"].includes(
+      ["all", "songs", "albums", "artists", "playlists"].includes(
         search.filter,
       )
         ? (search.filter as SearchFilter)
@@ -79,7 +79,6 @@ const FILTERS: SearchFilter[] = [
   "albums",
   "artists",
   "playlists",
-  "videos",
 ];
 const HISTORY_LIMIT = 5;
 
@@ -195,7 +194,6 @@ function FilterChip({
     albums: "search.filterAlbums",
     artists: "search.filterArtists",
     playlists: "search.filterPlaylists",
-    videos: "search.filterVideos",
   };
   return (
     <button
@@ -334,12 +332,6 @@ const ALL_SECTIONS: {
   {
     filter: "albums",
     titleKey: "searchGroup.album",
-    display: "card",
-    cap: 15,
-  },
-  {
-    filter: "videos",
-    titleKey: "searchGroup.video",
     display: "card",
     cap: 15,
   },
@@ -598,7 +590,7 @@ function TopResultHero({
       <h2 className="px-1 text-xl font-semibold tracking-tight">
         {t("search.topResult")}
       </h2>
-      {item.kind === "song" || item.kind === "video" ? (
+      {item.kind === "song" ? (
         <TrackContextMenu item={item}>{card}</TrackContextMenu>
       ) : (
         card
@@ -630,9 +622,7 @@ function FilterResults({
   if (filter === "songs") return <TrackList tracks={items} />;
 
   const gridClass =
-    filter === "videos"
-      ? "grid w-full gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))]"
-      : "grid w-full gap-2 grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] [&>*]:max-w-[20rem]";
+    "grid w-full gap-2 grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] [&>*]:max-w-[20rem]";
 
   return (
     <div className={gridClass}>
@@ -1028,23 +1018,16 @@ function ShelfSkeleton({
  * Loading state for the catalog results, shaped like what each tab
  * renders: All is the top-result card plus the sections in their real
  * order and titles, Songs is the track table, and the other tabs are the
- * responsive card grid (wider 16:9 cards for Videos).
+ * responsive card grid.
  */
 function SearchSkeleton({ filter }: { filter: SearchFilter }) {
   const t = useT();
   if (filter === "songs") return <TrackRowSkeletonList count={8} />;
   if (filter !== "all") {
-    const video = filter === "videos";
     return (
-      <div
-        className={
-          video
-            ? "grid w-full gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))]"
-            : "grid w-full gap-2 grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] [&>*]:max-w-[20rem]"
-        }
-      >
+      <div className="grid w-full gap-2 grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] [&>*]:max-w-[20rem]">
         {Array.from({ length: 8 }).map((_, i) => (
-          <ShelfCardSkeleton key={i} video={video} />
+          <ShelfCardSkeleton key={i} />
         ))}
       </div>
     );

@@ -57,6 +57,8 @@ import {
 } from "@/lib/store/accounts";
 import { useSessionStatusListener } from "@/lib/store/session-status";
 import { useProxySync } from "@/lib/proxy";
+import { useAlternativeSourcesPrefetch } from "@/lib/providers/alternatives";
+import { useNeteaseAuthListener } from "@/lib/providers/netease-auth";
 
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -138,6 +140,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   useCacheAutoClean();
   usePlaybackNotifications();
   useLastfmScrobbler();
+  useNeteaseAuthListener();
+  // Keeps the source switcher's list warm, so opening it shows the
+  // alternatives instead of a spinner.
+  useAlternativeSourcesPrefetch(usePlaybackStore(currentTrack));
   const mode = useLayoutStore((s) => s.mode);
   const settingsOpen = useSettingsDialog((s) => s.open);
   const fullscreenOpen = useFullscreenStore((s) => s.open);

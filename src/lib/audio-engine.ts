@@ -10,7 +10,7 @@ import { getLikedIdsSet } from "@/components/shared/like-buttons";
 import { toggleLiked } from "@/lib/like-actions";
 import { fetchWatchQueueContinuation } from "@/lib/innertube/radio";
 import { fetchVariedRadio } from "@/lib/innertube/radio-variety";
-import { prefetchStream, saveTrackMeta, streamUrlFor } from "@/lib/stream";
+import { prefetchStreamFor, saveTrackMeta, streamUrlForProvider } from "@/lib/stream";
 import { AudioGraph, canSelectOutputDevice } from "@/lib/audio-graph";
 import { analyzeTrack, peekAnalysis, planMix } from "@/lib/track-analysis";
 import { consumeFadeInto } from "@/lib/fade-request";
@@ -18,10 +18,8 @@ import { usePlaybackStore, type QueueTrack } from "@/lib/store/playback";
 import { eqGains, usePlaybackSettings } from "@/lib/store/playback-settings";
 // Fork: Discord toggle lives in the dedicated discord store (not settings).
 import { useDiscordStore, isDiscordConfigured } from "@/lib/store/discord";
-import { resolveStreamId, useTrackSourceStore } from "@/lib/store/track-source";
 import { pickThumbnail } from "@/components/shared/thumbnail";
 import { IS_LINUX, IS_WINDOWS } from "@/lib/platform";
-import { translate } from "@/lib/i18n";
 // Fork note: Discord/track-meta/playback-position/shuffle restores deferred
 // to a follow-up (see next commit) to keep this port reviewable. Premium
 // gate already removed above.
@@ -55,9 +53,6 @@ import { translate } from "@/lib/i18n";
 
 /** Start loading the next track this long before the crossfade begins. */
 const CROSSFADE_PRELOAD_LEAD_SEC = 8;
-/** Length of the ramp that hands playback to the other source on a
- *  Song ↔ Video switch: just long enough to avoid a click. */
-const SOURCE_SWITCH_FADE_SEC = 0.12;
 /** Fade ramp resolution. */
 const CROSSFADE_TICK_MS = 40;
 
@@ -103,11 +98,7 @@ export function useAudioEngine() {
   } | null>(null);
   // Guard against stale stream resolutions when the user skips mid-fetch.
   const resolveTokenRef = useRef(0);
-  // The queue slot the resolve effect last handled, and the stream id that
-  // is actually loaded in the active element. Together they tell a Song ↔
-  // Video switch on the *same* track apart from a real track change, so the
-  // switch can carry the playback position over instead of restarting.
-  const lastTrackRef = useRef<{ videoId: string; index: number } | null>(null);
+  // The stream id that is actually loaded in the active element.
   const loadedStreamRef = useRef<string | null>(null);
   // Counts how many tracks have failed in a row without a successful
   // play in between. Reset to 0 on `playing`. Used to short-circuit
@@ -270,10 +261,9 @@ export function useAudioEngine() {
       }
 
       const nextTrack = s.queue[nextIndex];
-      const nextStreamId = resolveStreamId(
-        nextTrack.videoId,
-        useTrackSourceStore.getState().byVideoId,
-      );
+      const nextStreamId = nextTrack.videoId;
+      const nextProvider = nextTrack.provider ?? "youtube";
+      const nextProviderTrackId = nextTrack.providerTrackId ?? nextTrack.videoId;
 
       const pending = pendingRef.current;
       if (
@@ -299,7 +289,7 @@ export function useAudioEngine() {
           el: standby,
         };
         pendingRef.current = p;
-        streamUrlFor(nextStreamId)
+        streamUrlForProvider(nextProvider, nextProviderTrackId)
           .then((src) => {
             if (pendingRef.current !== p) return;
             p.src = src;
@@ -488,39 +478,30 @@ export function useAudioEngine() {
   }, []);
 
   // React to current-track changes → resolve stream → set src.
-  const { videoId, track, index } = usePlaybackStore(
+  const { track, index } = usePlaybackStore(
     useShallow((s) => {
       const t = s.index >= 0 ? s.queue[s.index] : undefined;
-      return { videoId: t?.videoId, track: t, index: s.index };
+      return { track: t, index: s.index };
     }),
   );
 
-  // Substitute the streaming videoId via the user's per-track source
-  // preference (Song ↔ Music Video). Subscribing here means the effect
-  // below re-runs and re-resolves the stream when the user toggles the
-  // source on the currently playing track.
-  const streamVideoId = useTrackSourceStore((s) =>
-    videoId ? resolveStreamId(videoId, s.byVideoId) : undefined,
-  );
+  // The id of the track whose stream is currently loaded. With the
+  // music-video module gone there is no per-track source substitution
+  // anymore — the queue slot's id *is* the stream id.
+  const streamVideoId = track?.videoId;
+  // Which provider serves this track, and that provider's own id for
+  // it. A YouTube track uses its videoId; a NetEase track uses the
+  // song id. The pair is what the stream server needs to answer.
+  const streamProvider = track?.provider ?? "youtube";
+  const streamProviderTrackId = track
+    ? (track.providerTrackId ?? track.videoId)
+    : "";
 
   // Fork note: upstream's Premium subscription removed — no gate in this fork.
 
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
-    // Same queue slot as last time, but a different stream id than the one
-    // loaded: the user flipped Song ↔ Video on the playing track.
-    const prevTrack = lastTrackRef.current;
-    lastTrackRef.current = videoId !== undefined ? { videoId, index } : null;
-    const loadedId = loadedStreamRef.current;
-    const isSourceSwitch =
-      !!prevTrack &&
-      videoId !== undefined &&
-      prevTrack.videoId === videoId &&
-      prevTrack.index === index &&
-      !!streamVideoId &&
-      !!loadedId &&
-      loadedId !== streamVideoId;
     // A crossfade already has this track playing on the (now active)
     // element: adopt it rather than reloading. The outgoing element keeps
     // fading in the background.
@@ -578,7 +559,7 @@ export function useAudioEngine() {
       );
       const fade: Fade = { from, to, timer: 0 };
       fadeRef.current = fade;
-      streamUrlFor(streamVideoId)
+      streamUrlForProvider(streamProvider, streamProviderTrackId)
         .then((src) => {
           if (token !== resolveTokenRef.current) return;
           to.src = src;
@@ -611,117 +592,6 @@ export function useAudioEngine() {
           usePlaybackStore.getState().setPlaying(false);
         });
       return;
-    }
-    // Song ↔ Video on the track that is playing right now: keep the old
-    // source audible while the new one loads on the standby element, seek
-    // it to the same position, start it silently, line it up with the old
-    // one, and only then swap with a very short ramp. There is never a
-    // silent gap, and the position carries over.
-    if (
-      isSourceSwitch &&
-      streamVideoId &&
-      standbyRef.current &&
-      !el.paused &&
-      el.currentSrc &&
-      !el.error &&
-      el.readyState >= 2
-    ) {
-      cancelFade();
-      clearPending();
-      const from = el;
-      const to = standbyRef.current;
-      const newId = streamVideoId;
-      const token = ++resolveTokenRef.current;
-      to.muted = from.muted;
-      to.volume = 0;
-      const fail = () => {
-        if (token !== resolveTokenRef.current) return;
-        to.removeAttribute("src");
-        to.load();
-        toast.error(
-          translate("toast.couldNotLoadVersionStillPlaying"),
-        );
-      };
-      streamUrlFor(newId)
-        .then((src) => {
-          if (token !== resolveTokenRef.current) return;
-          let swapped = false;
-          const swap = () => {
-            if (swapped || token !== resolveTokenRef.current) return;
-            swapped = true;
-            const st = usePlaybackStore.getState();
-            audioRef.current = to;
-            standbyRef.current = from;
-            loadedStreamRef.current = newId;
-            st.setStreamUrl(src);
-            if (Number.isFinite(to.duration) && to.duration > 0) {
-              st.setDuration(to.duration);
-            }
-            graphRef.current?.resume();
-            if (st.playing) {
-              const fade: Fade = { from, to, timer: 0 };
-              fadeRef.current = fade;
-              beginRamp(fade, SOURCE_SWITCH_FADE_SEC, cancelFade);
-            } else {
-              // Paused while it loaded: swap in place, no ramp.
-              to.pause();
-              to.volume = elementVolume(st.volume);
-              from.pause();
-              from.removeAttribute("src");
-              from.load();
-            }
-          };
-          to.addEventListener("error", fail, { once: true });
-          to.addEventListener(
-            "loadedmetadata",
-            () => {
-              if (token !== resolveTokenRef.current) return;
-              const limit = Number.isFinite(to.duration)
-                ? Math.max(0, to.duration - 0.5)
-                : Infinity;
-              to.currentTime = Math.min(from.currentTime, limit);
-            },
-            { once: true },
-          );
-          to.addEventListener(
-            "seeked",
-            () => {
-              if (token !== resolveTokenRef.current) return;
-              void to.play().catch(fail);
-            },
-            { once: true },
-          );
-          to.addEventListener(
-            "playing",
-            () => {
-              if (token !== resolveTokenRef.current) return;
-              // `from` kept playing while this loaded: close the gap.
-              const target = from.currentTime + 0.05;
-              if (Math.abs(to.currentTime - target) > 0.08) {
-                to.addEventListener("seeked", swap, { once: true });
-                window.setTimeout(swap, 1500);
-                to.currentTime = target;
-              } else {
-                swap();
-              }
-            },
-            { once: true },
-          );
-          to.src = src;
-          to.load();
-        })
-        .catch(fail);
-      return;
-    }
-    // A switch that cannot be done seamlessly (paused, or the element is
-    // not playable): fall through to a normal load, but keep the position.
-    if (isSourceSwitch) {
-      const pos = el.currentSrc
-        ? el.currentTime
-        : usePlaybackStore.getState().position;
-      if (pos > 0.5 && videoId !== undefined) {
-        resumeRef.current = { videoId, index, seconds: pos };
-      }
     }
     // Any other track change ends a fade and discards the preload.
     cancelFade();
@@ -763,12 +633,14 @@ export function useAudioEngine() {
     // Playback goes through our local streaming HTTP server. It spawns
     // yt-dlp and pipes the audio bytes progressively so playback starts
     // as soon as the first chunk lands (typically ~200ms after the
-    // yt-dlp subprocess starts emitting bytes).
-    streamUrlFor(streamVideoId)
+    // yt-dlp subprocess starts emitting bytes). A NetEase track takes
+    // the same route: the server resolves the song id to a CDN URL and
+    // serves the bytes with the same Range support.
+    streamUrlForProvider(streamProvider, streamProviderTrackId)
       .then((src) => {
         if (token !== resolveTokenRef.current) return;
         if (import.meta.env.DEV) {
-          console.debug("[audio] setting src for", videoId, "→", src);
+          console.debug("[audio] setting src for", streamVideoId, "→", src);
         }
         el.src = src;
         loadedStreamRef.current = streamVideoId;
@@ -778,7 +650,7 @@ export function useAudioEngine() {
         // where it left off once the element knows its duration.
         const resume = resumeRef.current;
         resumeRef.current = null;
-        if (resume && resume.videoId === videoId && resume.index === index) {
+        if (resume && resume.videoId === streamVideoId && resume.index === index) {
           el.addEventListener(
             "loadedmetadata",
             () => {
@@ -820,9 +692,18 @@ export function useAudioEngine() {
     // track (repeat-one, or repeat-all on a 1-track queue) keeps the same
     // index, so the store replays it via pendingSeek instead — see
     // `next()` in store/playback.ts.
+    // The provider pair is in the deps for the same reason: a track
+    // that switches provider keeps its queue slot but needs a
+    // different stream URL, and the effect has to re-run to fetch it.
     // `retryNonce` so the error handler can force a fresh stream-URL fetch
     // for the current track after a transient failure without changing id.
-  }, [streamVideoId, videoId, index, retryNonce]);
+  }, [
+    streamVideoId,
+    streamProvider,
+    streamProviderTrackId,
+    index,
+    retryNonce,
+  ]);
 
   // Play / pause follow store.
   const playing = usePlaybackStore((s) => s.playing);
@@ -1075,33 +956,31 @@ export function useAudioEngine() {
   // chunk); by the time the user hits "next" the file is cached on
   // disk and playback starts instantly with full seek support.
   const status = usePlaybackStore((s) => s.status);
-  const { nextVideoId } = usePlaybackStore(
-    useShallow((s) => ({
-      nextVideoId:
-        s.index >= 0 && s.index + 1 < s.queue.length
-          ? s.queue[s.index + 1].videoId
-          : undefined,
-    })),
-  );
-  // Substitute via source-prefs for the prefetch too — otherwise we'd
-  // warm the cache for the wrong stream when the user has switched the
-  // upcoming track to its video version.
-  const nextStreamVideoId = useTrackSourceStore((s) =>
-    nextVideoId ? resolveStreamId(nextVideoId, s.byVideoId) : undefined,
+  const { nextVideoId, nextProvider, nextProviderTrackId } = usePlaybackStore(
+    useShallow((s) => {
+      const next = s.index >= 0 && s.index + 1 < s.queue.length
+        ? s.queue[s.index + 1]
+        : undefined;
+      return {
+        nextVideoId: next?.videoId,
+        nextProvider: next?.provider ?? "youtube",
+        nextProviderTrackId: next?.providerTrackId ?? next?.videoId,
+      };
+    }),
   );
   useEffect(() => {
     if (status !== "ready") return;
-    if (!nextStreamVideoId) return;
-    void prefetchStream(nextStreamVideoId);
+    if (!nextVideoId || !nextProviderTrackId) return;
+    void prefetchStreamFor(nextProvider, nextProviderTrackId);
     // Label the prefetched file too — same reasoning as the play path.
     const st = usePlaybackStore.getState();
     void saveTrackMeta(
-      nextStreamVideoId,
+      nextVideoId,
       st.index >= 0 && st.index + 1 < st.queue.length
         ? st.queue[st.index + 1]
         : undefined,
     );
-  }, [status, nextStreamVideoId]);
+  }, [status, nextVideoId, nextProvider, nextProviderTrackId]);
 
   // Auto-extend the queue with radio tracks when we're near the end, so
   // playback continues past the explicit queue.

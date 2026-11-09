@@ -1,3 +1,5 @@
+import type { ProviderId } from "@/lib/providers/types";
+
 export type Thumbnail = {
   url: string;
   width?: number;
@@ -10,7 +12,7 @@ export type MinimalArtist = {
 };
 
 export type ShelfItemKind =
-  "song" | "video" | "album" | "playlist" | "artist" | "category";
+  "song" | "album" | "playlist" | "artist" | "category";
 
 export type ShelfItem = {
   kind: ShelfItemKind;
@@ -39,6 +41,21 @@ export type ShelfItem = {
    * `browse/edit_playlist`'s ACTION_REMOVE_VIDEO.
    */
   setVideoId?: string;
+  /**
+   * The provider this row's track lives on, when it is not YouTube.
+   *
+   * The home feed and the search results are YouTube's, so this is
+   * absent for them — and absent means YouTube, which is what every
+   * existing consumer already assumes. It is set for the rows that
+   * come from another platform (the NetEase daily picks), so the row
+   * can be turned into a queue entry that streams from there.
+   */
+  provider?: ProviderId;
+  /**
+   * That provider's own id for the track — a NetEase song id, for
+   * example. Meaningful only alongside `provider`.
+   */
+  providerTrackId?: string;
   /** Round (true for artists) */
   round?: boolean;
   /**

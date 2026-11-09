@@ -18,7 +18,6 @@ import { SEARCH_TYPE_TOKENS } from "./locale-tokens";
 export const SEARCH_FILTERS = {
   all: undefined,
   songs: "EgWKAQIIAWoQEAkQBRAKEAMQBBAQEBUQEQ==",
-  videos: "EgWKAQIQAWoQEAkQBRAKEAMQBBAQEBUQEQ==",
   albums: "EgWKAQIYAWoQEAkQBRAKEAMQBBAQEBUQEQ==",
   artists: "EgWKAQIgAWoQEAkQBRAKEAMQBBAQEBUQEQ==",
   playlists: "EgWKAQIoAWoQEAkQBRAKEAMQBBAQEBUQEQ==",
@@ -30,13 +29,12 @@ export type SearchFilter = keyof typeof SEARCH_FILTERS;
  * The "all" tab groups its flat result list into these buckets, rendered in
  * this order. Each maps to the dedicated filter tab that shows the full list.
  */
-export type SearchGroup = "song" | "artist" | "album" | "video" | "playlist";
+export type SearchGroup = "song" | "artist" | "album" | "playlist";
 
 const GROUP_ORDER: SearchGroup[] = [
   "song",
   "artist",
   "album",
-  "video",
   "playlist",
 ];
 
@@ -48,7 +46,6 @@ const GROUP_TITLE_KEY: Record<SearchGroup, string> = {
   song: "searchGroup.song",
   artist: "searchGroup.artist",
   album: "searchGroup.album",
-  video: "searchGroup.video",
   playlist: "searchGroup.playlist",
 };
 
@@ -57,7 +54,6 @@ export const GROUP_FILTER: Record<SearchGroup, SearchFilter> = {
   song: "songs",
   artist: "artists",
   album: "albums",
-  video: "videos",
   playlist: "playlists",
 };
 
@@ -96,12 +92,6 @@ export function classifyAllRow(
   const item = mapResponsiveListItem(mrli);
   if (!item) return null;
 
-  // `mapResponsiveListItem` can't tell a music video from a song (both carry
-  // a watch videoId) and always tags "song" — the subtitle token is
-  // authoritative, so correct the kind for videos.
-  if (group === "video" && item.kind === "song") {
-    return { group, item: { ...item, kind: "video" } };
-  }
   return { group, item };
 }
 
@@ -128,9 +118,8 @@ export function mapTopResultCard(card: YtNode): ShelfItem | null {
   const browse = tap.browseEndpoint;
 
   if (watchId) {
-    const token = subtitle.split("•")[0]?.trim().toLowerCase();
     return {
-      kind: token === "video" ? "video" : "song",
+      kind: "song",
       id: watchId,
       title,
       subtitle: subtitle || undefined,
@@ -193,22 +182,14 @@ function sectionsFromResponse(json: YtNode): YtNode[] {
 
 /**
  * A dedicated filter tab (Songs / Artists / Albums / …) returns a single
- * `musicShelfRenderer` with up to ~20 rows. Map it straight through; the
- * "videos" tab needs its rows re-kinded (see classifyAllRow) since the row
- * mapper defaults watch rows to "song".
+ * `musicShelfRenderer` with up to ~20 rows. Map it straight through.
  */
-function buildFilterShelves(sections: YtNode[], filter: SearchFilter): Shelf[] {
+function buildFilterShelves(sections: YtNode[]): Shelf[] {
   const shelves: Shelf[] = [];
   collectShelfNodes(sections).forEach((wrapper, i) => {
     const { title, items, display } = mapShelfWrapper(wrapper, i);
-    const finalItems =
-      filter === "videos"
-        ? items.map((it) =>
-            it.kind === "song" ? { ...it, kind: "video" as const } : it,
-          )
-        : items;
-    if (finalItems.length === 0) return;
-    shelves.push({ id: `${title}-${i}`, title, items: finalItems, display });
+    if (items.length === 0) return;
+    shelves.push({ id: `${title}-${i}`, title, items, display });
   });
   return shelves;
 }
@@ -270,7 +251,7 @@ export async function fetchSearch(
   const sections = sectionsFromResponse(json);
 
   if (filter !== "all") {
-    return { query, shelves: buildFilterShelves(sections, filter) };
+    return { query, shelves: buildFilterShelves(sections) };
   }
   return buildAllResults(query, sections);
 }

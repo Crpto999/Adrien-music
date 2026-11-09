@@ -6,7 +6,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 // Tabler, per the design system. Every Browse row swaps to its filled
 // twin when active. The design draws Library as a bookshelf, which in
-// Tabler ships outline-only, so Library wears the bookmarks glyph — it
+// Tabler ships outline-only, so Library wears the bookmarks glyph �?it
 // has the filled twin the active state needs, and it doesn't collide
 // with the compass above it or the playlist rows below.
 import {
@@ -32,6 +32,7 @@ import {
   IconUserCogFilled,
   IconUserPlusFilled,
   IconUsersGroupFilled,
+  IconMusicFilled,
 } from "@/components/shared/filled-icons";
 import {
   Sidebar,
@@ -79,6 +80,7 @@ import { pickThumbnail } from "@/components/shared/thumbnail";
 import { resetInnertube } from "@/lib/innertube/client";
 import { accountSlot } from "@/lib/auth-presence";
 import { usePremiumStore } from "@/lib/store/premium";
+import { useNeteaseSession } from "@/lib/providers/netease-auth";
 import { accountInfoQuery, authLoggedInQuery } from "@/lib/store/auth-queries";
 import { useSessionStatusStore } from "@/lib/store/session-status";
 import {
@@ -106,13 +108,13 @@ const NAV_ITEMS = [
   },
 ] as const;
 
-// Liked Songs is the YTM magic playlist — browseId `VLLM` (wraps
+// Liked Songs is the YTM magic playlist �?browseId `VLLM` (wraps
 // playlistId "LM"). Always present, always first in the playlists
 // section, not user-removable.
 const LIKED_ID = "VLLM";
 
-// Artwork rows carry a 24px tile — the same size as the nav glyphs, so
-// the whole column reads as one set of marks — and the row keeps the
+// Artwork rows carry a 24px tile �?the same size as the nav glyphs, so
+// the whole column reads as one set of marks �?and the row keeps the
 // same 32px height as the icon rows above it.
 const ART_BTN_CLS = "h-8 py-0";
 
@@ -205,7 +207,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* A `--w055` hairline fences the footer off from the playlist
-          list, but only while that list scrolls — see `playlistsScroll`.
+          list, but only while that list scrolls �?see `playlistsScroll`.
           The border stays declared either way so the row keeps its
           height and nothing shifts when the list crosses the threshold. */}
       <SidebarFooter
@@ -275,7 +277,7 @@ function PlaylistArt({ src }: { src?: string }) {
 
 /**
  * The "Playlists" section. Shows Liked Songs, then every playlist in the
- * user's library. Pinning doesn't gate visibility any more — it only
+ * user's library. Pinning doesn't gate visibility any more �?it only
  * floats a playlist to the top of the list (right under Liked Songs).
  *
  * Shares the `["library", "playlists"]` query cache with the Library
@@ -292,12 +294,20 @@ function SidebarPlaylists({
 }) {
   const t = useT();
   const loggedIn = useQuery(authLoggedInQuery);
+  const { location } = useRouterState();
   const library = useQuery({
     queryKey: ["library", "playlists"],
     queryFn: fetchLibraryPlaylists,
     enabled: loggedIn.data === true,
     staleTime: 5 * 60_000,
   });
+
+  // The NetEase daily recommendation. It only exists for a signed-in
+  // NetEase account �?the platform answers anonymously with an empty
+  // list �?so the row is hidden entirely when there is no account,
+  // rather than shown and failing to load.
+  const { data: neteaseSession } = useNeteaseSession();
+  const neteaseSignedIn = neteaseSession?.signedIn === true;
 
   const pinned = usePinned();
   const hidden = useHidden();
@@ -307,8 +317,7 @@ function SidebarPlaylists({
 
   const rows = useMemo<PlaylistRow[]>(() => {
     const hiddenIds = new Set(hidden);
-    // Liked Songs (`VLLM`) ships in the playlists shelf too; drop it —
-    // it's always rendered as the hard-coded first row below. Hidden
+    // Liked Songs (`VLLM`) ships in the playlists shelf too; drop it �?    // it's always rendered as the hard-coded first row below. Hidden
     // playlists are dropped entirely (un-hidden from the Library).
     const libItems = (library.data ?? [])
       .flatMap((s) => s.items)
@@ -350,8 +359,8 @@ function SidebarPlaylists({
 
   // Ramp a soft top/bottom fade on the list from its scroll position so
   // rows dissolve into transparency at each edge instead of being cut by
-  // a hard line. An edge with nothing beyond it — the top at rest, the
-  // bottom when fully scrolled, or a list too short to scroll — stays
+  // a hard line. An edge with nothing beyond it �?the top at rest, the
+  // bottom when fully scrolled, or a list too short to scroll �?stays
   // crisp. Vertical mirror of the carousels' `shelf-edge-fade`.
   useEffect(() => {
     const el = scrollRef.current;
@@ -391,7 +400,7 @@ function SidebarPlaylists({
   // panel edge. `sidebar-list-scroll` (index.css) reserves a stable 8px
   // scrollbar gutter there, so the rows keep a constant right inset
   // (aligned with Browse) whether or not a scrollbar shows, and the
-  // scrollbar — when it shows — sits flush at the border. Collapsed
+  // scrollbar �?when it shows �?sits flush at the border. Collapsed
   // restores the rail's own 14px inset so the tiles stay centered.
   return (
     <SidebarGroup className="mt-2 flex min-h-0 flex-1 flex-col py-1 pe-0 group-data-[collapsible=icon]:mt-4 group-data-[collapsible=icon]:pe-2.5">
@@ -428,6 +437,30 @@ function SidebarPlaylists({
             </SidebarMenuButton>
           </SidebarMenuItem>
 
+          {neteaseSignedIn ? (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={location.pathname === "/netease/daily"}
+                tooltip={t("settings.providers.neteaseDaily")}
+                className={ART_BTN_CLS}
+              >
+                <Link to="/netease/daily">
+                  {/* The platform's own red, so the row reads as a
+                      NetEase destination rather than another
+                      YouTube playlist. */}
+                  <span
+                    data-slot="playlist-art"
+                    className="grid size-6 shrink-0 place-items-center rounded-[6px] bg-[linear-gradient(145deg,#e8544a_0%,#c9302c_55%,#8f1d21_100%)]"
+                  >
+                    <IconMusicFilled className="size-3.5 text-white/95" />
+                  </span>
+                  <span>{t("settings.providers.neteaseDaily")}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ) : null}
+
           {rows.map((p) => (
             <SidebarMenuItem key={p.id}>
               <ContextMenu>
@@ -442,7 +475,7 @@ function SidebarPlaylists({
                       <PlaylistArt src={p.thumbnailUrl} />
                       <span className="min-w-0 flex-1 truncate">{p.title}</span>
                       {/* Subtle marker so the pinned/unpinned boundary is
-                          legible — pinning's only visible effect is the
+                          legible �?pinning's only visible effect is the
                           reorder, this just explains it. */}
                       {p.pinned ? (
                         <IconPinFilled className="size-3! shrink-0 text-t7 group-data-[collapsible=icon]:hidden" />
@@ -584,7 +617,7 @@ function UserProfile() {
   const expired = !!activeAccount && expiredAccountId === activeAccount.id;
   // Fork note: upstream passes canRefresh-guarded relinkId (null when the
   // account can't renew). This fork's accounts store doesn't carry
-  // canRefresh yet (Rust renewal deferred — gate times out), so always
+  // canRefresh yet (Rust renewal deferred �?gate times out), so always
   // pass the id; relink still works, renewal benefit deferred.
   const relinkId = activeAccount ? activeAccount.id : null;
   if (slot === "wait") return null;
@@ -636,7 +669,7 @@ function UserProfile() {
   };
 
   // Opens an isolated Google sign-in window so the user can pick a
-  // *different* identity — the new account is appended to the list
+  // *different* identity �?the new account is appended to the list
   // rather than replacing the current one. Rust's `start_login`
   // emits `accounts-changed` on success which invalidates the list
   // query for us.
@@ -652,7 +685,7 @@ function UserProfile() {
     if (target.isActive) return;
     try {
       await switchAccount(target.id);
-      // `accounts-changed` listener handles all invalidation — no need
+      // `accounts-changed` listener handles all invalidation �?no need
       // to do it manually here.
     } catch (e) {
       toast.error(t("toast.switchFailed"), { description: String(e) });
@@ -713,7 +746,7 @@ function UserProfile() {
               </>
             ) : null}
             {/* Fork note: upstream's canRefresh warning (no persisted
-                browser profile) is skipped — this fork's accounts store
+                browser profile) is skipped �?this fork's accounts store
                 doesn't carry canRefresh yet. It will return with the
                 session-gate/auth port (35f9131). */}
             {allAccounts.length ? (
@@ -728,7 +761,7 @@ function UserProfile() {
                     // Highlight the active row so the picker reads as
                     // "you are signed in as this one". `data-active`
                     // style mirrors what TanStack Router does on
-                    // sidebar links — same visual language across the
+                    // sidebar links �?same visual language across the
                     // app. `focus:bg-accent` from the base item style
                     // still wins on hover, which is what we want.
                     data-active={a.isActive ? "true" : undefined}

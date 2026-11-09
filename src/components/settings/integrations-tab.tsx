@@ -46,9 +46,13 @@ import {
   getUserInfo,
 } from "@/lib/lastfm/api";
 import { useDiscordStore, isDiscordConfigured } from "@/lib/store/discord";
+import {
+  useNeteaseAuthActions,
+  useNeteaseSession,
+} from "@/lib/providers/netease-auth";
 import { useT } from "@/lib/i18n";
 
-type IntegrationId = "lastfm" | "discord";
+type IntegrationId = "lastfm" | "discord" | "netease";
 
 /**
  * List → detail navigation: the tab opens on a flat list of available
@@ -84,6 +88,17 @@ export function IntegrationsTab() {
       </TabPane>
     );
   }
+  if (active === "netease") {
+    return (
+      <TabPane>
+        <BackRow
+          label={t("settings.integrations.netease")}
+          onBack={() => setActive(null)}
+        />
+        <NeteaseGroup />
+      </TabPane>
+    );
+  }
 
   return (
     <TabPane>
@@ -100,6 +115,13 @@ export function IntegrationsTab() {
         title={t("settings.integrations.discord")}
         status={<DiscordStatusBadge />}
         onClick={() => setActive("discord")}
+      />
+      <IntegrationListRow
+        icon={IconDiscFilled}
+        settingId="netease"
+        title={t("settings.integrations.netease")}
+        status={<NeteaseStatusBadge />}
+        onClick={() => setActive("netease")}
       />
     </TabPane>
   );
@@ -176,6 +198,22 @@ function LastfmStatusBadge() {
     </div>
   ) : (
     <Badge variant="outline">{t("settings.integrations.notConnected")}</Badge>
+  );
+}
+
+function NeteaseStatusBadge() {
+  const t = useT();
+  const { data } = useNeteaseSession();
+  if (!data?.signedIn) {
+    return <Badge variant="outline">{t("settings.integrations.notConnected")}</Badge>;
+  }
+  return (
+    <Badge
+      variant="secondary"
+      className="bg-red-500/15 text-red-600 dark:text-red-400"
+    >
+      {data.nickname || t("settings.integrations.connected")}
+    </Badge>
   );
 }
 
@@ -688,6 +726,95 @@ function DiscordGroup() {
           />
         </>
       )}
+    </Group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* NetEase Cloud Music                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The NetEase account.
+ *
+ * The credential is the `MUSIC_U` cookie the platform issues to a
+ * signed-in browser session. It buys two things:
+ *
+ *   1. The **daily recommendation** — a playlist of tracks a day,
+ *      picked for the account. The endpoint answers anonymously with an
+ *      empty list, so without this the sidebar has no daily-picks
+ *      entry at all.
+ *   2. **Playback rights** — the platform serves the account's own
+ *      catalogue (including lossless) instead of the anonymous
+ *      preview tier.
+ *
+ * The app never sees the password: the sign-in happens in NetEase's
+ * own page, in a window the app opens, and the app only reads the
+ * cookie the browser ends up holding.
+ */
+function NeteaseGroup() {
+  const t = useT();
+  const { data, isLoading } = useNeteaseSession();
+  const { pending, signIn, signOut } = useNeteaseAuthActions();
+
+  return (
+    <Group>
+      <SettingRow
+        icon={IconDiscFilled}
+        settingId="netease"
+        title={t("settings.integrations.netease")}
+        description={t("settings.integrations.neteaseDesc")}
+        control={
+          <div className="flex shrink-0 items-center gap-2">
+            {isLoading ? null : data?.signedIn ? (
+              <>
+                {data.avatarUrl ? (
+                  <Avatar size="sm">
+                    <AvatarImage src={data.avatarUrl} alt="" />
+                    <AvatarFallback>
+                      {data.nickname?.[0]?.toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : null}
+                <Badge
+                  variant="secondary"
+                  className="bg-red-500/15 text-red-600 dark:text-red-400"
+                >
+                  {data.nickname || t("settings.integrations.connected")}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void signOut()}
+                  disabled={pending}
+                >
+                  <IconLogout stroke={2.3} />
+                  {t("settings.integrations.disconnect")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Badge variant="outline">
+                  {t("settings.integrations.notConnected")}
+                </Badge>
+                <Button onClick={() => void signIn()} disabled={pending}>
+                  {pending ? (
+                    <IconLoader2 className="animate-spin" />
+                  ) : (
+                    <IconLogin stroke={2.3} />
+                  )}
+                  {t("settings.integrations.connect")}
+                </Button>
+              </>
+            )}
+          </div>
+        }
+      />
+      {data?.signedIn ? (
+        <p className="pb-4 text-xs text-muted-foreground">
+          {t("settings.integrations.neteaseSignedInHint")}
+        </p>
+      ) : null}
     </Group>
   );
 }
