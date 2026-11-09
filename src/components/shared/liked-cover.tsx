@@ -37,8 +37,8 @@ export const LIKED_COVERS: Record<LikedCoverPreset, CoverArt> = {
     fill: "var(--t2)",
     outline: true,
   },
-  ytubic: {
-    label: "YTubic",
+  adrify: {
+    label: "adrify",
     labelKey: "app.name",
     bg: "radial-gradient(130% 110% at 22% 12%,#FF5F79,#E8214C 34%,#8E1230 68%,#2A0913)",
     ring: "var(--w140)",
@@ -71,7 +71,7 @@ export const LIKED_COVERS: Record<LikedCoverPreset, CoverArt> = {
 
 export const LIKED_COVER_ORDER: LikedCoverPreset[] = [
   DEFAULT_LIKED_COVER_PRESET,
-  "ytubic",
+  "adrify",
   "default",
   "clear",
   "glow",

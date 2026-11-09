@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 /** Cover presets, including the theme-aware default. See `liked-cover.tsx`. */
-export type LikedCoverPreset = "theme" | "ytubic" | "default" | "clear" | "glow";
+export type LikedCoverPreset = "theme" | "adrify" | "default" | "clear" | "glow";
 
 export const DEFAULT_LIKED_COVER_PRESET: LikedCoverPreset = "theme";
 

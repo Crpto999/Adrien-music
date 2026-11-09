@@ -1,7 +1,7 @@
 [package]
-name = "ytubic"
+name = "adrify"
 version = "0.13.0"
-description = "YTubic — fast, responsive YouTube Music desktop client"
+description = "adrify — fast, responsive YouTube Music desktop client"
 authors = ["George Shyshov"]
 license = "GPL-3.0-only"
 edition = "2021"
@@ -12,7 +12,7 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "ytubic_lib"
+name = "adrify_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -71,12 +71,12 @@ tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 # Native media controls: SMTC on Windows, MPRIS on Linux, and Now Playing on
 # macOS. We create the Windows SMTC from the host process so the tile resolves
-# to YTubic's identity instead of the msedgewebview2.exe child. See media.rs.
+# to adrify's identity instead of the msedgewebview2.exe child. See media.rs.
 souvlaki = "0.7"
 # Discord Rich Presence: talks to the local Discord client over its IPC
 # socket / named pipe (no native deps beyond that). Off by default; opt-in
-# from Settings. See src/discord.rs. Set YTUBIC_DISCORD_APP_ID at build time
-# (or edit APP_ID) to the Application ID of a Discord app named "YTubic".
+# from Settings. See src/discord.rs. Set ADRIFY_DISCORD_APP_ID at build time
+# (or edit APP_ID) to the Application ID of a Discord app named "adrify".
 discord-rich-presence = "0.2"
 # stream::unfold for the progressive /stream response body (progressive.rs).
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
@@ -87,7 +87,7 @@ windows-sys = { version = "0.59", features = [
     "Win32_Security_Cryptography",
     # SetCurrentProcessExplicitAppUserModelID — pins our AppUserModelID onto the
     # process so the SMTC media tile resolves (via the installer's matching Start
-    # Menu shortcut) to "YTubic" instead of "Unknown app". See src/appid.rs.
+    # Menu shortcut) to "adrify" instead of "Unknown app". See src/appid.rs.
     "Win32_UI_Shell",
     # PowerRegisterSuspendResumeNotification: wake the session-refresh loop on
     # resume from sleep/standby instead of waiting out a tokio timer that may

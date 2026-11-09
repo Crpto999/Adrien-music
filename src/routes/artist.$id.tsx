@@ -256,7 +256,7 @@ function ArtistActions({ artist }: { artist: ArtistPage }) {
           count={artist.subscribers}
         />
       ) : null}
-      {/* One link for everyone: the share page opens the artist in YTubic
+      {/* One link for everyone: the share page opens the artist in adrify
           when it's installed and falls back to YouTube Music when it isn't. */}
       <Button
         variant="outline"

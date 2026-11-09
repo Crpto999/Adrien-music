@@ -429,7 +429,13 @@ function TimedLyrics({
   }, []);
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
+    // `data-blank-exclude` keeps the lyrics column out of the
+    // blank-click check: scrolling and reading it is a deliberate
+    // interaction with the song, not a click on empty surface.
+    <div
+      data-blank-exclude
+      className="relative flex h-full min-h-0 flex-col"
+    >
       <div
         ref={scrollRef}
         className={cn(

@@ -2,7 +2,7 @@
 
 ## WebKitGTK 2.54 compositor workaround
 
-YTubic selects WebKitGTK's **TextureMapper compositor** on Linux when the loaded
+adrify selects WebKitGTK's **TextureMapper compositor** on Linux when the loaded
 WebKitGTK version is **2.54.x**, unless `WEBKIT_USE_SKIA_FOR_COMPOSITION` is already
 set in the environment. This happens at startup, before Tauri creates any
 webviews, so the main window and subsequent player/login windows inherit the
@@ -17,7 +17,7 @@ compositor path as the practical workaround, not a specific upstream defect.
 
 Disabling the DMA-BUF renderer was also tested: it removed the opening flicker,
 but closing still flickered and performance deteriorated substantially. That
-setting is **not** applied by YTubic. The selected workaround does not disable
+setting is **not** applied by adrify. The selected workaround does not disable
 DMA-BUF or GPU acceleration, change image sources/quality, or alter animations,
 blur, reduced-motion preferences, modal focus handling, or drag behavior.
 
@@ -42,9 +42,9 @@ WEBKIT_USE_SKIA_FOR_COMPOSITION=0 pnpm tauri:dev
 For an installed build, use the same environment variable before its executable
 instead of `pnpm tauri:dev`. Quit the running instance before comparing: opening
 a second instance only focuses the first and does not change its renderer.
-Any explicitly present value is respected; unset the variable to use YTubic's
+Any explicitly present value is respected; unset the variable to use adrify's
 version-scoped default. The fallback logs a `[linux-graphics]` message at startup.
 
 For troubleshooting, remove `WEBKIT_DISABLE_DMABUF_RENDERER` or
 `WEBKIT_DISABLE_COMPOSITING_MODE` from the launch environment if they were added
-during testing. YTubic never sets or removes these user-provided variables.
+during testing. adrify never sets or removes these user-provided variables.

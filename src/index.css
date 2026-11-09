@@ -101,6 +101,96 @@
   --acc4: #b01030;
   --acc5: #e1123b;
 
+  /* ------------------------------------------------------------------
+     Brand roles.
+
+     The accent ramp above is a *ramp* — five steps of one hue, meant
+     for hover/press states. The spec also names three roles that are
+     not steps of a ramp but siblings of the primary:
+
+       --brand            primary
+       --brand-secondary  brand support
+       --brand-accent     emphasis
+
+     They get their own tokens so a component can ask for "the support
+     one" or "the emphasis one" by role rather than by guessing which
+     ramp index happens to hold it. The soft variants are the low-alpha
+     washes used for tints and glows.
+
+     In the red themes the roles stay in the same hue family, so they
+     read as a deeper / a brighter step rather than as new colours;
+     the cyberpunk theme maps them onto violet and magenta.
+     ------------------------------------------------------------------ */
+  --brand-secondary: #b01030;
+  --brand-secondary-rgb: 176, 16, 48;
+  --brand-secondary-soft: #d61239;
+  --brand-accent: #d61239;
+  --brand-accent-rgb: 214, 18, 57;
+  --brand-accent-soft: #ff8aa1;
+  --brand-soft: #d61239;
+
+  /* ------------------------------------------------------------------
+     The "activated" colour.
+
+     A control that is switched on, selected or checked reads from
+     this token rather than from the primary. The primary hue is the
+     app's background voice — buttons, focus rings, the accent ramp —
+     and reusing it for every lit toggle made a dense panel of
+     switches read as one undifferentiated glow. The support hue
+     gives each activated control its own identity.
+
+     It follows `--brand-secondary` so a theme only has to define the
+     brand roles to move every activated control with it.
+     ------------------------------------------------------------------ */
+  --active: var(--brand-secondary);
+  --active-rgb: var(--brand-secondary-rgb);
+  --active-soft: var(--brand-secondary-soft);
+  /* The label colour that sits on a filled `--active` surface. The
+     support hue is deep in the light theme and pale in the dark one, so
+     the label has to flip with it. */
+  --active-foreground: #ffffff;
+
+  /* The account tier badge's accent. A status green reads as "good" in
+     the red themes, but on the cyberpunk ground a green badge is just
+     another dim colour among the neons — that theme swaps it for the
+     emphasis hue, which is the loudest thing the palette can show. */
+  --tier-accent: var(--status-success);
+
+  /* ------------------------------------------------------------------
+     Functional status colours.
+
+     The spec is explicit that these must stay distinguishable from
+     each other and from the brand trio: a user has to tell "saved"
+     from "syncing" from "about to expire" at a glance. They are
+     therefore *not* drawn from the brand hue.
+
+     Success / info / warning are theme-independent — a "success" is a
+     success whatever the palette is. Error follows the brand family
+     (a red theme's error is red, the cyberpunk theme's is the
+     spec's hot pink) and the live state uses the emphasis hue.
+     ------------------------------------------------------------------ */
+  --status-success: #27e6a3;
+  --status-success-rgb: 39, 230, 163;
+  --status-info: #35c9ff;
+  --status-info-rgb: 53, 201, 255;
+  --status-warning: #ffd166;
+  --status-warning-rgb: 255, 209, 102;
+  --status-error: #e11d48;
+  --status-error-rgb: 225, 29, 72;
+  /* "Live" / "playing now" — the one status that deliberately uses the
+     emphasis hue, because it is a brand moment rather than a signal. */
+  --status-live: #ff1fe8;
+  --status-live-rgb: 255, 31, 232;
+
+  /* The playback progress fill. The cyberpunk theme sweeps the brand
+     gradient across the playhead; the red themes keep a flat accent,
+     which is the same rule the spec applies to buttons — the gradient
+     is only worth it on a moving element.
+     Always a gradient, never a bare colour: it is applied as a
+     `background-image`, and `background-image` rejects a colour. The
+     flat accent sits behind it as the fallback fill. */
+  --progress-fill: linear-gradient(90deg, #fa1f4b, #d61239);
+
   --t1: #18181b;
   --t2: #27272a;
   --t3: #3f3f46;
@@ -263,6 +353,36 @@
   --acc4: #ffb3c2;
   --acc5: #fd4b6f;
 
+  /* Brand roles — see the :root block for what they mean. The dark
+     theme lifts the support/emphasis hues so they stay legible on a
+     near-black ground. */
+  --brand-secondary: #ff8aa1;
+  --brand-secondary-rgb: 255, 138, 161;
+  --brand-secondary-soft: #ffb3c2;
+  --brand-accent: #ff5e7e;
+  --brand-accent-rgb: 255, 94, 126;
+  --brand-accent-soft: #ffb3c2;
+  --brand-soft: #ff8aa1;
+
+  --active: var(--brand-secondary);
+  --active-rgb: var(--brand-secondary-rgb);
+  --active-soft: var(--brand-secondary-soft);
+  /* The dark theme's support hue is a pale pink, so a filled
+     activation surface takes the dark theme's own foreground rather
+     than white. */
+  --active-foreground: oklch(0.145 0 0);
+
+  --tier-accent: var(--status-success);
+
+  /* Functional status colours. Success / info / warning are the same
+     everywhere; error follows the brand family, so it is the deeper
+     red on the dark theme and the hot pink on the cyberpunk one. */
+  --status-error: #ff4d78;
+  --status-error-rgb: 255, 77, 120;
+
+  /* The playback progress fill — see the :root block. */
+  --progress-fill: linear-gradient(90deg, #fd4b6f, #ff5e7e);
+
   --t1: #f5f4f2;
   --t2: #ededef;
   --t3: #dcdce0;
@@ -364,9 +484,347 @@
   --fs-label: rgba(255, 255, 255, 0.5);
 }
 
+/* ------------------------------------------------------------------
+   Cyberpunk — "Neon Ghost" (see repo/syber-ui.md).
+
+   A dark theme built on the app logo's own palette: deep void navy,
+   electric cyan, neon violet, hot magenta. The scheme is deliberately
+   restrained — the neon is an accent, not a fill — so the interface
+   stays readable over blurred album art.
+
+   Every token the other two themes define has a counterpart here, so
+   a component that reads the semantic tokens works unchanged. The
+   `.dark` class stays on the root (Tailwind's `dark:` variant reads
+   it), and `data-theme="cyberpunk"` identifies the theme itself.
+   ------------------------------------------------------------------ */
+[data-theme="cyberpunk"] {
+  /* Brand: electric cyan as the primary, violet + magenta as the
+     supporting accents. */
+  --brand: #00e5ff;
+  --brand-rgb: 0, 229, 255;
+  --brand-foreground: #080a12;
+
+  --background: #080a12;
+  --foreground: #f4faff;
+  --card: #12172a;
+  --card-foreground: #f4faff;
+  --popover: #181d35;
+  --popover-foreground: #f4faff;
+  --primary: #00e5ff;
+  --primary-foreground: #080a12;
+  --secondary: #7c3cff;
+  --secondary-foreground: #f4faff;
+  --muted: #181d35;
+  --muted-foreground: #b8c4d9;
+  --accent: rgba(0, 229, 255, 0.12);
+  --accent-foreground: #7df4ff;
+  --destructive: #ff4d78;
+  --destructive-foreground: #080a12;
+  --border: #27304a;
+  --input: #0b0f1d;
+  --ring: #00e5ff;
+  --radius: 0.75rem;
+
+  --sidebar: #0d1020;
+  --sidebar-foreground: #f4faff;
+  --sidebar-primary: #00e5ff;
+  --sidebar-primary-foreground: #080a12;
+  --sidebar-accent: rgba(0, 229, 255, 0.12);
+  --sidebar-accent-foreground: #7df4ff;
+  --sidebar-border: #27304a;
+  --sidebar-ring: #00e5ff;
+
+  /* Translucent surfaces that float over the blurred album art. The
+     cyan tint keeps them in the theme's family instead of the
+     neutral grey the other dark theme uses. */
+  --surface: rgba(18, 23, 42, 0.62);
+  --surface-hover: rgba(24, 29, 53, 0.78);
+  --surface-active: rgba(24, 29, 53, 0.9);
+  --hairline: rgba(0, 191, 214, 0.16);
+  --titlebar-hover: rgba(0, 229, 255, 0.1);
+
+  --slider-track: rgba(180, 196, 217, 0.22);
+  --slider-thumb: #00e5ff;
+  --slider-thumb-glow:
+    0 0 6px rgba(0, 229, 255, 0.55), 0 0 14px rgba(0, 229, 255, 0.25);
+  --slider-thumb-glow-strong:
+    0 0 9px rgba(0, 229, 255, 0.75), 0 0 22px rgba(0, 229, 255, 0.35);
+
+  /* Design-system palette. --acc1 is the cyan; --acc2..5 walk the
+     violet -> magenta ramp the logo uses. */
+  --acc1: #00e5ff;
+  --acc1rgb: 0, 229, 255;
+  --acc2: #7c3cff;
+  --acc3: #a45cff;
+  --acc4: #ff1fe8;
+  --acc5: #00b0ff;
+
+  /* ------------------------------------------------------------------
+     Brand roles.
+
+     The accent ramp above is a *ramp* — five steps of one hue, meant
+     for hover/press states. The spec also names three roles that are
+     not steps of a ramp but siblings of the primary:
+
+       --brand            primary, electric cyan
+       --brand-secondary  brand support, neon violet
+       --brand-accent     emphasis, hot magenta
+
+     They get their own tokens so a component can ask for "the violet
+     one" or "the magenta one" by role rather than by guessing which
+     ramp index happens to hold it. The soft variants are the low-alpha
+     washes used for tints and glows.
+     ------------------------------------------------------------------ */
+  --brand-secondary: #7c3cff;
+  --brand-secondary-rgb: 124, 60, 255;
+  --brand-secondary-soft: #c8b8ff;
+  --brand-accent: #ff1fe8;
+  --brand-accent-rgb: 255, 31, 232;
+  --brand-accent-soft: #ff8ee8;
+  --brand-soft: #7df4ff;
+
+  --active: var(--brand-accent);
+  --active-rgb: var(--brand-accent-rgb);
+  --active-soft: var(--brand-accent-soft);
+  /* The emphasis hue is a hot magenta, so a filled activation surface
+     takes the void-black foreground instead of white — same rule as
+     the primary button. */
+  --active-foreground: #080a12;
+
+  /* The account tier badge. The success green is a status colour, not
+     a brand one, and on a neon ground it reads as just another dim
+     hue; the emphasis magenta is the loudest thing this palette can
+     show, which is what a premium badge has to beat. */
+  --tier-accent: var(--brand-accent);
+
+  /* ------------------------------------------------------------------
+     Functional status colours.
+
+     The spec is explicit that these must stay distinguishable from
+     each other and from the neon trio: a user has to tell "saved"
+     from "syncing" from "about to expire" at a glance. They are
+     therefore *not* drawn from the cyan/violet/magenta family.
+     ------------------------------------------------------------------ */
+  --status-success: #27e6a3;
+  --status-success-rgb: 39, 230, 163;
+  --status-info: #35c9ff;
+  --status-info-rgb: 53, 201, 255;
+  --status-warning: #ffd166;
+  --status-warning-rgb: 255, 209, 102;
+  --status-error: #ff4d78;
+  --status-error-rgb: 255, 77, 120;
+  /* "Live" / "playing now" — the one status that deliberately uses the
+     emphasis hue, because it is a brand moment rather than a signal. */
+  --status-live: #ff1fe8;
+  --status-live-rgb: 255, 31, 232;
+
+  /* The playback progress fill. The spec puts the brand gradient on
+     the *playhead* specifically — it is one of the few places the
+     three-colour sweep is worth its cost, because the bar is a moving
+     thing the eye tracks. The other gradients stay reserved for
+     static hero surfaces. */
+  --progress-fill: linear-gradient(
+    90deg,
+    #00e5ff 0%,
+    #7c3cff 52%,
+    #ff1fe8 100%
+  );
+
+  /* The spec's two supporting gradients. Cool for information and
+     system state, violet-to-magenta for entertainment and premium
+     surfaces. Both are "one step down" from the brand sweep and are
+     used for accents, never for a primary action. */
+  --gradient-cool: linear-gradient(135deg, #00e5ff 0%, #246bff 100%);
+  --gradient-violet: linear-gradient(135deg, #7c3cff 0%, #ff1fe8 100%);
+
+  /* The glowing border the spec uses for focus and hover: a cyan
+     outline plus its own soft halo. */
+  --glow-border: #00bfd6;
+  --glow-border-rgb: 0, 191, 214;
+  --glow-cyan: 0 0 18px rgba(0, 229, 255, 0.35);
+  --glow-cyan-soft: 0 0 12px rgba(0, 229, 255, 0.55);
+  --glow-magenta: 0 0 18px rgba(255, 31, 232, 0.3);
+
+  /* Text ramp: ice white down to the disabled tone. */
+  --t1: #f4faff;
+  --t2: #d6e4f5;
+  --t3: #b8c4d9;
+  --t4: #9aa7c0;
+  --t5: #74809a;
+  --t6: #67728a;
+  --t7: #5b6579;
+  --t8: #4f586a;
+  --t9: #454d5c;
+  --t10: #3b424e;
+  --tph: #74809a;
+
+  --win: #080a12;
+
+  /* Opaque surfaces, low to high. */
+  --surf1: #0b0e1a;
+  --surf2: #0d1020;
+  --surf3: #12172a;
+  --surf4: #161c30;
+  --surf5: #181d35;
+  --surf6: #1e2440;
+  --surf7: #27304a;
+
+  --desk1: #0d1020;
+  --desk2: #0a0c18;
+  --desk3: #080a12;
+  --scrim: rgba(8, 10, 18, 0.62);
+  --sidepanel: rgba(13, 16, 32, 0.5);
+
+  /* Translucent surfaces (always paired with a backdrop blur). */
+  --glass1: rgba(18, 23, 42, 0.42);
+  --glass2: rgba(18, 23, 42, 0.82);
+  --glass3: rgba(24, 29, 53, 0.7);
+  --glass4: rgba(24, 29, 53, 0.8);
+  --glass5: rgba(24, 29, 53, 0.86);
+  --glass6: rgba(11, 15, 29, 0.9);
+
+  /* Full-screen player, over the blurred cover. */
+  --fs-title: #ffffff;
+  --fs-sub: rgba(244, 250, 255, 0.66);
+  --fs-label: rgba(244, 250, 255, 0.52);
+  --fs-txt: rgba(244, 250, 255, 0.88);
+  --fs-txt2: rgba(244, 250, 255, 0.78);
+  --fs-txt3: rgba(244, 250, 255, 0.62);
+  --fs-time: rgba(244, 250, 255, 0.6);
+  --fs-seg: rgba(244, 250, 255, 0.55);
+
+  --g6a: rgba(8, 10, 18, 0.5);
+  --g6b: rgba(8, 10, 18, 0.55);
+  --g9a: rgba(11, 15, 29, 0.44);
+  --g9b: rgba(11, 15, 29, 0.22);
+  --g9c: rgba(8, 10, 18, 0.88);
+  --g9d: rgba(8, 10, 18, 0.62);
+
+  /* White overlays: the cyan-leaning surface tint. */
+  --w020: rgba(0, 229, 255, 0.03);
+  --w028: rgba(0, 229, 255, 0.038);
+  --w030: rgba(0, 229, 255, 0.04);
+  --w035: rgba(0, 229, 255, 0.048);
+  --w040: rgba(0, 229, 255, 0.055);
+  --w045: rgba(0, 229, 255, 0.062);
+  --w050: rgba(0, 229, 255, 0.07);
+  --w055: rgba(0, 229, 255, 0.078);
+  --w060: rgba(0, 229, 255, 0.086);
+  --w070: rgba(0, 229, 255, 0.1);
+  --w075: rgba(0, 229, 255, 0.11);
+  --w080: rgba(0, 229, 255, 0.12);
+  --w085: rgba(0, 229, 255, 0.13);
+  --w090: rgba(0, 229, 255, 0.14);
+  --w100: rgba(0, 229, 255, 0.16);
+  --w110: rgba(0, 229, 255, 0.18);
+  --w120: rgba(0, 229, 255, 0.2);
+  --w140: rgba(0, 229, 255, 0.24);
+  --w150: rgba(0, 229, 255, 0.26);
+  --w160: rgba(0, 229, 255, 0.28);
+  --w170: rgba(0, 229, 255, 0.3);
+  --w180: rgba(0, 229, 255, 0.32);
+  --w200: rgba(0, 229, 255, 0.36);
+  --w220: rgba(0, 229, 255, 0.4);
+  --w240: rgba(0, 229, 255, 0.44);
+  --w250: rgba(0, 229, 255, 0.46);
+  --w260: rgba(0, 229, 255, 0.5);
+  --w280: rgba(0, 229, 255, 0.54);
+  --w300: rgba(0, 229, 255, 0.58);
+  --w350: rgba(0, 229, 255, 0.64);
+
+  /* Black overlays. */
+  --k180: rgba(0, 0, 0, 0.2);
+  --k200: rgba(0, 0, 0, 0.24);
+  --k220: rgba(0, 0, 0, 0.26);
+  --k240: rgba(0, 0, 0, 0.28);
+  --k300: rgba(0, 0, 0, 0.34);
+  --k320: rgba(0, 0, 0, 0.36);
+  --k350: rgba(0, 0, 0, 0.4);
+  --k400: rgba(0, 0, 0, 0.44);
+  --k420: rgba(0, 0, 0, 0.46);
+  --k550: rgba(0, 0, 0, 0.58);
+  --k600: rgba(0, 0, 0, 0.62);
+  --k800: rgba(0, 0, 0, 0.78);
+  --k850: rgba(0, 0, 0, 0.83);
+  --k900: rgba(0, 0, 0, 0.9);
+
+  /* The Liked-songs cover's glass and glow hearts pick up the theme. */
+  --liked-heart-glass: rgba(244, 250, 255, 0.55);
+  --liked-heart-glow: rgba(255, 31, 232, 0.85);
+
+  /* The brand gradient from the design spec, used by the few places
+     that want the full cyan -> violet -> magenta sweep. */
+  --brand-gradient: linear-gradient(
+    135deg,
+    #00e5ff 0%,
+    #7c3cff 52%,
+    #ff1fe8 100%
+  );
+  --brand-glow: 0 0 18px rgba(0, 229, 255, 0.35);
+}
+
+/* The accent ramps are cyan-tinted, so the components that key on the
+   raw `--acc1` read a cyan rather than the neutral they get from the
+   `dark` theme. The `text-white` on top of a cyan accent needs the
+   void-black foreground instead, so the accent-flavoured badges and
+   chips carry their own colour. */
+[data-theme="cyberpunk"] .bg-acc1 {
+  color: var(--brand-foreground);
+}
+
+/* ------------------------------------------------------------------
+   Settings-panel slider.
+
+   The slider is the one control the settings panel shares with the
+   player bar, so its colours are token-driven rather than hard-coded
+   on the component. Inside the settings panel the playhead takes the
+   brand's support hue instead of the primary: a panel of sliders that
+   all run in the primary cyan reads as one undifferentiated glow
+   rather than as a set of separate readings. The player bar keeps the
+   primary, which is right there — it is the app's ambient voice.
+
+   The switch, the segmented control and the menu ticks carry the same
+   colour in their own class names (`bg-active` / `text-active`).
+   ------------------------------------------------------------------ */
+[data-settings-dialog] {
+  --slider-thumb: var(--active);
+  --slider-thumb-glow:
+    0 0 6px rgba(var(--active-rgb), 0.55),
+    0 0 14px rgba(var(--active-rgb), 0.25);
+  --slider-thumb-glow-strong:
+    0 0 9px rgba(var(--active-rgb), 0.75),
+    0 0 22px rgba(var(--active-rgb), 0.35);
+  --progress-fill: linear-gradient(
+    90deg,
+    var(--active) 0%,
+    var(--brand-accent) 100%
+  );
+}
+
 @theme inline {
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
+  /* Brand roles — the support / emphasis hues. Exposed as their own
+     colours so a component can use `text-brand-accent` without
+     reaching for a ramp index. */
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-secondary-soft: var(--brand-secondary-soft);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-soft: var(--brand-accent-soft);
+  --color-brand-soft: var(--brand-soft);
+  /* The "activated" colour — see the token's own comment. Exposed so a
+     control can use `bg-active` / `text-active` / `border-active`. */
+  --color-active: var(--active);
+  --color-active-soft: var(--active-soft);
+  --color-active-foreground: var(--active-foreground);
+  /* The account tier badge's accent. */
+  --color-tier-accent: var(--tier-accent);
+  /* Functional status colours. */
+  --color-status-success: var(--status-success);
+  --color-status-info: var(--status-info);
+  --color-status-warning: var(--status-warning);
+  --color-status-error: var(--status-error);
+  --color-status-live: var(--status-live);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -540,10 +998,14 @@
   /* Push the floating shadcn sidebar below the custom title bar so the
      sidebar's logo header doesn't overlap the window-control strip.
      The sidebar component itself uses `fixed inset-y-0`, which we
-     can't easily override via the React API. */
+     can't easily override via the React API.
+     `--bottom-bar-h` is the height of the full-width bottom bar (the
+     one layout where the player spans the whole window). The sidebar
+     is fixed too, so it has to stop that much higher or it would run
+     under the bar. */
   [data-slot="sidebar-container"] {
     top: var(--titlebar-h) !important;
-    height: calc(100svh - var(--titlebar-h)) !important;
+    height: calc(100svh - var(--titlebar-h) - var(--bottom-bar-h, 0px)) !important;
   }
 
   /* Width follows the pointer directly while resizing. The regular
@@ -853,7 +1315,8 @@
      the What's New entrance animation from the same upstream commit is
      intentionally skipped — this fork removed What's New in fef3c0d. */
   .liked-cover {
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' fill-opacity='0.94'><path d='M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z'/></svg>"),
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' fill-opacity='0.94'><path d='M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z'/></svg>"),
       radial-gradient(
         130% 110% at 22% 12%,
         #ff5f79,
@@ -863,7 +1326,9 @@
       );
     background-position: center, center;
     background-repeat: no-repeat, no-repeat;
-    background-size: 52% 52%, 140% 118%;
+    background-size:
+      52% 52%,
+      140% 118%;
   }
 
   /* Top-of-column blur strip. Strongest at the top of the overlay,
@@ -897,12 +1362,7 @@
   .lyrics-blur-overlay-bottom {
     backdrop-filter: blur(1.5px);
     -webkit-backdrop-filter: blur(1.5px);
-    mask-image: linear-gradient(
-      to top,
-      black 0%,
-      black 20%,
-      transparent 80%
-    );
+    mask-image: linear-gradient(to top, black 0%, black 20%, transparent 80%);
     -webkit-mask-image: linear-gradient(
       to top,
       black 0%,
@@ -1011,16 +1471,22 @@
 .window-glow {
   box-shadow:
     inset 0 0 0 1px rgba(var(--glow-rgb, var(--acc1rgb)), 0.85),
-    inset 0 0 calc(14px * var(--glow-scale, 1)) calc(2px * var(--glow-scale, 1)) rgba(var(--glow-rgb, var(--acc1rgb)), 0.55),
-    inset 0 0 calc(40px * var(--glow-scale, 1)) calc(6px * var(--glow-scale, 1)) rgba(var(--glow-rgb, var(--acc1rgb)), 0.25);
+    inset 0 0 calc(14px * var(--glow-scale, 1)) calc(2px * var(--glow-scale, 1))
+      rgba(var(--glow-rgb, var(--acc1rgb)), 0.55),
+    inset 0 0 calc(40px * var(--glow-scale, 1)) calc(6px * var(--glow-scale, 1))
+      rgba(var(--glow-rgb, var(--acc1rgb)), 0.25);
   animation: window-glow-pulse 3.2s ease-in-out infinite alternate;
 }
 @keyframes window-glow-pulse {
   to {
     box-shadow:
       inset 0 0 0 1px rgba(var(--glow-rgb, var(--acc1rgb)), 1),
-      inset 0 0 calc(22px * var(--glow-scale, 1)) calc(4px * var(--glow-scale, 1)) rgba(var(--glow-rgb, var(--acc1rgb)), 0.75),
-      inset 0 0 calc(56px * var(--glow-scale, 1)) calc(10px * var(--glow-scale, 1)) rgba(var(--glow-rgb, var(--acc1rgb)), 0.35);
+      inset 0 0 calc(22px * var(--glow-scale, 1))
+        calc(4px * var(--glow-scale, 1))
+        rgba(var(--glow-rgb, var(--acc1rgb)), 0.75),
+      inset 0 0 calc(56px * var(--glow-scale, 1))
+        calc(10px * var(--glow-scale, 1))
+        rgba(var(--glow-rgb, var(--acc1rgb)), 0.35);
   }
 }
 @media (prefers-reduced-motion: reduce) {

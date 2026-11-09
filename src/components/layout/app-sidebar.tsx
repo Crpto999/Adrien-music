@@ -13,8 +13,6 @@ import {
   IconHome,
   IconHomeFilled,
   IconBrandSafari,
-  IconSearch,
-  IconSearchFilled,
   IconBookmarks,
   IconBookmarksFilled,
   IconSettings,
@@ -72,6 +70,8 @@ import {
 import { openChannelPicker } from "@/lib/store/channel-picker";
 import { openSettings } from "@/lib/store/settings-dialog";
 import { UpdateBanner } from "@/components/layout/update-banner";
+import { AppLogo } from "@/components/shared/app-logo";
+import { AppLogoMenu } from "@/components/layout/app-logo-menu";
 import { LikedCover } from "@/components/shared/liked-cover";
 import { fetchLibraryPlaylists } from "@/lib/innertube/library";
 import type { ShelfItem } from "@/lib/innertube/types";
@@ -99,12 +99,6 @@ const NAV_ITEMS = [
     iconOn: IconBrandSafariFilled,
   },
   {
-    to: "/search",
-    labelKey: "nav.search",
-    icon: IconSearch,
-    iconOn: IconSearchFilled,
-  },
-  {
     to: "/library",
     labelKey: "nav.library",
     icon: IconBookmarks,
@@ -117,12 +111,10 @@ const NAV_ITEMS = [
 // section, not user-removable.
 const LIKED_ID = "VLLM";
 
-// Artwork rows carry a 20px tile where the icon rows carry a 16px
-// glyph, so the menu button's fixed height would squeeze it. `h-auto`
-// hands the height back to the padding: 7px above and below puts the
-// row at 34px, a step over the 28px icon rows without opening the list
-// back up. Icon rows keep the fixed height.
-const ART_BTN_CLS = "h-auto py-[7px]";
+// Artwork rows carry a 24px tile — the same size as the nav glyphs, so
+// the whole column reads as one set of marks — and the row keeps the
+// same 32px height as the icon rows above it.
+const ART_BTN_CLS = "h-8 py-0";
 
 export function AppSidebar() {
   const t = useT();
@@ -142,15 +134,42 @@ export function AppSidebar() {
       variant="floating"
       collapsible="icon"
       // Panel chrome, per the design system: a 12px glass card with a
-      // `--w110` hairline and a shallow, wide-spread shadow. The blur is
-      // what makes `--glass1` read as frosted over the album-art wash
-      // behind it rather than as flat translucency.
-      className="px-2 pb-2 pt-0 duration-300 ease-out [&>[data-slot=sidebar-inner]]:rounded-[12px] [&>[data-slot=sidebar-inner]]:border [&>[data-slot=sidebar-inner]]:border-w110 [&>[data-slot=sidebar-inner]]:bg-glass1 [&>[data-slot=sidebar-inner]]:shadow-[0_6px_18px_-14px_var(--k550)] [&>[data-slot=sidebar-inner]]:backdrop-blur-[24px]"
+      // shallow, wide-spread shadow. The blur is what makes `--glass1`
+      // read as frosted over the album-art wash behind it rather than
+      // as flat translucency. No hairline: the panel sits on the same
+      // ground as the content, and a border only drew a hard edge
+      // where the glass already fades out.
+      className="px-2 pb-2 pt-0 duration-300 ease-out [&>[data-slot=sidebar-inner]]:rounded-[12px] [&>[data-slot=sidebar-inner]]:border-0! [&>[data-slot=sidebar-inner]]:bg-glass1 [&>[data-slot=sidebar-inner]]:shadow-[0_6px_18px_-14px_var(--k550)] [&>[data-slot=sidebar-inner]]:backdrop-blur-[24px]"
     >
-      {/* Branding (logo + wordmark) intentionally omitted on this fork
-          (8968d91). A slim empty header stays as top spacing so the first
-          nav group doesn't butt against the sidebar's rounded top edge. */}
-      <SidebarHeader className="pt-3" />
+      {/* The app mark, at the top of the panel. It picks its own
+          variant from the active theme (colour on the cyberpunk
+          ground, white/black elsewhere), so the wordmark below it
+          always sits on a legible pairing. */}
+      <SidebarHeader className="pt-4 pb-2">
+        {/* Stacked lockup: the mark on top, the wordmark underneath in
+            caps with a wide track, so the panel reads like a masthead
+            rather than a nav row. On the rail the wordmark is dropped
+            (see `data-sidebar-label` in index.css) and the mark centres
+            itself in the icon column.
+
+            The whole lockup is the app menu: right-click it for
+            settings, layout, theme, feedback, about and quit; a plain
+            click is a plain navigation home. */}
+        <AppLogoMenu>
+          <div className="flex flex-col items-center gap-1.5 group-data-[collapsible=icon]:gap-0">
+            <AppLogo
+              className="w-30 max-w-full shrink-0 group-data-[collapsible=icon]:w-10"
+              alt=""
+            />
+            <span
+              data-sidebar-label
+              className="truncate text-[13px] font-bold uppercase tracking-[0.22em] text-t2 group-data-[collapsible=icon]:hidden"
+            >
+              {t("app.name")}
+            </span>
+          </div>
+        </AppLogoMenu>
+      </SidebarHeader>
 
       {/* The content column itself doesn't scroll: Browse stays pinned
           (shrink-0) and only the Playlists list scrolls, so the top nav
@@ -166,11 +185,7 @@ export function AppSidebar() {
                 const label = t(labelKey);
                 return (
                   <SidebarMenuItem key={to}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={on}
-                      tooltip={label}
-                    >
+                    <SidebarMenuButton asChild isActive={on} tooltip={label}>
                       <Link to={to}>
                         <Icon />
                         <span>{label}</span>
@@ -249,7 +264,7 @@ function PlaylistArt({ src }: { src?: string }) {
     <img
       src={src}
       alt=""
-      className="size-5 shrink-0 rounded-[5px] object-cover outline outline-1 -outline-offset-1 outline-w140"
+      className="size-6 shrink-0 rounded-[6px] object-cover outline outline-1 -outline-offset-1 outline-w140"
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"
@@ -405,7 +420,7 @@ function SidebarPlaylists({
                     playlist page. */}
                 <LikedCover
                   data-slot="playlist-art"
-                  className="size-5 shrink-0 rounded-[5px]"
+                  className="size-6 shrink-0 rounded-[6px]"
                   heart={52}
                 />
                 <span>{t("nav.likedSongs")}</span>
@@ -509,14 +524,26 @@ function SidebarSignInButton({ relinkId }: { relinkId: string | null }) {
               }),
             );
           }}
-          // Same 32px icon column as the Settings row above, and the same
+          // Same 28px icon column as the nav rows above, and the same
           // 2px before it: 1px of padding plus the primary variant's 1px
           // border. `!` because the Button's own `has-[>svg]:px-3` is more
           // specific and would win. `justify-start` keeps that column pinned
           // when the collapsed rail makes the button narrower than it;
           // Button's `justify-center` would centre the overflow and pull
           // the icon off the rail's axis.
-          className="grid h-9 w-full grid-cols-[32px_minmax(0,1fr)] items-center justify-start gap-0.5 overflow-hidden py-0 ps-px! pe-2.5! [&>svg]:justify-self-center"
+          //
+          // The `brand` variant rather than the default fill: the sign-in
+          // row is the sidebar's one call to action, and the default
+          // primary wash made it look like the app's ambient accent
+          // instead of a distinct next step. The label wears the brand's
+          // support hue outright rather than its softened variant, so the
+          // word reads as the accent the user is being asked to notice.
+          //
+          // On the rail the two-column grid collapses to a single
+          // centred one: the label is gone, and the glyph has to sit on
+          // the rail's axis rather than in the leftover 28px column.
+          className="grid h-9 w-full grid-cols-[28px_minmax(0,1fr)] items-center justify-start gap-1 overflow-hidden py-0 ps-px! pe-2.5! text-brand-secondary hover:text-brand-secondary [&>svg]:size-6 [&>svg]:justify-self-center group-data-[collapsible=icon]:grid-cols-[minmax(0,1fr)] group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:ps-0! group-data-[collapsible=icon]:pe-0!"
+          variant="brand"
         >
           <IconLogin stroke={2.3} />
           <span data-sidebar-label className="truncate text-start">
@@ -554,8 +581,7 @@ function UserProfile() {
   // queries above: Google expired the session and wants the user to
   // sign in again. Shown as the sign-in button rather than the stored
   // profile, which would look signed in over a dead session.
-  const expired =
-    !!activeAccount && expiredAccountId === activeAccount.id;
+  const expired = !!activeAccount && expiredAccountId === activeAccount.id;
   // Fork note: upstream passes canRefresh-guarded relinkId (null when the
   // account can't renew). This fork's accounts store doesn't carry
   // canRefresh yet (Rust renewal deferred — gate times out), so always
@@ -642,12 +668,10 @@ function UserProfile() {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              tooltip={email ? `${name} (${email})` : name}
-            >
-              <Avatar className="size-4 shrink-0">
+            <SidebarMenuButton tooltip={email ? `${name} (${email})` : name}>
+              <Avatar className="size-6 shrink-0">
                 {photoUrl ? <AvatarImage src={photoUrl} alt={name} /> : null}
-                <AvatarFallback className="text-[9px] leading-none">
+                <AvatarFallback className="text-[10px] leading-none">
                   {initial}
                 </AvatarFallback>
               </Avatar>
@@ -663,7 +687,7 @@ function UserProfile() {
                     "ms-auto h-4 px-1.5 text-[10px] font-semibold uppercase tracking-wide",
                     "group-data-[collapsible=icon]:hidden",
                     isPremium
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      ? "border-tier-accent/30 bg-tier-accent/10 text-tier-accent"
                       : "text-muted-foreground",
                   )}
                 >

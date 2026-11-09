@@ -36,7 +36,7 @@ describe("theme-aware Liked songs artwork", () => {
     expect(LIKED_COVER_ORDER[0]).toBe(DEFAULT_LIKED_COVER_PRESET);
     expect(LIKED_COVER_ORDER).toEqual([
       "theme",
-      "ytubic",
+      "adrify",
       "default",
       "clear",
       "glow",
@@ -62,7 +62,7 @@ describe("theme-aware Liked songs artwork", () => {
 
   it("keeps the legacy filled presets intact", () => {
     const html = renderToStaticMarkup(
-      createElement(LikedCoverArt, { art: LIKED_COVERS.ytubic }),
+      createElement(LikedCoverArt, { art: LIKED_COVERS.adrify }),
     );
     expect(html).toContain("#FF5F79");
     expect(html).toContain('fill="rgba(255,255,255,0.94)"');

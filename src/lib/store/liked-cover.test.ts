@@ -45,7 +45,7 @@ describe("Liked songs cover preferences", () => {
     });
   });
 
-  it.each(["ytubic", "default", "clear", "glow"] as const)(
+  it.each(["adrify", "default", "clear", "glow"] as const)(
     "preserves a previously saved %s preset",
     async (preset) => {
       saved.set(
@@ -61,11 +61,11 @@ describe("Liked songs cover preferences", () => {
     const custom = "data:image/jpeg;base64,saved";
     saved.set(
       "ytm-liked-cover",
-      JSON.stringify({ state: { preset: "ytubic", custom }, version: 0 }),
+      JSON.stringify({ state: { preset: "adrify", custom }, version: 0 }),
     );
     await useLikedCoverStore.persist.rehydrate();
     expect(useLikedCoverStore.getState()).toMatchObject({
-      preset: "ytubic",
+      preset: "adrify",
       custom,
     });
   });

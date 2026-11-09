@@ -5,9 +5,7 @@ import { fetchLikedSongs } from "@/lib/innertube/library";
 import { toggleDisliked, toggleLiked } from "@/lib/like-actions";
 import { useDislikesStore } from "@/lib/store/dislikes";
 import { AnimatePresence, m } from "motion/react";
-import { useTheme } from "next-themes";
 import {
-  IconArrowsMinimize,
   IconArrowsShuffle,
   IconLoader2,
   IconPlayerPauseFilled,
@@ -59,6 +57,8 @@ import { useFullscreenStore } from "@/lib/store/fullscreen";
 import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
 import { useSettingsStore, type FullscreenLayout } from "@/lib/store/settings";
 import type { QueueTrack } from "@/lib/store/playback";
+import { useThemeScheme } from "@/lib/theme";
+import { isBlankClick } from "@/lib/blank-click";
 
 /**
  * The full-screen now-playing view, per the design handoff: the cover
@@ -117,8 +117,8 @@ function FullscreenView({ track }: { track: QueueTrack }) {
   const setOpen = useFullscreenStore((s) => s.setOpen);
   const layout = useSettingsStore((s) => s.fullscreenLayout);
   const setLayout = useSettingsStore((s) => s.setFullscreenLayout);
-  const { resolvedTheme } = useTheme();
-  const light = resolvedTheme === "light";
+  const scheme = useThemeScheme();
+  const light = scheme === "light";
 
   const { playing, status, duration, shuffle, repeat } = usePlaybackStore(
     useShallow((s) => ({
@@ -160,6 +160,27 @@ function FullscreenView({ track }: { track: QueueTrack }) {
 
   const immersive = shown === "immersive";
 
+  // Which way the now-playing cover travels into this view. The bottom
+  // bar hugs the bottom edge, so its cover rises; the side card hugs
+  // the right edge, so its cover slides left. Everything that moves
+  // during the transition follows this axis, so the screen shows one
+  // consistent direction rather than a cover moving sideways while the
+  // page scrolls up.
+  const origin = useFullscreenStore((s) => s.origin);
+
+  // Where the sheet comes from and goes back to. The bottom bar's
+  // player lives at the bottom of the window, so its sheet rises from
+  // the bottom edge; the side card's player lives at the right edge,
+  // so its sheet comes in from the right.
+  //
+  // The distance is a full viewport edge — this is a pull-out, not a
+  // nudge. A small offset reads as a fade, which is what the expand
+  // used to look like.
+  const slideFrom =
+    origin === "bottom" ? { y: "100%" } : { x: "100%" };
+  const slideTo =
+    origin === "bottom" ? { y: "100%" } : { x: "100%" };
+
   // Song / Video in the immersive layout. Video is sticky: once chosen,
   // each new track looks up its video and follows, until Song is picked.
   const wantsVideo = useSettingsStore((s) => s.fullscreenVideo);
@@ -196,17 +217,43 @@ function FullscreenView({ track }: { track: QueueTrack }) {
 
   return (
     <TooltipProvider delayDuration={800} skipDelayDuration={0}>
+      {/* The sheet: the whole full-screen view as one layer that slides
+          in from the edge the player lives on.
+          - from the bottom bar: it rises from the bottom edge
+          - from the side card: it comes in from the right edge
+
+          The direction is the whole point: the view is pulled out of
+          the player, not faded in over it. The cover is part of the
+          sheet, so it rises or slides left together with everything
+          else — one direction on screen at a time.
+
+          This replaces the shared-element (layoutId) transition the
+          cover used to have. That one animated the OLD element — the
+          small cover in the player bar — towards the new one, and the
+          old one sits UNDERNEATH this sheet, so the whole flight was
+          hidden behind it: the expand read as a cut while the exit
+          read as a flight (the sheet was fading out, letting the
+          small cover show). Moving the sheet itself is what makes the
+          entrance visible. */}
       <m.div
-        initial={{ opacity: 0, y: 10, scale: 0.985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 10, scale: 0.985 }}
-        transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+        initial={slideFrom}
+        animate={{ x: 0, y: 0 }}
+        exit={slideTo}
+        transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
         className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-background"
+        // Clicking the sheet's blank surface collapses the view. The
+        // click target is checked so a click on a button, the
+        // progress slider or a lyric line never collapses it.
+        onClick={(e) => {
+          if (!isBlankClick(e.target)) return;
+          setOpen(false);
+        }}
       >
-        {/* Backdrop: the cover, oversized so the blur has no soft edge.
-            An <img> through Thumbnail rather than a CSS background: the
-            Google image CDNs answer a request that carries our Referer
-            with an HTML stub, and only <img> can send none. */}
+        {/* The backdrop: the cover, oversized so the blur has no soft
+            edge. An <img> through Thumbnail rather than a CSS
+            background: the Google image CDNs answer a request that
+            carries our Referer with an HTML stub, and only <img> can
+            send none. */}
         <div
           aria-hidden
           className="absolute inset-[-8%] scale-110 transition-[filter] duration-500"
@@ -326,16 +373,6 @@ function FullscreenView({ track }: { track: QueueTrack }) {
               </div>
             ) : null}
             <div className="flex-1" />
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="flex h-[34px] cursor-pointer items-center gap-2 rounded-[9px] bg-w080 px-[13px] text-(--fs-txt2) transition-colors duration-[140ms] hover:bg-w160 hover:text-(--fs-title)"
-            >
-              <IconArrowsMinimize className="size-[15px]" stroke={1.9} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.09em]">
-                Exit fullscreen
-              </span>
-            </button>
           </div>
 
           {/* Body, one of three. */}
@@ -448,7 +485,7 @@ function FullscreenView({ track }: { track: QueueTrack }) {
                 size="icon"
                 aria-label={playing ? t("action.pause") : t("action.play")}
                 onClick={toggle}
-                className="mx-1.5 size-16 rounded-full text-white shadow-[0_6px_20px_-4px_rgba(var(--acc1rgb),0.28),inset_0_1px_1px_var(--w220)] transition-[filter,box-shadow] duration-[140ms] hover:brightness-[1.16] hover:shadow-[0_10px_28px_-6px_rgba(var(--acc1rgb),0.36),inset_0_1px_1px_var(--w260)]"
+                className="mx-1.5 size-16 rounded-full text-brand-foreground shadow-[0_6px_20px_-4px_rgba(var(--acc1rgb),0.28),inset_0_1px_1px_var(--w220)] transition-[filter,box-shadow] duration-[140ms] hover:brightness-[1.16] hover:shadow-[0_10px_28px_-6px_rgba(var(--acc1rgb),0.36),inset_0_1px_1px_var(--w260)]"
                 style={{
                   background:
                     "radial-gradient(circle at 50% 30%, var(--acc5), var(--acc1) 58%)",
@@ -613,16 +650,38 @@ function Cover({
   override: string | null;
   className?: string;
 }) {
+  const setOpen = useFullscreenStore((s) => s.setOpen);
   return (
-    <div className={cn("relative isolate aspect-square shrink-0", className)}>
-      <Thumbnail
-        thumbnails={track.thumbnails}
-        alt={track.title}
-        className="pointer-events-none size-full rounded-[inherit]"
-        targetSize={1024}
-        highRes
-        overrideHighRes={override}
-      />
+    <div
+      onClick={(e) => {
+        // The cover is the one thing here that is not "blank", but it
+        // is the other way out: clicking the artwork collapses the
+        // view. Stop the bubble so the sheet's own blank-click
+        // handler does not also run.
+        e.stopPropagation();
+        setOpen(false);
+      }}
+      className={cn(
+        "group/cover relative isolate aspect-square shrink-0 cursor-pointer overflow-hidden rounded-[inherit]",
+        className,
+      )}
+    >
+      {/* No shared-layout id here. The sheet itself slides in from the
+          player's edge, and the cover rides along with it — a second,
+          independent flight from the player bar's cover would fight
+          that motion and land in the wrong place, since motion would
+          have to measure this cover's box inside an already-translated
+          ancestor. */}
+      <div className="size-full">
+        <Thumbnail
+          thumbnails={track.thumbnails}
+          alt={track.title}
+          className="pointer-events-none size-full rounded-[inherit]"
+          targetSize={1024}
+          highRes
+          overrideHighRes={override}
+        />
+      </div>
       <ArtworkOutline className="rounded-[inherit]" />
     </div>
   );

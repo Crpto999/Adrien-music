@@ -838,7 +838,7 @@ function CacheRow({
               // Icon-only chip; px-1 tightens the now text-less pill so
               // it isn't mostly padding. Meaning is carried by the
               // title/aria-label instead of a visible caption.
-              className="bg-emerald-500/15 px-1 text-emerald-600 dark:text-emerald-400"
+              className="bg-status-success/15 px-1 text-status-success"
             >
               <IconBookmarks className="size-3" />
             </Badge>

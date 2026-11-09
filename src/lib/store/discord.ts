@@ -6,7 +6,7 @@ import { persist } from "zustand/middleware";
 export type DiscordActivityType = "listening" | "playing" | "watching";
 
 /**
- * YTubic's own Discord application, shipped so Rich Presence works with zero
+ * adrify's own Discord application, shipped so Rich Presence works with zero
  * setup — the same pattern every other app with Rich Presence uses (Spotify,
  * VS Code, Steam games): the *developer* registers one Discord app and bakes
  * its Client ID into the shipped binary, so end users never see a "create a
@@ -25,7 +25,7 @@ type State = {
   // ── Connection ──
   /** Master switch. Off ⇒ nothing is sent and any existing presence is cleared. */
   enabled: boolean;
-  /** Discord application (Client ID) to present as. Defaults to YTubic's own
+  /** Discord application (Client ID) to present as. Defaults to adrify's own
    *  (see `DEFAULT_APPLICATION_ID`); users can swap in their own app's ID. */
   applicationId: string;
   /** The "<NAME>" in "<verb> NAME" — independent of whatever the Discord

@@ -23,6 +23,7 @@ import {
 import { useUpdateStore } from "@/lib/store/update";
 import { IS_BETA_PLATFORM, IS_MAC } from "@/lib/platform";
 import { DiscordIcon, GithubIcon } from "@/components/shared/brand-icons";
+import { AppLogo } from "@/components/shared/app-logo";
 import { copyToClipboard } from "@/lib/clipboard";
 import { toast } from "sonner";
 import {
@@ -211,9 +212,7 @@ export function AboutDialog({
         <div className="flex flex-col gap-4 px-7 pb-0 pt-7">
           {/* Right padding clears the close button. */}
           <div className="flex items-center gap-4 pr-[34px]">
-            <img
-              src="/ytubic-icon.svg"
-              alt=""
+            <AppLogo
               // The design draws a 16px squircle here, but our icon is a
               // circular disc — a box-shadow follows the element's radius,
               // so at 16px the accent glow leaked out as square corners.
@@ -221,7 +220,7 @@ export function AboutDialog({
             />
             <div className="flex min-w-0 flex-col gap-[9px]">
               <DialogTitle className="text-[23px] font-bold leading-none tracking-[-0.02em] text-t1">
-                YTubic
+                adrify
               </DialogTitle>
               <div className="flex items-center gap-2">
                 <span className="text-[13px] text-t5">

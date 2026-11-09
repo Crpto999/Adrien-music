@@ -6,8 +6,8 @@ This replaces the `rename-assets` job that used to live in
 that the release is never half-renamed:
 
 1. Renames every installer to a name that says which OS it is for
-   (`YTubic_0.13.0_Windows_x64_Setup.exe` instead of
-   `YTubic_0.13.0_x64-setup.exe`).
+   (`adrify_0.13.0_Windows_x64_Setup.exe` instead of
+   `adrify_0.13.0_x64-setup.exe`).
 2. Builds `latest.json` -- the manifest the in-app updater reads -- from
    the `.sig` files, and uploads it.
 
@@ -52,7 +52,7 @@ def request(method: str, path: str, token: str | None, raw: bool = False):
     req = urllib.request.Request(url, method=method)
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    req.add_header("User-Agent", "ytubic-release")
+    req.add_header("User-Agent", "adrify-release")
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     if raw:
@@ -108,7 +108,7 @@ def patch_asset(repo: str, asset_id: int, name: str, token: str | None) -> None:
     )
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("Content-Type", "application/json")
-    req.add_header("User-Agent", "ytubic-release")
+    req.add_header("User-Agent", "adrify-release")
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     try:
@@ -128,7 +128,7 @@ def upload_asset(repo: str, release_id: int, name: str, data: bytes, token: str 
     url = f"https://uploads.github.com/repos/{repo}/releases/{release_id}/assets?name={name}"
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/octet-stream")
-    req.add_header("User-Agent", "ytubic-release")
+    req.add_header("User-Agent", "adrify-release")
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     try:
@@ -150,16 +150,16 @@ def friendly_name(name: str, version: str) -> str:
     file is for which OS. Anything we don't recognise keeps its name.
     """
     rules = [
-        ("*_aarch64-setup.exe", f"YTubic_{version}_Windows_arm64_Setup.exe"),
-        ("*_arm64-setup.exe", f"YTubic_{version}_Windows_arm64_Setup.exe"),
-        ("*-setup.exe", f"YTubic_{version}_Windows_x64_Setup.exe"),
-        ("*.app.tar.gz", f"YTubic_{version}_macOS_Universal.app.tar.gz"),
-        ("*.dmg", f"YTubic_{version}_macOS_Universal.dmg"),
-        ("*_aarch64.AppImage", f"YTubic_{version}_Linux_arm64.AppImage"),
-        ("*.AppImage", f"YTubic_{version}_Linux_x86_64.AppImage"),
-        ("*_arm64.deb", f"YTubic_{version}_Linux_arm64.deb"),
-        ("*.deb", f"YTubic_{version}_Linux_x86_64.deb"),
-        ("*.rpm", f"YTubic_{version}_Linux_x86_64.rpm"),
+        ("*_aarch64-setup.exe", f"adrify_{version}_Windows_arm64_Setup.exe"),
+        ("*_arm64-setup.exe", f"adrify_{version}_Windows_arm64_Setup.exe"),
+        ("*-setup.exe", f"adrify_{version}_Windows_x64_Setup.exe"),
+        ("*.app.tar.gz", f"adrify_{version}_macOS_Universal.app.tar.gz"),
+        ("*.dmg", f"adrify_{version}_macOS_Universal.dmg"),
+        ("*_aarch64.AppImage", f"adrify_{version}_Linux_arm64.AppImage"),
+        ("*.AppImage", f"adrify_{version}_Linux_x86_64.AppImage"),
+        ("*_arm64.deb", f"adrify_{version}_Linux_arm64.deb"),
+        ("*.deb", f"adrify_{version}_Linux_x86_64.deb"),
+        ("*.rpm", f"adrify_{version}_Linux_x86_64.rpm"),
     ]
     for pattern, new in rules:
         if _fnmatch.fnmatch(name, pattern):

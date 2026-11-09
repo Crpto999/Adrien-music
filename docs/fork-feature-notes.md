@@ -1,6 +1,6 @@
 # Идеи и улучшения из форков
 
-Снимок fork-сети `NUber-dev/YTubic` от 15 июля 2026 года. Это список идей для последующего разбора, а не готовый план слияния: крупные ветки конфликтуют с `main`, поэтому изменения следует переносить небольшими тематическими коммитами с тестами.
+Снимок fork-сети `NUber-dev/adrify` от 15 июля 2026 года. Это список идей для последующего разбора, а не готовый план слияния: крупные ветки конфликтуют с `main`, поэтому изменения следует переносить небольшими тематическими коммитами с тестами.
 
 ## Платформы
 
@@ -56,9 +56,9 @@
 
 ## Источники
 
-- PR #1: <https://github.com/NUber-dev/YTubic/pull/1>
-- PR #3: <https://github.com/NUber-dev/YTubic/pull/3>
-- PR #27: <https://github.com/NUber-dev/YTubic/pull/27>
-- PR #33: <https://github.com/NUber-dev/YTubic/pull/33>
-- Ameen fork: <https://github.com/ameenalasady/YTubic>
+- PR #1: <https://github.com/NUber-dev/adrify/pull/1>
+- PR #3: <https://github.com/NUber-dev/adrify/pull/3>
+- PR #27: <https://github.com/NUber-dev/adrify/pull/27>
+- PR #33: <https://github.com/NUber-dev/adrify/pull/33>
+- Ameen fork: <https://github.com/ameenalasady/adrify>
 - YTMac fork: <https://github.com/metabreakr/YTMac>

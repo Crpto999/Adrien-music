@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { ThemeProvider } from "next-themes";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -22,6 +21,7 @@ import { useSettingsStore } from "@/lib/store/settings";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { PERSIST_MAX_AGE, persister, queryClient } from "@/lib/query-client";
+import { ThemeProvider } from "@/lib/theme";
 
 // Wire the store's user-facing actions to emit Tauri events instead of
 // mutating local state directly — only the main window's audio engine
@@ -65,16 +65,10 @@ export default function FloatingPlayerApp() {
   }, []);
   if (!restored) return null;
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      enableSystem
-      storageKey="ytm-theme"
-      disableTransitionOnChange
-    >
+    <ThemeProvider>
       {/* Plain (non-persisting) provider: the floating window is a separate
           JS context that would otherwise write its own cache into the shared
-          `ytubic-query-cache` key — clobbering the main window and
+          `adrify-query-cache` key — clobbering the main window and
           resurrecting a previous account's data after a switch. The cache
           is hydrated from disk once above, read-only. */}
       <QueryClientProvider client={queryClient}>

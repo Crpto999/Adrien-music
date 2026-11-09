@@ -182,7 +182,10 @@ export function QueueBody({ onClose }: { onClose?: () => void }) {
         </div>
       </header>
 
-      <ScrollArea className={QUEUE_SCROLL}>
+      {/* `data-blank-exclude` keeps the queue list out of the
+          blank-click check: the list is content, and clicking an empty
+          spot next to a track should not open the full-screen view. */}
+      <ScrollArea data-blank-exclude className={QUEUE_SCROLL}>
         {/* Sections space themselves; the old hard-coded spacer between
             "Now playing" and "Up next" is this gap. */}
         <div className="flex flex-col gap-3 p-2 pb-7">

@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { fetchHomeFeedPage } from "@/lib/innertube/home";
 import { ShelfCarousel } from "@/components/shared/shelf-carousel";
+import { PageSearchBox } from "@/components/shared/page-search-box";
 import { ShelfSectionSkeleton } from "@/components/shared/skeletons";
 import { useHomeSectionsStore } from "@/lib/store/home-sections";
 import { homeSectionKey } from "@/lib/i18n/home-sections";
@@ -137,10 +138,14 @@ function HomePage() {
 
   return (
     <div className="flex flex-col gap-8 px-6 pb-6 pt-3">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">
+      {/* Title, search entry point and refresh share one row: the box
+          is the page's main action, so it belongs beside the heading
+          rather than under it. */}
+      <div className="flex items-center gap-4">
+        <h1 className="shrink-0 text-3xl font-bold tracking-tight">
           {t("home.title")}
         </h1>
+        <PageSearchBox className="min-w-0 flex-1 sm:max-w-xl" />
         <button
           type="button"
           onClick={handleRefresh}
@@ -173,14 +178,14 @@ function HomePage() {
 
       {error && shelves.length > 0 ? (
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <IconAlertCircle className="size-4 shrink-0 text-destructive" />
+          <IconAlertCircle className="size-4 shrink-0 text-status-error" />
           <span>
             {t("home.couldNotLoadMore", { error: (error as Error).message })}
           </span>
           <button
             type="button"
             onClick={resetFeed}
-            className="text-brand hover:underline"
+            className="text-brand-soft hover:underline"
           >
             {t("common.retry")}
           </button>

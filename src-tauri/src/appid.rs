@@ -5,7 +5,7 @@
 //! media session's AUMID and matching it against a Start Menu shortcut that
 //! carries the same AUMID. Tauri's NSIS installer stamps that AUMID — the
 //! bundle identifier — onto the shortcuts it creates, so an installed build
-//! resolves to "YTubic" + icon for free.
+//! resolves to "adrify" + icon for free.
 //!
 //! But a media session only carries our AUMID if the *process* has one. A
 //! launch that doesn't go through a shortcut (autostart's Run entry, a direct
@@ -28,9 +28,9 @@ pub fn init() {
         // Debug uses a distinct id so a dev run and an installed release don't
         // collide, and a dev-only Start Menu shortcut can carry it.
         #[cfg(not(debug_assertions))]
-        const AUMID: &str = "com.github.ivasy.ytubic";
+        const AUMID: &str = "com.github.crpto999.adrify";
         #[cfg(debug_assertions)]
-        const AUMID: &str = "com.github.ivasy.ytubic.dev";
+        const AUMID: &str = "com.github.crpto999.adrify.dev";
 
         use windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
         let wide: Vec<u16> = AUMID.encode_utf16().chain(std::iter::once(0)).collect();

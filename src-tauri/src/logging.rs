@@ -12,8 +12,8 @@
 //! the terminal output is unchanged and the file keeps the history.
 //!
 //! The file lives in the app's log directory (`%LOCALAPPDATA%\
-//! com.github.ivasy.ytubic\logs` on Windows) and is rotated at
-//! 1 MiB: the old file is renamed to `ytubic.log.1` and the previous
+//! com.github.crpto999.adrify\logs` on Windows) and is rotated at
+//! 1 MiB: the old file is renamed to `adrify.log.1` and the previous
 //! one is dropped, so the log can never grow without bound.
 
 use std::io::Write;
@@ -34,7 +34,7 @@ pub fn init(dir: &std::path::Path) {
         eprintln!("[log] create log dir failed: {e}");
         return;
     }
-    let path = dir.join("ytubic.log");
+    let path = dir.join("adrify.log");
     let slot = LOG_PATH.get_or_init(|| Mutex::new(None));
     if let Ok(mut guard) = slot.lock() {
         *guard = Some(path);
@@ -71,7 +71,7 @@ fn append(line: &str) {
     // steps and a failed rotation cannot lose the line.
     if let Ok(meta) = std::fs::metadata(&path) {
         if meta.len() >= MAX_BYTES {
-            let old = path.with_file_name("ytubic.log.1");
+            let old = path.with_file_name("adrify.log.1");
             let _ = std::fs::remove_file(&old);
             let _ = std::fs::rename(&path, &old);
         }

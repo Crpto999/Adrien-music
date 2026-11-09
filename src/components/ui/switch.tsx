@@ -13,9 +13,14 @@ function Switch({
       className={cn(
         // Design-system switch: a 44x26 track, off on the same
         // `--w050` / `--w070` fill every other resting control uses, on
-        // in the accent with a dark hairline and an inner highlight so
-        // the fill reads as lit rather than flat.
-        "peer inline-flex h-[26px] w-11 shrink-0 items-center rounded-full border transition-[background-color,border-color,box-shadow] duration-[180ms] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=unchecked]:border-w070 data-[state=unchecked]:bg-w050 data-[state=checked]:border-k180 data-[state=checked]:bg-acc1 data-[state=checked]:shadow-[inset_0_1px_1px_var(--w220)]",
+        // in the "activated" colour with a dark hairline and an inner
+        // highlight so the fill reads as lit rather than flat.
+        //
+        // The lit fill is `--active` (the brand's support hue), not the
+        // primary: the primary is the app's background voice, and a
+        // panel full of cyan switches read as one undifferentiated
+        // glow. See the `--active` token in index.css.
+        "peer inline-flex h-[26px] w-11 shrink-0 items-center rounded-full border transition-[background-color,border-color,box-shadow] duration-[180ms] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=unchecked]:border-w070 data-[state=unchecked]:bg-w050 data-[state=checked]:border-k180 data-[state=checked]:bg-active data-[state=checked]:shadow-[inset_0_1px_1px_var(--w220)]",
         className
       )}
       {...props}

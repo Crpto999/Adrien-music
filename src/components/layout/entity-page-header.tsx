@@ -371,7 +371,9 @@ const HeaderActions = memo(function HeaderActions({
         </Button>
       ) : null}
       {config.onShuffle ? (
-        <Button variant="secondary" onClick={config.onShuffle}>
+        // The spec's secondary button: the violet-bordered companion
+        // that sits beside the primary Play action.
+        <Button variant="brand" onClick={config.onShuffle}>
           <IconArrowsShuffle />
           Shuffle
         </Button>

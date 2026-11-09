@@ -1,13 +1,13 @@
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 /**
- * `ytubic://` links. The scheme is registered by the installer (and at
+ * `adrify://` links. The scheme is registered by the installer (and at
  * runtime in dev / on Linux), so opening one launches or focuses the app:
  *
- *   ytubic://watch?v=<videoId>
- *   ytubic://artist/<channelId>
- *   ytubic://album/<browseId>
- *   ytubic://playlist/<playlistId>
+ *   adrify://watch?v=<videoId>
+ *   adrify://artist/<channelId>
+ *   adrify://album/<browseId>
+ *   adrify://playlist/<playlistId>
  */
 export type DeepLinkTarget =
   | { kind: "watch"; id: string }
@@ -15,17 +15,17 @@ export type DeepLinkTarget =
 
 const ID_RE = /^[A-Za-z0-9_-]{6,}$/;
 
-export function ytubicShareUrl(kind: DeepLinkTarget["kind"], id: string): string {
-  return kind === "watch" ? `ytubic://watch?v=${id}` : `ytubic://${kind}/${id}`;
+export function adrifyShareUrl(kind: DeepLinkTarget["kind"], id: string): string {
+  return kind === "watch" ? `adrify://watch?v=${id}` : `adrify://${kind}/${id}`;
 }
 
 /**
  * Universal share link: a GitHub Pages landing page (docs/s/) that offers
- * "Open in YTubic" (the ytubic:// link above) and falls back to YouTube
+ * "Open in adrify" (the adrify:// link above) and falls back to YouTube
  * Music, so the link works for people without the app too. Songs get
  * their metadata from YouTube's oEmbed; other entities carry a title.
  */
-export const SHARE_BASE = "https://nuber-dev.github.io/YTubic/s/";
+export const SHARE_BASE = "https://crpto999.github.io/Adrien-music/s/";
 
 export function universalShareUrl(
   kind: DeepLinkTarget["kind"],
@@ -49,7 +49,7 @@ export function parseDeepLink(raw: string): DeepLinkTarget | null {
   } catch {
     return null;
   }
-  if (url.protocol !== "ytubic:") return null;
+  if (url.protocol !== "adrify:") return null;
   const host = url.hostname.toLowerCase();
   if (host === "watch") {
     const v = url.searchParams.get("v") ?? "";

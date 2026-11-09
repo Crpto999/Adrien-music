@@ -75,7 +75,7 @@ function Highlight({ text, terms }: { text: string; terms: string[] }) {
         lower.has(part.toLowerCase()) ? (
           <mark
             key={i}
-            className="rounded-[3px] bg-[rgba(var(--acc1rgb),0.22)] px-px text-inherit"
+            className="rounded-[3px] bg-[rgba(var(--active-rgb),0.22)] px-px text-inherit"
           >
             {part}
           </mark>

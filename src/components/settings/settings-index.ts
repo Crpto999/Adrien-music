@@ -159,7 +159,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     titleKey: "settings.appearance.theme",
     descriptionKey: "settings.appearance.themeDesc",
     id: "theme",
-    keywords: "dark light mode system colors",
+    keywords: "dark light cyberpunk neon mode system colors theme",
   },
   {
     tab: "appearance",

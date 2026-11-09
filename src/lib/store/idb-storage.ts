@@ -13,14 +13,14 @@ import { createStore, del, get, set } from "idb-keyval";
  * settings only.
  *
  * Deliberately a separate IndexedDB database from the query cache
- * (`ytubic-cache` / `query-cache` in `query-client.ts`): `idb-keyval`'s
+ * (`adrify-cache` / `query-cache` in `query-client.ts`): `idb-keyval`'s
  * `createStore` opens a database with exactly one object store, so a second
  * store in that same database would require a version-bumped upgrade. All
  * stores using this helper share one `kv` object store, keyed by their own
  * zustand `persist` `name` — no collisions.
  */
 const idbStore =
-  typeof window !== "undefined" ? createStore("ytubic-stores", "kv") : undefined;
+  typeof window !== "undefined" ? createStore("adrify-stores", "kv") : undefined;
 
 /**
  * Zustand `StateStorage` backed by IndexedDB. Like `safeLocalStorage`,

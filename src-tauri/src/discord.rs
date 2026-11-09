@@ -252,7 +252,7 @@ pub fn discord_update(state: tauri::State<'_, DiscordState>, payload: PresencePa
 
 /// Discord's `status_display_type` for an activity: which field the member
 /// list and the status line show after "Listening to". 0 is the app name
-/// (the default, "Listening to YTubic"), 1 the state, 2 the details.
+/// (the default, "Listening to adrify"), 1 the state, 2 the details.
 /// Same helper as upstream 1d0cc56: the 0.2.5 builder predates
 /// `status_display_type`, so the activity is serialised here and the field
 /// added before the frame goes out; the envelope is the same one the

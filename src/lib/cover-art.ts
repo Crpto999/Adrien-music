@@ -40,7 +40,7 @@ function cacheKey(artist: string, title: string): string {
 }
 
 // Dedicated IndexedDB store for this cache — deliberately its own database
-// rather than a second store in `idb-storage.ts`'s `ytubic-stores` (an
+// rather than a second store in `idb-storage.ts`'s `adrify-stores` (an
 // `idb-keyval` database has exactly one object store; a second store there
 // would need a version-bumped schema migration). This used to live in
 // localStorage as `ytm-cover-itunes:*` keys, but lazy TTL eviction (only on
@@ -50,7 +50,7 @@ function cacheKey(artist: string, title: string): string {
 // disk-backed quota.
 const coverCacheStore =
   typeof window !== "undefined"
-    ? createStore("ytubic-cover-cache", "urls")
+    ? createStore("adrify-cover-cache", "urls")
     : undefined;
 
 // In-memory mirror so repeat lookups within a session (e.g. a shelf

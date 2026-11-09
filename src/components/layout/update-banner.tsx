@@ -88,6 +88,11 @@ export function UpdateBanner() {
           "group-data-[collapsible=icon]:rounded-[9px] group-data-[collapsible=icon]:border-0",
           "group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0",
           "group-data-[collapsible=icon]:shadow-none group-data-[collapsible=icon]:hover:bg-transparent",
+          // On the rail the tile is the whole control, so it has to sit
+          // on the rail's axis like every nav glyph above it. The label
+          // column gives up its width (and the gap with it), leaving the
+          // tile alone in the row to centre itself.
+          "group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center",
         )}
       >
         <span className="relative grid w-[26px] shrink-0 place-items-center transition-[width] duration-[220ms] ease-[cubic-bezier(.32,.72,0,1)] group-data-[collapsible=icon]:w-9">
@@ -95,7 +100,7 @@ export function UpdateBanner() {
             <IconRefresh className="size-[15px]" />
           </span>
         </span>
-        <span data-sidebar-label className="flex min-w-0 flex-1 flex-col gap-px">
+        <span data-sidebar-label className="flex min-w-0 flex-1 flex-col gap-px group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none">
           <span className="truncate text-[12.5px] font-semibold leading-tight tracking-[-0.005em] text-t1">
             {t("update.available")}
           </span>
@@ -183,6 +188,10 @@ export function UpdateBanner() {
         "group-data-[collapsible=icon]:rounded-[9px] group-data-[collapsible=icon]:border-0",
         "group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0",
         "group-data-[collapsible=icon]:shadow-none group-data-[collapsible=icon]:hover:bg-transparent",
+        // Same as the system card above: on the rail the tile is the
+        // whole control, so it centres on the rail's axis and the label
+        // column gives up its width and the gap with it.
+        "group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center",
       )}
     >
       <span
@@ -217,7 +226,7 @@ export function UpdateBanner() {
             "group-data-[collapsible=icon]:group-hover/upd:bg-w110",
           )}
         >
-          <Icon className={cfg.iconClass} />
+          <Icon className={cn(cfg.iconClass, phase === "error" && "text-status-error")} />
         </span>
         {busy ? (
           // A 2px arc 4px out from the tile: a conic gradient masked down
@@ -237,7 +246,7 @@ export function UpdateBanner() {
         ) : null}
       </span>
 
-      <span data-sidebar-label className="flex min-w-0 flex-1 flex-col gap-px">
+      <span data-sidebar-label className="flex min-w-0 flex-1 flex-col gap-px group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none">
         <span className="truncate text-[12.5px] font-semibold leading-tight tracking-[-0.005em] text-t1">
           {title}
         </span>

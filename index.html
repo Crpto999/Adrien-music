@@ -2,26 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/ytubic-icon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/adrify-logo-color.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YTubic</title>
+    <title>adrify</title>
     <script>
-      // Resolve and apply the persisted theme class before first paint to
-      // avoid a light-mode flash while next-themes hydrates. Mirrors the
-      // ThemeProvider config in src/App.tsx (storageKey, default).
+      // Resolve and apply the persisted theme before the first paint to
+      // avoid a light-mode flash while the theme store hydrates. Mirrors
+      // the logic in src/lib/theme/use-apply-theme.ts: the stored id is
+      // either a theme name, "system", or a custom theme's id (which
+      // lives in the persisted store, so it cannot be read here — a
+      // custom theme falls back to its own tokens once React mounts).
       (function () {
         try {
           var t = localStorage.getItem("ytm-theme") || "dark";
+          var raw = t;
+          try {
+            raw = JSON.parse(t)?.state?.themeId ?? t;
+          } catch (_) {
+            // The pre-store format was a bare string.
+          }
           var resolved =
-            t === "system"
+            raw === "system"
               ? window.matchMedia("(prefers-color-scheme: dark)").matches
                 ? "dark"
                 : "light"
-              : t;
-          document.documentElement.classList.add(resolved);
-          document.documentElement.style.colorScheme = resolved;
+              : raw;
+          // A theme we don't know about would leave the app unstyled.
+          if (resolved !== "light" && resolved !== "dark" && resolved !== "cyberpunk") {
+            resolved = "dark";
+          }
+          document.documentElement.classList.add(resolved === "light" ? "light" : "dark");
+          document.documentElement.setAttribute("data-theme", resolved);
+          document.documentElement.style.colorScheme =
+            resolved === "light" ? "light" : "dark";
         } catch (_) {
           document.documentElement.classList.add("dark");
+          document.documentElement.setAttribute("data-theme", "dark");
         }
       })();
     </script>

@@ -2,7 +2,6 @@
 // read better filled at this size than the Tabler equivalents. The
 // footer row is Tabler, per the design.
 import {
-  IconArrowsMaximize,
   IconArrowsShuffle,
   IconLoader2,
   IconPlayerPauseFilled,
@@ -37,22 +36,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
-import {
-  Thumbnail,
-  getRenderedThumbnailSrc,
-} from "@/components/shared/thumbnail";
 import { LikeDislikeButtons } from "@/components/shared/like-buttons";
-import { ArtworkOutline } from "@/components/shared/artwork-outline";
 import { ArtistLinks } from "@/components/shared/artist-links";
 import { EntityLink } from "@/components/shared/entity-link";
 import { PlayerMoreMenu } from "@/components/layout/player-more-menu";
 import { PlayerCoverMenu } from "@/components/layout/player-cover-menu";
 import {
+  NowPlayingCover,
+} from "@/components/shared/now-playing-cover";
+import {
   playerIconButton,
 } from "@/components/layout/player-chrome";
 import { cn } from "@/lib/utils";
 import { usePlayerCoverDrag } from "@/lib/player-drag";
-import { openCoverLightbox } from "@/lib/store/cover-lightbox";
+import { isBlankClick } from "@/lib/blank-click";
 import { openFullscreen } from "@/lib/store/fullscreen";
 import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
 import { usePanelsStore } from "@/lib/store/panels";
@@ -206,14 +203,21 @@ export function ProgressSlider({
   );
 }
 
-export function VolumeControl({
-  direction = "horizontal",
-  className,
-}: {
-  direction?: "horizontal" | "vertical";
-  /** Extra classes for the speaker button (the full-screen chip). */
-  className?: string;
-}) {
+/**
+ * The volume control.
+ *
+ * One layout everywhere: the speaker button plus a slider that pops
+ * UP out of it on hover. The bottom bar is where that layout was
+ * settled on — a horizontal slider inline in the row only fits the
+ * side card, and it left the other surfaces (the full-screen view,
+ * the floating window) with a slider whose width had to be guessed
+ * per-container.
+ *
+ * The popup grows upward because the control always sits in a row
+ * near the bottom edge of its surface: below the button there is the
+ * edge of the window.
+ */
+export function VolumeControl({ className }: { className?: string }) {
   const t = useT();
   const { volume, muted } = usePlaybackStore(
     useShallow((s) => ({ volume: s.volume, muted: s.muted })),
@@ -232,36 +236,16 @@ export function VolumeControl({
         : IconVolumeFilled;
   const pct = muted ? 0 : Math.round(volume * 100);
 
-  // Horizontal: slider sits to the right of the speaker icon (right
-  // card variant — there's room beside the button).
-  // Vertical: slider pops upward (bottom bar — below the button is
-  // the page edge, so the popup has to grow up).
-  // Padding on the popup is invisible but counts toward the parent's
-  // mouseleave hit-test, so the slider doesn't snap shut the moment
-  // the cursor slips a couple px off the visible bar.
-  const popupClass =
-    direction === "vertical"
-      ? "absolute bottom-full left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-1 px-3 pb-2 transition-opacity duration-150"
-      : "absolute left-full top-1/2 z-10 flex -translate-y-1/2 items-center gap-0 py-3 pl-1 transition-opacity duration-150";
-
   return (
     <div
       className={cn(
         "relative flex items-center",
-        // Horizontal (side card): the slider is always visible and grows
-        // to fill whatever row space the resizable card gives it, so it
-        // scales with the card instead of overflowing a fixed width.
-        // Vertical (bottom bar) keeps the hover-popup layout below, so it
-        // doesn't need the grow/min-w-0 treatment.
-        direction === "horizontal" && "min-w-0 flex-1 gap-1",
         // Two invisible 8px strips (above and below the speaker button)
         // extend the container's hover hit-zone without overlapping the
         // button itself — overlapping it would steal its `:hover` state.
         // Together with the popup's own padding, the cursor gets a
         // comfortable grace area for traveling between icon and slider.
-        // Only the vertical popup needs this grace zone.
-        direction === "vertical" &&
-          "before:absolute before:-top-2 before:inset-x-0 before:h-2 before:content-[''] after:absolute after:-bottom-2 after:inset-x-0 after:h-2 after:content-['']",
+        "before:absolute before:-top-2 before:inset-x-0 before:h-2 before:content-[''] after:absolute after:-bottom-2 after:inset-x-0 after:h-2 after:content-['']",
       )}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
@@ -297,48 +281,30 @@ export function VolumeControl({
           </m.span>
         </AnimatePresence>
       </Button>
-      {direction === "vertical" ? (
-        <div
-          className={cn(
-            popupClass,
-            open ? "opacity-100" : "pointer-events-none opacity-0",
-          )}
-        >
-          <div className="flex w-12 flex-col items-center gap-2 rounded-md border border-hairline bg-surface-active/70 px-4 py-3 shadow backdrop-blur-md">
-            <span className="text-xs font-medium tabular-nums text-foreground">
-              {pct}
-            </span>
-            <Slider
-              orientation="vertical"
-              value={[pct]}
-              max={100}
-              step={1}
-              className="h-16 min-h-0"
-              aria-label={t("action.volume")}
-              onValueChange={([v]) => setVolume(v / 100)}
-            />
-          </div>
-        </div>
-      ) : (
-        // Inline, not a popup: grows to fill the row so its width tracks
-        // the resizable side card instead of a fixed size overflowing it.
-        // The min width is load-bearing outside the card: in the
-        // full-screen transport row the container is shrink-to-fit, so a
-        // pure flex-1 collapses the slider to a sliver.
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      {/* Padding on the popup is invisible but counts toward the
+          parent's mouseleave hit-test, so the slider doesn't snap shut
+          the moment the cursor slips a couple px off the visible bar. */}
+      <div
+        className={cn(
+          "absolute bottom-full left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-1 px-3 pb-2 transition-opacity duration-150",
+          open ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      >
+        <div className="flex w-12 flex-col items-center gap-2 rounded-md border border-hairline bg-surface-active/70 px-4 py-3 shadow backdrop-blur-md">
+          <span className="text-xs font-medium tabular-nums text-foreground">
+            {pct}
+          </span>
           <Slider
+            orientation="vertical"
             value={[pct]}
             max={100}
             step={1}
-            className="min-w-24 flex-1"
+            className="h-16 min-h-0"
             aria-label={t("action.volume")}
             onValueChange={([v]) => setVolume(v / 100)}
           />
-          <span className="w-7 shrink-0 text-right text-xs font-medium tabular-nums text-foreground">
-            {pct}
-          </span>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -383,12 +349,16 @@ export function PlayerBar({
   // The cover doubles as a drag handle for layout switching. In the
   // floating window the OS title bar already owns drag, so we don't
   // attach our own handler there.
+  //
+  // A plain click on the cover opens the full-screen view — that is
+  // the cover's job now, rather than opening a raw image preview.
   const { onPointerDown: onCoverPointerDown } = usePlayerCoverDrag({
     enabled: variant !== "floating",
     onClick: () => {
       if (!track) return;
-      const url = getRenderedThumbnailSrc(coverRef.current);
-      if (url) openCoverLightbox(url, track.title);
+      // The side card hugs the right edge, so the cover travels LEFT
+      // into the full-screen view.
+      openFullscreen("right");
     },
   });
 
@@ -424,7 +394,23 @@ export function PlayerBar({
     // 300ms, which makes the next tooltip pop up instantly — annoying
     // when the buttons are densely packed).
     <TooltipProvider delayDuration={800} skipDelayDuration={0}>
-    <aside className={wrapperClass} style={wrapperStyle}>
+    <aside
+      className={wrapperClass}
+      style={wrapperStyle}
+      // Clicking the card's blank surface opens the full-screen view.
+      // The click target is checked so a click on a button, a link or
+      // the lyrics column never opens it by accident.
+      onClick={(e) => {
+        if (!track || variant === "floating") return;
+        // The cover is handled by the drag hook, which tells a click
+        // apart from a drag. A native click ALSO fires after a drag
+        // that relocated the player, so letting the cover through here
+        // would open the full-screen view after every layout drag.
+        if (coverRef.current?.contains(e.target as Node)) return;
+        if (!isBlankClick(e.target)) return;
+        openFullscreen("right");
+      }}
+    >
       {/* Queue overlay vs. cover-and-lyrics body. AnimatePresence
           crossfades the two when the user toggles the queue button.
           Both branches fill the card above the bottom action row
@@ -482,7 +468,6 @@ export function PlayerBar({
             onPointerDown={onCoverPointerDown}
             className={cn(
               "mx-auto w-full max-w-[20rem] touch-none select-none",
-              variant !== "floating" && "cursor-zoom-in",
             )}
           >
             {track ? (
@@ -495,35 +480,11 @@ export function PlayerBar({
               // it that group is the m.div wrapping cover AND lyrics, so
               // the lyrics' backdrop-blur strip loses the card and the app
               // background from its backdrop and paints as a dark band.
-              <div className="group/cover relative isolate aspect-square w-full rounded-md shadow-[0_1px_14px_rgb(0_0_0/0.12)]">
-                <Thumbnail
-                  thumbnails={track.thumbnails}
-                  alt={track.title}
-                  className="size-full rounded-md pointer-events-none"
-                  targetSize={1024}
-                  highRes
-                  overrideHighRes={iTunesCover}
-                />
-                <ArtworkOutline className="rounded-md" />
-                {/* Hover pad with the Full screen chip, per the design.
-                    Only the chip is clickable, and it stops the pointer
-                    from reaching the cover's drag handle: the handle
-                    captures the pointer, which would swallow the click.
-                    The floating window has its own surface for this. */}
-                {variant !== "floating" ? (
-                  <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-md bg-(--g6a) opacity-0 transition-opacity duration-[160ms] group-hover/cover:opacity-100 has-[button:focus-visible]:opacity-100">
-                    <button
-                      type="button"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={openFullscreen}
-                      className="pointer-events-auto flex cursor-pointer items-center gap-2 rounded-[10px] bg-w160 px-3.5 py-[9px] text-[13px] font-semibold text-white backdrop-blur-[8px] transition-colors hover:bg-w200"
-                    >
-                      <IconArrowsMaximize className="size-[17px]" stroke={1.9} />
-                      Full screen
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              <NowPlayingCover
+                track={track}
+                override={iTunesCover}
+                className="shadow-[0_1px_14px_rgb(0_0_0/0.12)]"
+              />
             ) : (
               <div className="aspect-square w-full rounded-md border border-hairline bg-muted" />
             )}
@@ -618,7 +579,7 @@ export function PlayerBar({
             aria-label={playing ? t("action.pause") : t("action.play")}
             onClick={toggle}
             disabled={!hasTrack}
-            className="size-12 rounded-full bg-brand text-white hover:bg-brand/90"
+            className="size-12 rounded-full bg-brand text-brand-foreground hover:bg-brand/90"
           >
             {loading ? (
               <IconLoader2 className="animate-spin" />
@@ -665,13 +626,14 @@ export function PlayerBar({
         )}
       </AnimatePresence>
 
-      {/* Bottom row: lyrics-source + queue + volume on the left, more
-          menu on the right. The volume slider grows to fill the left
-          cluster so it scales with the resizable card instead of
-          overflowing into the menu button. The song/video source
-          picker lives inside `PlayerMoreMenu` now (its default
+      {/* Bottom row: lyrics-source + queue on the left, volume + more
+          menu on the right. The volume control is the same hover-popup
+          the bottom bar uses — the inline horizontal slider only ever
+          fitted the resizable side card, and it left the other
+          surfaces guessing at a width. The song/video source picker
+          lives inside `PlayerMoreMenu` now (its default
           `includeSource`) rather than as its own control here, which
-          is what used to crowd the volume slider. `PlayerMoreMenu`
+          is what used to crowd the volume control. `PlayerMoreMenu`
           handles the floating-window case internally — its
           `onGoToArtist` callback emits a Tauri nav event there
           instead of calling `useNavigate` (which would throw without
@@ -683,8 +645,8 @@ export function PlayerBar({
             open={queueOpen}
             onToggle={() => setQueueOpen((v) => !v)}
           />
-          <VolumeControl />
         </div>
+        <VolumeControl />
         <PlayerMoreMenu track={track} />
       </div>
     </aside>

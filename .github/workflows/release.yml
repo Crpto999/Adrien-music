@@ -89,7 +89,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: "-"
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "YTubic ${{ github.ref_name }}"
+          releaseName: "adrify ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install this version."
           releaseDraft: true
           prerelease: false

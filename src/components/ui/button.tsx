@@ -17,16 +17,24 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Primary accent (Play, modal confirm). The fill is a radial
-        // gradient rather than a flat accent so the top edge catches a
+        // Primary (Play, modal confirm). The fill is a radial gradient
+        // rather than a flat accent so the top edge catches a
         // highlight; hover brightens it and lifts the accent glow
         // instead of shifting the hue.
+        //
+        // The label is the void-black foreground, not white: the spec
+        // is explicit that a filled cyan button takes dark text, and
+        // white-on-cyan is the single worst-reading pairing in this
+        // palette.
         default:
-          "border border-transparent bg-[radial-gradient(circle_at_50%_0%,var(--acc5),var(--acc1)_62%)] font-semibold text-white shadow-[0_5px_16px_-5px_rgba(var(--acc1rgb),0.13),inset_0_1px_1px_var(--w170)] hover:brightness-[1.16] hover:shadow-[0_8px_22px_-5px_rgba(var(--acc1rgb),0.34),inset_0_1px_1px_var(--w240)]",
-        // Danger (Clear cache, Sign out). Accent hue, but hollow — the
-        // solid accent is reserved for the primary action.
+          "border border-transparent bg-[radial-gradient(circle_at_50%_0%,var(--acc5),var(--acc1)_62%)] font-semibold text-brand-foreground shadow-[0_5px_16px_-5px_rgba(var(--acc1rgb),0.13),inset_0_1px_1px_var(--w170)] hover:brightness-[1.16] hover:shadow-[0_8px_22px_-5px_rgba(var(--acc1rgb),0.34),inset_0_1px_1px_var(--w240)]",
+        // Danger (Clear cache, Sign out). The spec gives this its own
+        // recipe rather than reusing the accent hue: a dark maroon
+        // fill, a hot-pink border and a lighter pink label, so it
+        // reads as "destructive" without shouting louder than the
+        // primary action.
         destructive:
-          "border border-[rgba(var(--acc1rgb),0.38)] bg-[rgba(var(--acc1rgb),0.10)] text-acc2 hover:border-[rgba(var(--acc1rgb),0.5)] hover:bg-[rgba(var(--acc1rgb),0.16)]",
+          "border border-status-error/70 bg-[rgba(var(--status-error-rgb),0.12)] text-status-error hover:border-status-error hover:bg-[rgba(var(--status-error-rgb),0.2)]",
         // Quiet filled button — the settings-panel workhorse.
         outline:
           "border border-w090 bg-w050 text-t3 hover:bg-w090 hover:text-t1",
@@ -34,8 +42,18 @@ const buttonVariants = cva(
         // geometry and weight, neutral fill.
         secondary:
           "border border-w160 bg-w100 font-semibold text-t1 hover:border-w240 hover:bg-w150",
+        // Brand support — the spec's secondary button: a violet border
+        // on the elevated surface with a light violet label. Used for
+        // the action next to a primary one, never for the primary
+        // itself.
+        brand:
+          "border border-brand-secondary/70 bg-brand-secondary/10 font-semibold text-brand-secondary-soft hover:border-brand-secondary hover:bg-brand-secondary/20",
+        // Emphasis — the spec's CTA / highlight: the magenta hue, for
+        // the one action on a screen that must win.
+        accent:
+          "border border-transparent bg-brand-accent font-semibold text-brand-foreground shadow-[0_5px_16px_-5px_rgba(var(--brand-accent-rgb),0.35)] hover:brightness-[1.12]",
         ghost: "text-t4 hover:bg-w070 hover:text-t1",
-        link: "text-acc1 underline-offset-4 hover:underline",
+        link: "text-brand-soft underline-offset-4 hover:underline",
       },
       size: {
         // Text-bearing variants: `leading-none` collapses the default

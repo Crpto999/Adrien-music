@@ -6,9 +6,9 @@ import {
   IconLoader2,
   IconX,
 } from "@tabler/icons-react";
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import { useLayoutStore } from "@/lib/store/layout";
+import { useThemeScheme } from "@/lib/theme";
 
 /**
  * Toasts, per the design handoff.
@@ -29,27 +29,34 @@ const TOAST =
   "shadow-[0_18px_42px_-14px_var(--k850)] " +
   // Errors carry their own tint rather than only a red icon: a flat red
   // wash over the same glass, a red border, and a catch-light on top.
-  "data-[type=error]:border-[rgba(240,50,79,0.34)] " +
-  "data-[type=error]:bg-[linear-gradient(0deg,rgba(240,50,79,0.13),rgba(240,50,79,0.13)),var(--glass2)] " +
+  // The hue comes from the status token, so the toast follows the
+  // theme's error colour instead of a hard-coded red.
+  "data-[type=error]:border-status-error/35 " +
+  "data-[type=error]:bg-[linear-gradient(0deg,rgba(var(--status-error-rgb),0.13),rgba(var(--status-error-rgb),0.13)),var(--glass2)] " +
   "data-[type=error]:shadow-[0_18px_42px_-14px_var(--k850),inset_0_1px_0_var(--w060)]";
 
 /**
  * The 32px icon tile. Neutral by default; success goes green-on-tint,
  * error inverts to white on solid red so it reads as the loudest thing
  * in the stack.
+ *
+ * The four status hues are the spec's function colours, taken from the
+ * status tokens rather than spelled out, so they stay consistent with
+ * the rest of the app and follow the theme.
  */
 const ICON =
   "grid size-8 shrink-0 place-items-center rounded-[10px] bg-w080 text-t3 " +
-  "group-data-[type=success]:bg-[rgba(34,176,125,0.14)] group-data-[type=success]:text-[#22B07D] " +
-  "group-data-[type=warning]:bg-[rgba(240,160,60,0.14)] group-data-[type=warning]:text-[#F0A03C] " +
-  "group-data-[type=error]:bg-[#F0324F] group-data-[type=error]:text-white";
+  "group-data-[type=success]:bg-status-success/15 group-data-[type=success]:text-status-success " +
+  "group-data-[type=warning]:bg-status-warning/15 group-data-[type=warning]:text-status-warning " +
+  "group-data-[type=info]:bg-status-info/15 group-data-[type=info]:text-status-info " +
+  "group-data-[type=error]:bg-status-error group-data-[type=error]:text-white";
 
 const BUTTON =
   "shrink-0 cursor-pointer rounded-md bg-w060 px-[9px] py-1 text-[11.5px] " +
   "font-semibold transition-colors duration-[140ms] hover:bg-w090";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
+  const scheme = useThemeScheme();
   // The stack has to dodge the player: with the bottom bar it would land
   // right on top of it, so it moves to the opposite corner. Side card and
   // floating both leave the bottom of the page free.
@@ -57,7 +64,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={scheme}
       position={bottomBar ? "top-right" : "bottom-center"}
       // Top right has to start below the title bar, otherwise the first
       // card sits under the window controls.

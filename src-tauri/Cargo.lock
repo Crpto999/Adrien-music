@@ -9,6 +9,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "adrify"
+version = "0.13.0"
+dependencies = [
+ "aes-gcm",
+ "axum",
+ "base64 0.22.1",
+ "cookie",
+ "discord-rich-presence",
+ "futures-util",
+ "keyring",
+ "rand 0.8.6",
+ "reqwest 0.12.28",
+ "resvg",
+ "serde",
+ "serde_json",
+ "souvlaki",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-deep-link",
+ "tauri-plugin-dialog",
+ "tauri-plugin-http",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-process",
+ "tauri-plugin-shell",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-store",
+ "tauri-plugin-updater",
+ "tauri-plugin-window-state",
+ "time",
+ "tokio",
+ "tower",
+ "tower-http",
+ "urlencoding",
+ "webkit2gtk",
+ "webview2-com",
+ "windows 0.61.3",
+ "windows-sys 0.59.0",
+ "zbus",
+]
+
+[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7088,49 +7131,6 @@ dependencies = [
  "quote",
  "syn 2.0.117",
  "synstructure",
-]
-
-[[package]]
-name = "ytubic"
-version = "0.13.0"
-dependencies = [
- "aes-gcm",
- "axum",
- "base64 0.22.1",
- "cookie",
- "discord-rich-presence",
- "futures-util",
- "keyring",
- "rand 0.8.6",
- "reqwest 0.12.28",
- "resvg",
- "serde",
- "serde_json",
- "souvlaki",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-deep-link",
- "tauri-plugin-dialog",
- "tauri-plugin-http",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-process",
- "tauri-plugin-shell",
- "tauri-plugin-single-instance",
- "tauri-plugin-store",
- "tauri-plugin-updater",
- "tauri-plugin-window-state",
- "time",
- "tokio",
- "tower",
- "tower-http",
- "urlencoding",
- "webkit2gtk",
- "webview2-com",
- "windows 0.61.3",
- "windows-sys 0.59.0",
- "zbus",
 ]
 
 [[package]]

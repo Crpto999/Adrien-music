@@ -36,7 +36,7 @@ import { translate } from "@/lib/i18n";
  * app" duplicate. Everywhere else the web session IS the OS session: macOS
  * feeds WKWebView's Now Playing (which always wins the media keys), and on
  * Linux the entry WebKitGTK publishes over MPRIS is the one desktop widgets
- * see — feeding it directly is also what keeps WebKit's bare "YTubic"
+ * see — feeding it directly is also what keeps WebKit's bare "adrify"
  * fallback shell from showing up as a second player. Without that, a bare
  * <audio> element leaves next/previous unhandled and the keys do nothing.
  * On KDE, Rust also registers a host-owned player that supersedes WebKit's

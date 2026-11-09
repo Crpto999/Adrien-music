@@ -15,8 +15,8 @@ export function ErrorCard({
   onRetry?: () => void;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      <IconAlertCircle className="size-5 shrink-0 text-destructive" />
+    <div className="flex items-start gap-3 rounded-lg border border-status-error/40 bg-status-error/10 p-4 text-sm">
+      <IconAlertCircle className="size-5 shrink-0 text-status-error" />
       <div className="flex flex-col gap-1">
         <span className="font-medium">{title}</span>
         <span className="text-muted-foreground">{message}</span>
@@ -24,7 +24,7 @@ export function ErrorCard({
           <button
             type="button"
             onClick={onRetry}
-            className="mt-1 w-fit cursor-pointer text-brand hover:underline"
+            className="mt-1 w-fit cursor-pointer text-brand-soft hover:underline"
           >
             Retry
           </button>

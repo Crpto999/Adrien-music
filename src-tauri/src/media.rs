@@ -11,10 +11,10 @@
 // internally before our commands see them: play/pause appears to work but
 // next/previous are dead on a bare <audio> element). On Linux the extra
 // souvlaki registration shows up next to WebKit's as a second, metadata-less
-// "ytubic" player in desktop widgets. So on both we drive the web session
+// "adrify" player in desktop widgets. So on both we drive the web session
 // instead of fighting it — `navigator.mediaSession` supplies the metadata
 // and the missing next/previous/seek handlers; see the non-Windows branches
-// in src/lib/audio-engine.ts. The tile still attributes to YTubic because
+// in src/lib/audio-engine.ts. The tile still attributes to adrify because
 // those web sessions belong to the host process, which is exactly the
 // attribution problem Windows has and macOS/Linux don't.
 //
@@ -25,7 +25,7 @@
 // "Unknown app" with no icon. There is no supported API to re-attribute a
 // WebView2 media session to the host app (WebView2Feedback #2236, open since
 // 2022). Creating the SMTC ourselves, bound to the host process's main window,
-// makes Windows resolve the tile to YTubic's own executable identity (name +
+// makes Windows resolve the tile to adrify's own executable identity (name +
 // icon). Chromium's competing "Unknown app" tile is suppressed by disabling its
 // media session via `--disable-features=...MediaSessionService` on the main
 // window (see `additionalBrowserArgs` in tauri.conf.json).
@@ -76,8 +76,8 @@ pub fn init(app: &AppHandle) {
             .map(|h| h.0 as *mut std::ffi::c_void);
 
         let config = PlatformConfig {
-            dbus_name: "ytubic",
-            display_name: "YTubic",
+            dbus_name: "adrify",
+            display_name: "adrify",
             hwnd,
         };
 
@@ -215,7 +215,7 @@ fn apply(app: &AppHandle, now: NowPlaying) {
 
 fn clear(app: &AppHandle) {
     LAST_META.with(|m| *m.borrow_mut() = None);
-    set_window_title(app, "YTubic");
+    set_window_title(app, "adrify");
     #[cfg(windows)]
     crate::thumbbar::set_state(false, false, crate::thumbbar::Repeat::Off, false);
     CONTROLS.with(|cell| {
@@ -228,7 +228,7 @@ fn clear(app: &AppHandle) {
 /// The main window only: the floating player keeps its own title.
 fn set_window_title(app: &AppHandle, title: &str) {
     // Windows only: the title feeds the taskbar thumbnail. Elsewhere it would
-    // rename the taskbar entry / task switcher label away from "YTubic".
+    // rename the taskbar entry / task switcher label away from "adrify".
     #[cfg(windows)]
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_title(title);

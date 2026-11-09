@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/branding/ytubic-icon.svg" alt="YTubic" width="96" />
+  <img src="assets/branding/adrify-logo.png" alt="adrify" width="96" />
 </p>
 
-<h1 align="center">YTubic</h1>
+<h1 align="center">adrify</h1>
 
 <p align="center">
   A fast, responsive YouTube Music desktop client for Windows and Linux.
@@ -17,13 +17,13 @@
     <img src="https://img.shields.io/badge/%E2%AC%87%20Download-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Download" height="60" />
   </a>
   <a href="https://discord.gg/v7JGAWWWj">
-    <img src="https://img.shields.io/badge/Join%20the%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the YTubic Discord" height="60" />
+    <img src="https://img.shields.io/badge/Join%20the%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the adrify Discord" height="60" />
   </a>
 </p>
 
-Built as a reaction to the sluggish webview-wrapper experience — YTubic talks to YouTube's InnerTube API directly, renders its own UI, and caches aggressively, so navigation and playback feel instant.
+Built as a reaction to the sluggish webview-wrapper experience — adrify talks to YouTube's InnerTube API directly, renders its own UI, and caches aggressively, so navigation and playback feel instant.
 
-![YTubic — artist page with the player and synced lyrics](assets/screenshots/artist-page.jpg)
+![adrify — artist page with the player and synced lyrics](assets/screenshots/artist-page.jpg)
 
 ## What this fork adds
 
@@ -56,7 +56,7 @@ original, it adds:
 - **Desktop integration** — media keys and Now Playing controls (SMTC on Windows, MPRIS on Linux), tray icon, single instance
 - **Auto-updates** — the app updates itself from GitHub Releases, and keeps its yt-dlp copy fresh automatically
 
-> **Disclaimer:** YTubic is an unofficial client. It is not affiliated with,
+> **Disclaimer:** adrify is an unofficial client. It is not affiliated with,
 > endorsed by, or sponsored by Google or YouTube. "YouTube" and "YouTube Music"
 > are trademarks of Google LLC. The app streams audio through
 > [yt-dlp](https://github.com/yt-dlp/yt-dlp) and may stop working at any time if
@@ -73,7 +73,7 @@ Download the latest installer from the [Releases](../../releases) page and run i
   key.
 - **Linux (beta):** install the `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE), or
   run the `AppImage` directly. On Arch, install from the
-  [AUR](https://aur.archlinux.org/packages/ytubic) (`yay -S ytubic`).
+  [AUR](https://aur.archlinux.org/packages/adrify) (`yay -S adrify`).
   Requires WebKitGTK 4.1 + GTK 3, plus the
   GStreamer "good" and "base" plugins (and `gst-libav`) — WebKitGTK decodes
   audio through GStreamer, so without `autoaudiosink` + the WebM/Opus/AAC

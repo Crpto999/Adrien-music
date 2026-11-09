@@ -108,7 +108,7 @@ function DropdownMenuCheckboxItem({
       {children}
       <span className="pointer-events-none ms-auto flex size-4 shrink-0 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
-          <IconCheck className="size-4 text-acc1!" stroke={2.4} />
+          <IconCheck className="size-4 text-active!" stroke={2.4} />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
     </DropdownMenuPrimitive.CheckboxItem>
@@ -140,7 +140,7 @@ function DropdownMenuRadioItem({
       {children}
       <span className="pointer-events-none ms-auto flex size-4 shrink-0 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
-          <IconCheck className="size-4 text-acc1!" stroke={2.4} />
+          <IconCheck className="size-4 text-active!" stroke={2.4} />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
     </DropdownMenuPrimitive.RadioItem>

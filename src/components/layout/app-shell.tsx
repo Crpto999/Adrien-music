@@ -24,6 +24,7 @@ import { EntityPageHeader } from "@/components/layout/entity-page-header";
 import { useEntityHeaderStore } from "@/lib/store/entity-header";
 import { ChannelPickerDialog } from "@/components/layout/channel-picker-dialog";
 import { CoverLightboxDialog } from "@/components/layout/cover-lightbox-dialog";
+import { FullscreenPlayer } from "@/components/layout/fullscreen-loader";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAudioEngine } from "@/lib/audio-engine";
@@ -106,11 +107,6 @@ const SettingsDialog = lazy(() =>
     default: mod.SettingsDialog,
   })),
 );
-const FullscreenPlayer = lazy(() =>
-  import("@/components/layout/fullscreen-player").then((mod) => ({
-    default: mod.FullscreenPlayer,
-  })),
-);
 
 function MountOnceOpened({
   open,
@@ -169,6 +165,35 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [pathname]);
+
+  // How much room the bottom bar takes off the bottom of the window.
+  // The bar is in the normal flow, so the content column above it
+  // shrinks on its own — but the SIDEBAR is `position: fixed` (see
+  // index.css) and would keep running to the window's bottom edge,
+  // under the bar. Measuring the bar and telling the sidebar to stop
+  // that much higher keeps the two from overlapping.
+  //
+  // The measured value is the bar's box PLUS its bottom margin: the
+  // margin is the gap between the bar and the window edge, and the
+  // sidebar has to clear the whole thing.
+  const bottomBarRef = useRef<HTMLElement>(null);
+  const [bottomBarHeight, setBottomBarHeight] = useState(0);
+  useLayoutEffect(() => {
+    const el = bottomBarRef.current;
+    if (!el) {
+      setBottomBarHeight(0);
+      return;
+    }
+    const measure = () => {
+      const styles = getComputedStyle(el);
+      const margin = parseFloat(styles.marginBottom) || 0;
+      setBottomBarHeight(el.offsetHeight + margin);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mode, hasTrack]);
 
   // Open / close the floating player window. We only spawn it when
   // there's actually something to show — at first launch with mode
@@ -238,7 +263,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     bind<{ id: string }>("nav:artist", ({ id }) =>
       navigate({ to: "/artist/$id", params: { id } }),
     );
-    // Ported from upstream 6f4f2fb: album deep links (ytubic:// + universal)
+    // Ported from upstream 6f4f2fb: album deep links (adrify:// + universal)
     // need the same floating-window short-circuit as artists.
     bind<{ id: string }>("nav:album", ({ id }) =>
       navigate({ to: "/album/$id", params: { id } }),
@@ -255,9 +280,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         style={
           {
             "--sidebar-width": `${sidebarWidth}px`,
-            // Ported from upstream 6f4f2fb: rail is 56px (3.5rem) with
-            // 36x28 rows so a row reads as a pill. Fork was 4rem.
-            "--sidebar-width-icon": "3.5rem",
+            // The rail is 64px (4rem): the floating variant's own 8px
+            // padding on each side and the group's 10px inset leave a
+            // 28px content column, which holds the 24px rail marks.
+            // Upstream's 56px rail only had room for a 16px icon, which
+            // read as a column of specks.
+            "--sidebar-width-icon": "4rem",
+            // How much of the window's bottom the full-width bar
+            // covers. The sidebar is `position: fixed` and would
+            // otherwise run under it (see the ResizeObserver above).
+            "--bottom-bar-h": `${bottomBarHeight}px`,
           } as React.CSSProperties
         }
       >
@@ -311,7 +343,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                     (our horizontal carousels would never clip). */}
                 <EntityScroller mainRef={mainRef}>{children}</EntityScroller>
               </div>
-              {mode === "bottom" && hasTrack && <PlayerBarBottom />}
             </div>
             {mode === "right" && hasTrack && (
               <>
@@ -321,8 +352,23 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
             {mode === "floating" && hasTrack && <FloatingPlayerSync />}
           </div>
+          {/* The bottom bar is the one layout that spans the whole
+              window: the sidebar and the content column sit ABOVE it,
+              so the bar runs the full width, under the sidebar too.
+              Every other layout keeps the player inside the content
+              column, to the right of the sidebar. */}
+          {mode === "bottom" && hasTrack && (
+            <PlayerBarBottom ref={bottomBarRef} />
+          )}
           <DragSnapOverlay />
-          <MountOnceOpened open={fullscreenOpen}>
+          {/* Mounted as soon as there is a track, not on first open: the
+              view's chunk then has time to load before the user reaches
+              for the cover. A lazy mount would land the full-screen
+              cover a commit or two after the click, and motion can only
+              play the shared-element flight when both ends exist in the
+              same commit — so the very first expand would be a cut
+              instead of a travel. */}
+          <MountOnceOpened open={hasTrack || fullscreenOpen}>
             <FullscreenPlayer />
           </MountOnceOpened>
           <WindowResizeHandles disabled={IS_MAC} />
@@ -495,7 +541,11 @@ function SidebarResizeHandle() {
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
       className="absolute top-(--titlebar-h) bottom-0 z-20 w-1.5 -translate-x-1/2 cursor-ew-resize touch-none select-none hover:bg-sidebar-border/70 active:bg-sidebar-border"
-      style={{ left: sidebarWidth - 8 }}
+      // Stops at the bottom bar's top edge when that bar is up, so the
+      // two don't overlap. The bar's height is published as a custom
+      // property (see AppShell), which keeps this component free of the
+      // measurement plumbing.
+      style={{ left: sidebarWidth - 8, bottom: "var(--bottom-bar-h, 0px)" }}
     />
   );
 }

@@ -6,6 +6,7 @@ import { authLoggedInQuery } from "@/lib/store/auth-queries";
 import { AnimatedTabs } from "@/components/ui/animated-tabs";
 import { Button } from "@/components/ui/button";
 import { ShelfCard } from "@/components/shared/shelf-card";
+import { PageSearchBox } from "@/components/shared/page-search-box";
 import { TrackList } from "@/components/shared/track-list";
 import {
   ShelfCardSkeleton,
@@ -43,9 +44,15 @@ function LibraryPage() {
 
   return (
     <div className="flex flex-col gap-6 px-6 pb-6 pt-3">
-      <h1 className="text-3xl font-bold tracking-tight">
-        {t("library.title")}
-      </h1>
+      {/* Title and search entry point share one row: the box is the
+          page's main action, so it belongs beside the heading rather
+          than under it. */}
+      <div className="flex items-center gap-4">
+        <h1 className="shrink-0 text-3xl font-bold tracking-tight">
+          {t("library.title")}
+        </h1>
+        <PageSearchBox className="min-w-0 flex-1 sm:max-w-xl" />
+      </div>
       <AnimatedTabs
         activeTab={tab}
         onChange={setTab}

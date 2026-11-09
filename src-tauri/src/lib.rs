@@ -203,7 +203,7 @@ mod secure_store {
         use base64::Engine as _;
         use keyring::Entry;
 
-        let entry = Entry::new("ytubic", "cookies-master-key")
+        let entry = Entry::new("adrify", "cookies-master-key")
             .map_err(|e| format!("keyring entry: {e}"))?;
 
         match entry.get_password() {
@@ -1584,7 +1584,7 @@ async fn open_player_window(
         "player",
         WebviewUrl::App("index.html?floating-player=1".into()),
     )
-    .title("YTubic — player")
+    .title("adrify — player")
     .decorations(false)
     .inner_size(360.0, 720.0)
     .min_inner_size(320.0, 560.0)
@@ -2133,7 +2133,7 @@ async fn set_cache_dir(
             tokio::fs::create_dir_all(&dir)
                 .await
                 .map_err(|e| format!("Can't create the folder: {e}"))?;
-            let probe = dir.join(".ytubic-write-test");
+            let probe = dir.join(".adrify-write-test");
             tokio::fs::write(&probe, b"ok")
                 .await
                 .map_err(|e| format!("Folder isn't writable: {e}"))?;
@@ -3891,7 +3891,7 @@ fn runtime_icon(app: &tauri::AppHandle) -> tauri::image::Image<'static> {
 }
 
 fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
-    let show_item = MenuItem::with_id(app, "show", "Show YTubic", true, None::<&str>)?;
+    let show_item = MenuItem::with_id(app, "show", "Show adrify", true, None::<&str>)?;
     let play_item = MenuItem::with_id(app, "play_pause", "Play / Pause", true, Some("Space"))?;
     let prev_item = MenuItem::with_id(app, "prev", "Previous", true, None::<&str>)?;
     let next_item = MenuItem::with_id(app, "next", "Next", true, None::<&str>)?;
@@ -3906,9 +3906,9 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let _tray = TrayIconBuilder::with_id("main-tray")
         .icon(runtime_icon(app))
         .tooltip(if cfg!(debug_assertions) {
-            "YTubic (dev)"
+            "adrify (dev)"
         } else {
-            "YTubic"
+            "adrify"
         })
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -3951,7 +3951,7 @@ pub fn run() {
     linux_graphics::configure();
 
     // Register + pin the app's Windows identity (AppUserModelID) so the SMTC
-    // media tile (and notifications, taskbar) resolve to "YTubic" + icon rather
+    // media tile (and notifications, taskbar) resolve to "adrify" + icon rather
     // than "Unknown app". Must run before any window is created. No-op off
     // Windows.
     appid::init();
@@ -3963,7 +3963,7 @@ pub fn run() {
 
     tauri::Builder::default()
         // The `deep-link` feature forwards the second instance's argv
-        // (a `ytubic://` URL) to the deep-link plugin, so the running app
+        // (a `adrify://` URL) to the deep-link plugin, so the running app
         // receives it as a `deep-link://new-url` event.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main_window(app);
@@ -4093,7 +4093,7 @@ pub fn run() {
             logging::init(&log_dir);
             log!(
                 "[app] starting up; log file at {:?}",
-                log_dir.join("ytubic.log")
+                log_dir.join("adrify.log")
             );
             // User-chosen cache root (Settings → Storage) or the OS
             // default. Captured once and exposed as managed state so
@@ -4147,7 +4147,7 @@ pub fn run() {
             // main-thread-only (COM + a subclass on the main window's HWND).
             #[cfg(windows)]
             thumbbar::init(app.handle());
-            // The NSIS installer registers `ytubic://` for release builds;
+            // The NSIS installer registers `adrify://` for release builds;
             // dev runs and Linux need the runtime registration.
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
             {

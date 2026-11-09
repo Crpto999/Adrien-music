@@ -99,7 +99,7 @@ function LanguageRow() {
               <DropdownMenuItem key={id} onSelect={() => setLocale(id)}>
                 <span className="flex-1 truncate">{LOCALE_LABELS[id]}</span>
                 {locale === id ? (
-                  <IconCheck className="size-4 text-acc1!" stroke={2.4} />
+                  <IconCheck className="size-4 text-active!" stroke={2.4} />
                 ) : null}
               </DropdownMenuItem>
             ))}

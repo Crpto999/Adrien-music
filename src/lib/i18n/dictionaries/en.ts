@@ -10,7 +10,7 @@
  */
 export const en = {
   app: {
-    name: "YTubic",
+    name: "adrify",
     tagline: "A fast YouTube Music client for the desktop",
   },
 
@@ -80,7 +80,6 @@ export const en = {
     volume: "Volume",
     mute: "Mute",
     unmute: "Unmute",
-    fullScreen: "Full screen",
     lyrics: "Lyrics",
     share: "Share",
     about: "About",
@@ -254,6 +253,7 @@ export const en = {
     title: "Theme",
     light: "Light",
     dark: "Dark",
+    cyberpunk: "Cyberpunk",
     system: "System",
   },
 
@@ -271,7 +271,7 @@ export const en = {
   },
 
   about: {
-    title: "About YTubic",
+    title: "About adrify",
     version: "Version {version}",
     betaFor: "beta for {platform}",
     description:
@@ -300,7 +300,7 @@ export const en = {
   channel: {
     chooseTitle: "Choose a channel",
     chooseDesc:
-      "Your library, likes and recommendations belong to the channel, not the account. Pick the one YTubic should use.",
+      "Your library, likes and recommendations belong to the channel, not the account. Pick the one adrify should use.",
     couldNotLoad:
       "Couldn't load the channel list. Check your connection and try again.",
     brandChannel: "Brand channel",
@@ -520,7 +520,7 @@ export const en = {
     reportThanks:
       "Thanks! Finish submitting the issue in your browser.",
     lastfmAuthorized:
-      "Authorize YTubic in the browser tab that opened — linking will finish automatically.",
+      "Authorize adrify in the browser tab that opened — linking will finish automatically.",
     lastfmDisconnected: "Disconnected from Last.fm",
     lastfmMissingCredentials:
       "Enter your Last.fm API key and shared secret first.",
@@ -567,16 +567,16 @@ export const en = {
     },
     general: {
       launchAtStartup: "Launch at startup",
-      launchAtStartupDesc: "Start YTubic automatically when you log in.",
+      launchAtStartupDesc: "Start adrify automatically when you log in.",
       playbackNotifications: "Playback notifications",
       playbackNotificationsDesc:
         "Show a system notification when the track changes in the background.",
       closeToTray: "Close to tray",
       closeToMenuBar: "Close to menu bar",
       closeToTrayDesc:
-        "Hide YTubic to the tray when you press ✕ instead of quitting.",
+        "Hide adrify to the tray when you press ✕ instead of quitting.",
       closeToMenuBarDesc:
-        "Hide YTubic to the menu bar when you close the window instead of quitting.",
+        "Hide adrify to the menu bar when you close the window instead of quitting.",
       automaticUpdates: "Automatic updates",
       automaticUpdatesDesc:
         "Download updates quietly and install them on your next restart.",
@@ -614,7 +614,7 @@ export const en = {
       equalizerDesc:
         "Shape the sound with a preset, or tune the bands yourself.",
       outputDevice: "Output device",
-      outputDeviceDesc: "Where audio is sent when YTubic starts playing.",
+      outputDeviceDesc: "Where audio is sent when adrify starts playing.",
       backButton: "Back button",
       backButtonDesc: "What happens when you press previous mid-track.",
       resumeWhereYouLeftOff: "Resume where you left off",
@@ -640,7 +640,7 @@ export const en = {
     },
     appearance: {
       theme: "Theme",
-      themeDesc: "Choose light or dark, or follow your OS preference.",
+      themeDesc: "Pick a theme, or follow your OS preference.",
       ambientBackground: "Ambient background",
       ambientBackgroundDesc:
         "Tint the window with the current album art, or keep it plain.",
@@ -746,7 +746,7 @@ export const en = {
         "Send plays and now-playing updates to Last.fm.",
       loveLikedTracks: "Love liked tracks",
       loveLikedTracksDesc:
-        "When you like a song in YTubic, also love it on Last.fm.",
+        "When you like a song in adrify, also love it on Last.fm.",
       syncLovedTracks: "Sync loved tracks",
       apiKey: "Your Last.fm API key",
       apiSecret: "Your Last.fm shared secret",
@@ -794,7 +794,7 @@ export const en = {
       presenceNameHint:
         "The name in \"<verb> NAME\" — independent of whatever the Discord application above is actually named.",
       clientIdHint:
-        "Pre-filled with YTubic's own Discord application. Don't change this unless you know what you're doing — it only needs to change if you're intentionally presenting as a different Discord app (e.g. one you registered yourself).",
+        "Pre-filled with adrify's own Discord application. Don't change this unless you know what you're doing — it only needs to change if you're intentionally presenting as a different Discord app (e.g. one you registered yourself).",
       listening: "Listening",
       playing: "Playing",
       watching: "Watching",

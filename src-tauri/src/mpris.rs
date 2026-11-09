@@ -8,10 +8,10 @@
 // WebKit's player never matches and the hover tooltip has no media controls.
 //
 // So on KDE we register a second player from the host process: owner pid is
-// ours, `DesktopEntry` is YTubic's, and `kde:pid` carries the pid of WebKit's
+// ours, `DesktopEntry` is adrify's, and `kde:pid` carries the pid of WebKit's
 // player. Plasma hides every player whose owner pid appears in some player's
 // `kde:pid` (the same rule plasma-browser-integration relies on), so WebKit's
-// bare entry disappears and this one is the single YTubic player.
+// bare entry disappears and this one is the single adrify player.
 //
 // Not KDE: other desktops ignore `kde:pid`, so a second player would show up as
 // a duplicate there. `init` does nothing and `update` / `clear` are no-ops.
@@ -26,7 +26,7 @@ use zbus::zvariant::{ObjectPath, OwnedValue, Value};
 const PATH: &str = "/org/mpris/MediaPlayer2";
 const PLAYER_IFACE: &str = "org.mpris.MediaPlayer2.Player";
 const NO_TRACK: &str = "/org/mpris/MediaPlayer2/TrackList/NoTrack";
-const TRACK_ID: &str = "/org/ytubic/track/current";
+const TRACK_ID: &str = "/org/adrify/track/current";
 /// Position jumps larger than this versus the extrapolated one are reported
 /// as `Seeked` so clients re-sync their progress bar.
 const SEEK_THRESHOLD_US: i64 = 2_000_000;
@@ -156,12 +156,12 @@ impl Root {
 
     #[zbus(property)]
     fn identity(&self) -> &str {
-        "YTubic"
+        "adrify"
     }
 
     #[zbus(property)]
     fn desktop_entry(&self) -> &str {
-        "YTubic"
+        "adrify"
     }
 
     #[zbus(property)]
@@ -311,7 +311,7 @@ pub fn init(app: &AppHandle) {
         return;
     }
     let state: Shared = Arc::new(Mutex::new(State::default()));
-    let name = format!("org.mpris.MediaPlayer2.ytubic.instance{}", std::process::id());
+    let name = format!("org.mpris.MediaPlayer2.adrify.instance{}", std::process::id());
     let built = zbus::blocking::connection::Builder::session()
         .and_then(|b| b.name(name))
         .and_then(|b| b.serve_at(PATH, Root { app: app.clone() }))

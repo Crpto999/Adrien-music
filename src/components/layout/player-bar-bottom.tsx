@@ -23,10 +23,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Thumbnail,
-  getRenderedThumbnailSrc,
-} from "@/components/shared/thumbnail";
 import { LikeDislikeButtons } from "@/components/shared/like-buttons";
 import { ArtistLinks } from "@/components/shared/artist-links";
 import { AlbumLink } from "@/components/shared/album-link";
@@ -46,11 +42,15 @@ import {
 } from "@/components/layout/player-bar";
 import { PlayerMoreMenu } from "@/components/layout/player-more-menu";
 import { PlayerCoverMenu } from "@/components/layout/player-cover-menu";
+import {
+  NowPlayingCover,
+} from "@/components/shared/now-playing-cover";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { playerIconButton } from "@/components/layout/player-chrome";
 import { usePlayerCoverDrag } from "@/lib/player-drag";
-import { openCoverLightbox } from "@/lib/store/cover-lightbox";
+import { isBlankClick } from "@/lib/blank-click";
+import { openFullscreen } from "@/lib/store/fullscreen";
 import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
 
 /**
@@ -64,7 +64,11 @@ import { usePlaybackStore, currentTrack } from "@/lib/store/playback";
  * cluster sits dead-center because the left and right wing sections
  * both use `flex-1`.
  */
-export function PlayerBarBottom() {
+export function PlayerBarBottom({
+  ref,
+}: {
+  ref?: React.Ref<HTMLElement>;
+}) {
   const t = useT();
   const { playing, status, error, duration, shuffle, repeat } =
     usePlaybackStore(
@@ -88,11 +92,14 @@ export function PlayerBarBottom() {
   const iTunesCover = useITunesCover(track);
   const lyricsState = useLyricsView(track);
   const coverRef = useRef<HTMLDivElement>(null);
+  // A plain click on the cover opens the full-screen view — that is
+  // the cover's job now, rather than opening a raw image preview.
+  // The bottom bar hugs the bottom edge, so the cover travels UP into
+  // the view.
   const { onPointerDown: onCoverPointerDown } = usePlayerCoverDrag({
     onClick: () => {
       if (!track) return;
-      const url = getRenderedThumbnailSrc(coverRef.current);
-      if (url) openCoverLightbox(url, track.title);
+      openFullscreen("bottom");
     },
   });
 
@@ -109,12 +116,10 @@ export function PlayerBarBottom() {
     // repeat) and the ones from imported components (Like, Lyrics,
     // Queue, Volume, More). Matches the right-card's translucent
     // white feel.
-    // Right margin only (`mr-2` = 8px) matches the sidebar's own
-    // 8px inset from the window edges. The sidebar's `data-slot=sidebar-container`
-    // already eats 8px on its right side via shadcn's `p-2`, so a 0px
-    // left margin here lands the bar's left edge 8px away from the
-    // sidebar's visible right edge — symmetric with how the sidebar
-    // sits 8px from the window-left.
+    // The bar spans the WHOLE window in this layout: the sidebar and
+    // the content column sit above it. So it insets 8px on both sides
+    // (the sidebar's own inset from the window-left) and 8px from the
+    // bottom — a uniform frame around the bar.
     // SidebarProvider injects a nested TooltipProvider with delay=0
     // that shadows the outer slow one — wrap this surface so its
     // tooltips honor the intended 1s delay. `skipDelayDuration={0}`
@@ -123,7 +128,21 @@ export function PlayerBarBottom() {
     // pop up instantly otherwise).
     <TooltipProvider delayDuration={800} skipDelayDuration={0}>
     <aside
-      className="relative z-10 mr-2 mb-2 flex shrink-0 flex-col gap-2 rounded-[10px] border border-sidebar-border bg-surface px-4 py-3 shadow-sm"
+      ref={ref}
+      className="relative z-10 mx-2 mb-2 flex shrink-0 flex-col gap-2 rounded-[10px] border border-sidebar-border bg-surface px-4 py-3 shadow-sm"
+      // Clicking the bar's blank surface opens the full-screen view.
+      // The click target is checked so a click on a button, a link or
+      // the progress slider never opens it by accident.
+      onClick={(e) => {
+        if (!track) return;
+        // The cover is handled by the drag hook, which tells a click
+        // apart from a drag. A native click ALSO fires after a drag
+        // that relocated the player, so letting the cover through here
+        // would open the full-screen view after every layout drag.
+        if (coverRef.current?.contains(e.target as Node)) return;
+        if (!isBlankClick(e.target)) return;
+        openFullscreen("bottom");
+      }}
     >
       {status === "error" && error ? (
         <div className="absolute -top-9 left-3 right-3 truncate rounded-md bg-destructive/90 px-3 py-1 text-xs text-destructive-foreground shadow">
@@ -146,16 +165,13 @@ export function PlayerBarBottom() {
             <div
               ref={coverRef}
               onPointerDown={onCoverPointerDown}
-              className="shrink-0 touch-none select-none cursor-zoom-in"
+              className="shrink-0 touch-none select-none"
             >
               {track ? (
-                <Thumbnail
-                  thumbnails={track.thumbnails}
-                  alt={track.title}
-                  className="size-14 shrink-0 rounded-md border border-hairline pointer-events-none"
-                  targetSize={256}
-                  highRes
-                  overrideHighRes={iTunesCover}
+                <NowPlayingCover
+                  track={track}
+                  override={iTunesCover}
+                  className="size-14 shrink-0 rounded-md border border-hairline"
                 />
               ) : (
                 <div className="size-14 shrink-0 rounded-md border border-hairline bg-muted" />
@@ -214,7 +230,7 @@ export function PlayerBarBottom() {
             aria-label={playing ? t("action.pause") : t("action.play")}
             onClick={toggle}
             disabled={!hasTrack}
-            className="size-12 rounded-full bg-brand text-white hover:bg-brand/90"
+            className="size-12 rounded-full bg-brand text-brand-foreground hover:bg-brand/90"
           >
             {loading ? (
               <IconLoader2 className="animate-spin" />
@@ -261,7 +277,7 @@ export function PlayerBarBottom() {
           ) : null}
           <LyricsPopover state={lyricsState} />
           <QueuePopover />
-          <VolumeControl direction="vertical" />
+          <VolumeControl />
           <PlayerMoreMenu track={track} />
         </div>
       </div>

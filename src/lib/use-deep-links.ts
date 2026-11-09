@@ -6,7 +6,7 @@ import { fetchRadio } from "@/lib/innertube/radio";
 import { usePlaybackStore } from "@/lib/store/playback";
 import { translate } from "@/lib/i18n";
 
-/** Route `ytubic://` links into the app: play a track or open a page. */
+/** Route `adrify://` links into the app: play a track or open a page. */
 export function useDeepLinks() {
   const navigate = useNavigate();
   useEffect(() => {

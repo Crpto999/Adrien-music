@@ -1,4 +1,3 @@
-import { useTheme } from "next-themes";
 import {
   IconAppWindowFilled,
   IconCheck,
@@ -24,9 +23,14 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Group, SettingRow, TabPane } from "@/components/settings/primitives";
 import { INTERFACE_FONTS, interfaceFontStack } from "@/lib/interface-font";
+import {
+  ThemeGlyph,
+  useThemeChoices,
+} from "@/components/shared/theme-choices";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type LayoutMode } from "@/lib/store/layout";
+import { SYSTEM_THEME_ID, useThemeStore } from "@/lib/theme";
 import {
   useSettingsStore,
   type FullscreenLayout,
@@ -61,7 +65,9 @@ const RATING_OPTIONS = (
 
 export function AppearanceTab() {
   const t = useT();
-  const { theme, setTheme } = useTheme();
+  const { options, labelFor } = useThemeChoices();
+  const themeId = useThemeStore((s) => s.themeId);
+  const setThemeId = useThemeStore((s) => s.setThemeId);
   const background = useSettingsStore((s) => s.background);
   const setBackground = useSettingsStore((s) => s.setBackground);
   const rating = useSettingsStore((s) => s.ratingButtons);
@@ -84,18 +90,49 @@ export function AppearanceTab() {
           title={t("settings.appearance.theme")}
           description={t("settings.appearance.themeDesc")}
           control={
-            <SegmentedControl
-              // `theme` is undefined during the very first render
-              // (next-themes resolves it on mount) — fall back to
-              // "system" so the control never renders empty.
-              value={theme ?? "system"}
-              onChange={setTheme}
-              options={[
-                { value: "light", label: t("theme.light") },
-                { value: "dark", label: t("theme.dark") },
-                { value: "system", label: t("theme.system") },
-              ]}
-            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-8 w-[196px] cursor-pointer items-center gap-2 rounded-[10px] border border-w090 bg-w040 px-3 text-[13px] text-t2 transition-colors duration-[140ms] hover:bg-w070 data-[state=open]:border-w200"
+                >
+                  <ThemeGlyph id={themeId} className="size-4 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {themeId === SYSTEM_THEME_ID
+                      ? t("theme.system")
+                      : labelFor(
+                          options.find((o) => o.id === themeId) ?? {
+                            id: themeId,
+                            labelKey: "theme.dark",
+                            scheme: "dark" as const,
+                          },
+                        )}
+                  </span>
+                  <IconChevronDown className="size-3 shrink-0 text-t6" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[232px]">
+                {options.map((opt) => (
+                  <DropdownMenuItem
+                    key={opt.id}
+                    onSelect={() => setThemeId(opt.id)}
+                  >
+                    <ThemeGlyph id={opt.id} className="size-4 shrink-0" />
+                    <span className="flex-1 truncate">{labelFor(opt)}</span>
+                    {themeId === opt.id ? (
+                      <IconCheck className="size-4 text-active!" stroke={2.4} />
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem onSelect={() => setThemeId(SYSTEM_THEME_ID)}>
+                  <ThemeGlyph id={SYSTEM_THEME_ID} className="size-4 shrink-0" />
+                  <span className="flex-1 truncate">{t("theme.system")}</span>
+                  {themeId === SYSTEM_THEME_ID ? (
+                    <IconCheck className="size-4 text-active!" stroke={2.4} />
+                  ) : null}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           }
         />
         <InterfaceFontRow />
@@ -229,7 +266,7 @@ function LayoutTile({
         className={cn(
           "relative h-[136px] overflow-hidden rounded-[11px] border transition-[border-color,box-shadow] duration-150",
           on
-            ? "border-[rgba(var(--acc1rgb),0.7)] shadow-[0_0_0_3px_rgba(var(--acc1rgb),0.16)]"
+            ? "border-active/70 shadow-[0_0_0_3px_rgba(var(--active-rgb),0.16)]"
             : "border-w080 group-hover/tile:border-w160",
         )}
         style={{ background: DUSK_WASH }}
@@ -243,7 +280,7 @@ function LayoutTile({
           {children}
         </div>
         {on ? (
-          <span className="absolute right-2 top-2 grid size-[18px] place-items-center rounded-full bg-acc1 text-white">
+          <span className="absolute right-2 top-2 grid size-[18px] place-items-center rounded-full bg-active text-active-foreground">
             <IconCheck className="size-[11px]" stroke={3} />
           </span>
         ) : null}
@@ -384,7 +421,7 @@ function MiniPrevNext({ on }: { on: boolean }) {
         className={cn(
           "grid size-3.5 shrink-0 place-items-center rounded-full",
           on
-            ? "bg-acc1 shadow-[0_4px_10px_-3px_rgba(var(--acc1rgb),0.7)]"
+            ? "bg-active shadow-[0_4px_10px_-3px_rgba(var(--active-rgb),0.7)]"
             : "bg-white/22",
         )}
       >
@@ -610,7 +647,7 @@ function MiniTransport({ on }: { on: boolean }) {
           className={cn(
             "grid size-5 place-items-center rounded-full",
             on
-              ? "bg-acc1 shadow-[0_4px_10px_-3px_rgba(var(--acc1rgb),0.7)]"
+              ? "bg-active shadow-[0_4px_10px_-3px_rgba(var(--active-rgb),0.7)]"
               : "bg-white/22",
           )}
         >
@@ -722,7 +759,7 @@ function InterfaceFontRow() {
               >
                 <span className="flex-1 truncate">{f.label}</span>
                 {font === f.id ? (
-                  <IconCheck className="size-4 text-acc1!" stroke={2.4} />
+                  <IconCheck className="size-4 text-active!" stroke={2.4} />
                 ) : null}
               </DropdownMenuItem>
             ))}

@@ -117,7 +117,12 @@ export function AnimatedTabs({
   const getIndicatorStyles = () =>
     cn(
       "absolute",
-      variant === "underline" && "right-0 -bottom-px left-0 h-0.5 bg-brand",
+      // The spec's Tab recipe: the active label takes the soft brand
+      // colour, and the underline indicator is the *emphasis* hue with
+      // a cyan glow under it — the one place the magenta is allowed to
+      // sit next to the cyan.
+      variant === "underline" &&
+        "right-0 -bottom-px left-0 h-0.5 bg-brand-accent shadow-[0_0_12px_rgba(var(--acc1rgb),0.55)]",
       variant === "pill" &&
         "inset-0 rounded-md border border-w100 bg-w100 shadow-sm",
       variant === "segment" &&

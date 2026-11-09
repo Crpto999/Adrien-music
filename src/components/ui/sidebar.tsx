@@ -491,8 +491,21 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 // transparent, hover `--w050`/`--t3`, active `--w070`/`--t1` at weight
 // 600. The active row is marked by its fill and weight alone — no
 // accent rail, so every row keeps the same left inset.
+//
+// The glyph is 24px, matching the *visible* size of the app mark
+// above it: the artwork in the logo file occupies ~61% of its box, so
+// a 40px logo element shows a 24px mark — sizing the glyph to the
+// mark's visible size (rather than to some element box) is what keeps
+// the rail reading as one column of equal marks.
+//
+// The label keeps its 13.5px caption size: with the glyph now at 24px
+// the ratio between them reads as a heading-and-caption pair rather
+// than two competing elements. The row grows to 32px so the 24px mark
+// has room to breathe. On the collapsed rail the row's own paddings
+// drop to zero and the mark centres on the rail's axis; the label's
+// column collapses to zero width (its fade is handled in index.css).
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button relative grid w-full grid-cols-[32px_minmax(0,1fr)_auto] content-center items-center gap-0.5 overflow-hidden rounded-md py-2 ps-0.5 pe-2.5 text-left text-[13.5px] font-medium text-t5 ring-sidebar-ring outline-hidden group-has-data-[sidebar=menu-action]/menu-item:pr-8 [&>*:first-child]:justify-self-center hover:bg-w050 hover:text-t3 focus-visible:ring-2 active:bg-w070 active:text-t1 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-w070 data-[active=true]:font-semibold data-[active=true]:text-t1 data-[state=open]:hover:bg-w050 data-[state=open]:hover:text-t3 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+  "peer/menu-button relative grid w-full grid-cols-[28px_minmax(0,1fr)_auto] content-center items-center gap-1 overflow-hidden rounded-md py-2 ps-0.5 pe-2.5 text-left text-[13.5px] font-medium text-t5 ring-sidebar-ring outline-hidden group-has-data-[sidebar=menu-action]/menu-item:pr-8 [&>*:first-child]:justify-self-center hover:bg-w050 hover:text-t3 focus-visible:ring-2 active:bg-w070 active:text-t1 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-w070 data-[active=true]:font-semibold data-[active=true]:text-t1 data-[state=open]:hover:bg-w050 data-[state=open]:hover:text-t3 [&>span:last-child]:truncate [&>svg]:size-6 [&>svg]:shrink-0 group-data-[collapsible=icon]:grid-cols-[minmax(0,1fr)_0px_auto] group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:ps-0 group-data-[collapsible=icon]:pe-0",
   {
     variants: {
       variant: {
@@ -501,10 +514,11 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        // 28px, not 32: the caption-sized label and 16px icon don't need
-        // the extra 4px, and the list reads denser without losing the
-        // hit target.
-        default: "h-7",
+        // 32px, not 28: the glyph is 24px now, so the row needs the
+        // extra 4px to keep the mark off the row's edges. On the rail
+        // the row grows further to hold the mark on its own.
+        default:
+          "h-8 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:py-0",
         sm: "h-7 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
       },

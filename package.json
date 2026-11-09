@@ -1,8 +1,9 @@
 {
-  "name": "ytubic",
+  "name": "adrify",
   "private": true,
   "version": "0.13.0",
   "license": "GPL-3.0-only",
+  "description": "adrify — fast, responsive YouTube Music desktop client",
   "packageManager": "pnpm@10.33.1",
   "type": "module",
   "scripts": {
@@ -10,7 +11,7 @@
     "build": "vite build && tsc --noEmit",
     "preview": "vite preview",
     "tauri": "tauri",
-    "//tauri:dev": "Runs the desktop app in dev with its OWN bundle identifier (see src-tauri/tauri.dev.conf.json). Without the override, a dev run and the installed release share %APPDATA%\\com.github.ivasy.ytubic, so both their session-refresh loops write the same accounts.json and cookies.enc and each overwrites the other's snapshot. Costs one extra sign-in for the dev instance.",
+    "//tauri:dev": "Runs the desktop app in dev with its OWN bundle identifier (see src-tauri/tauri.dev.conf.json). Without the override, a dev run and the installed release share %APPDATA%\\com.github.crpto999.adrify, so both their session-refresh loops write the same accounts.json and cookies.enc and each overwrites the other's snapshot. Costs one extra sign-in for the dev instance.",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -41,7 +42,6 @@
     "cmdk": "^1.1.1",
     "idb-keyval": "^6.3.0",
     "motion": "^12.38.0",
-    "next-themes": "^0.4.6",
     "radix-ui": "^1.4.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

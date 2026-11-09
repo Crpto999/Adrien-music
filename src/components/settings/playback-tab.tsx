@@ -312,7 +312,7 @@ function EqualizerGroup() {
                     className={cn(
                       "cursor-pointer rounded-lg border px-3 py-1.5 text-[12.5px] transition-colors duration-[140ms]",
                       on
-                        ? "border-transparent bg-[rgba(var(--acc1rgb),0.2)] font-semibold text-acc4"
+                        ? "border-transparent bg-brand-secondary/25 font-semibold text-brand-secondary-soft"
                         : "border-w070 bg-w040 font-medium text-t5 hover:bg-w070 hover:text-t3",
                     )}
                   >
@@ -442,7 +442,7 @@ function EqBand({
           style={{
             top,
             background:
-              "radial-gradient(circle at 50% 35%, var(--acc2), var(--acc1) 70%)",
+              "radial-gradient(circle at 50% 35%, var(--acc2), var(--active) 70%)",
           }}
         />
       </div>
@@ -541,7 +541,7 @@ function OutputDeviceRow() {
                 {t("settings.playback.systemDefault")}
               </span>
               {deviceId === "" ? (
-                <IconCheck className="size-4 text-acc1!" stroke={2.4} />
+                <IconCheck className="size-4 text-active!" stroke={2.4} />
               ) : null}
             </DropdownMenuItem>
             {devices.map((d) => (
@@ -551,7 +551,7 @@ function OutputDeviceRow() {
               >
                 <span className="flex-1 truncate">{d.label}</span>
                 {deviceId === d.deviceId ? (
-                  <IconCheck className="size-4 text-acc1!" stroke={2.4} />
+                  <IconCheck className="size-4 text-active!" stroke={2.4} />
                 ) : null}
               </DropdownMenuItem>
             ))}

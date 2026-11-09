@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Slider as SliderPrimitive } from "radix-ui"
+import * as React from "react";
+import { Slider as SliderPrimitive } from "radix-ui";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 // Half-width of the visible break around the thumb. The active fill
 // stops `THUMB_GAP` before the thumb's center and the inactive piece
@@ -11,14 +11,14 @@ import { cn } from "@/lib/utils"
 // side of the 6px-thick thumb. Rendering the track as two separately
 // rounded pills (instead of masking a single bar) keeps the cut ends
 // nicely radiused, matching the YouTube/Joji reference.
-const THUMB_GAP = 8
+const THUMB_GAP = 8;
 
 // Half of the thumb's thickness in px (w-1.5 / h-1.5 → 6px → 3px half).
 // Radix shifts the thumb inward by this amount near the value
 // extremes so it doesn't poke out of the track; we mirror that shift
 // so the break stays centered on the thumb's *actual* on-screen
 // position, not on the raw value percentage.
-const THUMB_HALF_PX = 3
+const THUMB_HALF_PX = 3;
 
 function Slider({
   className,
@@ -35,19 +35,18 @@ function Slider({
         : Array.isArray(defaultValue)
           ? defaultValue
           : [min, max],
-    [value, defaultValue, min, max]
-  )
+    [value, defaultValue, min, max],
+  );
 
-  const range = max - min || 1
-  const thumbPct =
-    _values.length > 0 ? ((_values[0] - min) / range) * 100 : 0
-  const isVertical = props.orientation === "vertical"
+  const range = max - min || 1;
+  const thumbPct = _values.length > 0 ? ((_values[0] - min) / range) * 100 : 0;
+  const isVertical = props.orientation === "vertical";
   // Same in-bounds clamp Radix applies: at 0% push the thumb inward
   // by +half, at 100% by -half, linear in between.
-  const thumbOffsetPx = (THUMB_HALF_PX * (50 - thumbPct)) / 50
-  const centerExpr = `calc(${thumbPct}% + ${thumbOffsetPx}px)`
-  const activeSize = `calc(${centerExpr} - ${THUMB_GAP}px)`
-  const inactiveStart = `calc(${centerExpr} + ${THUMB_GAP}px)`
+  const thumbOffsetPx = (THUMB_HALF_PX * (50 - thumbPct)) / 50;
+  const centerExpr = `calc(${thumbPct}% + ${thumbOffsetPx}px)`;
+  const activeSize = `calc(${centerExpr} - ${THUMB_GAP}px)`;
+  const inactiveStart = `calc(${centerExpr} + ${THUMB_GAP}px)`;
 
   return (
     <SliderPrimitive.Root
@@ -67,24 +66,33 @@ function Slider({
         "before:absolute before:content-['']",
         "data-[orientation=horizontal]:before:-inset-y-2 data-[orientation=horizontal]:before:inset-x-0",
         "data-[orientation=vertical]:before:-inset-x-2 data-[orientation=vertical]:before:inset-y-0",
-        className
+        className,
       )}
       {...props}
     >
       <SliderPrimitive.Track
         className={cn(
-          "relative grow data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
+          "relative grow data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5",
         )}
       >
-        {/* Active (filled) pill — grows from the start to the thumb gap. */}
+        {/* Active (filled) pill — grows from the start to the thumb gap.
+            The fill is a gradient token rather than a flat colour, so a
+            theme can paint it with the brand sweep (the spec puts the
+            gradient on the playhead) without this component knowing
+            about themes. `bg-primary` stays underneath as the
+            fallback for a browser that drops the image. */}
         <div
           data-slot="slider-range"
           aria-hidden
           className={cn(
             "absolute rounded-full bg-primary",
-            isVertical ? "inset-x-0 bottom-0" : "inset-y-0 left-0"
+            isVertical ? "inset-x-0 bottom-0" : "inset-y-0 left-0",
           )}
-          style={isVertical ? { height: activeSize } : { width: activeSize }}
+          style={
+            isVertical
+              ? { height: activeSize, backgroundImage: "var(--progress-fill)" }
+              : { width: activeSize, backgroundImage: "var(--progress-fill)" }
+          }
         />
         {/* Inactive pill — starts after the thumb gap, runs to the end.
             Keeps the `slider-track` data-slot so a consumer can still
@@ -94,12 +102,10 @@ function Slider({
           aria-hidden
           className={cn(
             "absolute rounded-full bg-slider-track",
-            isVertical ? "inset-x-0 top-0" : "inset-y-0 right-0"
+            isVertical ? "inset-x-0 top-0" : "inset-y-0 right-0",
           )}
           style={
-            isVertical
-              ? { bottom: inactiveStart }
-              : { left: inactiveStart }
+            isVertical ? { bottom: inactiveStart } : { left: inactiveStart }
           }
         />
       </SliderPrimitive.Track>
@@ -111,7 +117,7 @@ function Slider({
         />
       ))}
     </SliderPrimitive.Root>
-  )
+  );
 }
 
-export { Slider }
+export { Slider };

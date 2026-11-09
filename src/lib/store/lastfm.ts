@@ -20,7 +20,7 @@ type State = {
    */
   scrobblingEnabled: boolean;
   /**
-   * When true, liking a track in YTubic also loves it on Last.fm (and
+   * When true, liking a track in adrify also loves it on Last.fm (and
    * unliking unloves it). Independent of scrobbling.
    */
   loveSyncEnabled: boolean;

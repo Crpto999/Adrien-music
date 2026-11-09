@@ -24,14 +24,14 @@ describe("normalizeManager", () => {
 
 describe("aurUpdateCmd", () => {
   it("uses the detected helper", () => {
-    expect(aurUpdateCmd("paru")).toBe("paru -Syu ytubic");
-    expect(aurUpdateCmd("yay")).toBe("yay -Syu ytubic");
-    expect(aurUpdateCmd("pikaur")).toBe("pikaur -Syu ytubic");
+    expect(aurUpdateCmd("paru")).toBe("paru -Syu adrify");
+    expect(aurUpdateCmd("yay")).toBe("yay -Syu adrify");
+    expect(aurUpdateCmd("pikaur")).toBe("pikaur -Syu adrify");
   });
 
   it("falls back to yay for missing/garbage helpers", () => {
-    expect(aurUpdateCmd("")).toBe("yay -Syu ytubic");
-    expect(aurUpdateCmd("pacman")).toBe("yay -Syu ytubic");
+    expect(aurUpdateCmd("")).toBe("yay -Syu adrify");
+    expect(aurUpdateCmd("pacman")).toBe("yay -Syu adrify");
   });
 });
 
@@ -40,13 +40,13 @@ describe("systemUpdateGuidance", () => {
     const g = systemUpdateGuidance("aur", "paru");
     expect(g.channel).toBe("AUR");
     expect(g.actionLabel).toBe("Copy command");
-    expect(g.command).toBe("paru -Syu ytubic");
-    expect(g.blurb).toContain("paru -Syu ytubic");
+    expect(g.command).toBe("paru -Syu adrify");
+    expect(g.blurb).toContain("paru -Syu adrify");
   });
 
   it("defaults to yay when no helper was detected", () => {
     const g = systemUpdateGuidance("aur", "");
-    expect(g.command).toBe("yay -Syu ytubic");
+    expect(g.command).toBe("yay -Syu adrify");
   });
 
   it("points deb/rpm/unknown installs at the Releases page", () => {

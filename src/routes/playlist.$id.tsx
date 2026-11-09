@@ -285,7 +285,7 @@ function PlaylistPageView() {
           isArtistTopSongs || openedFromArtist ? null : isLikedSongs ? null : (
             <>
               {/* One link for everyone: the share page opens the playlist in
-                  YTubic when it's installed and falls back to YouTube Music
+                  adrify when it's installed and falls back to YouTube Music
                   when it isn't. The YTM fallback wants the bare list id, so
                   the internal VL prefix stays out of the link. */}
               <Button

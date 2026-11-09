@@ -46,7 +46,7 @@ export function SegmentedControl<T extends string>({
       className={cn(
         // Track and thumb per the design: the same `--w050` / `--w070`
         // resting fill as the switch, with the selected segment raised
-        // on `--w140` instead of tinted.
+        // on a tinted chip.
         //
         // The segment's radius is the track's minus the 2px padding
         // (10 - 2 = 8, i.e. `rounded-md` here, since `--radius` is 10px).
@@ -80,7 +80,12 @@ export function SegmentedControl<T extends string>({
               <m.span
                 layout
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-md bg-w140 shadow-[0_1px_2px_var(--k350),inset_0_1px_0_var(--w080)]"
+                // The selected segment wears the "activated" colour —
+                // the brand's support hue — as a tint plus a hairline
+                // ring, so it reads as *chosen* rather than as the
+                // next control in a row of grey pills. See the
+                // `--active` token in index.css.
+                className="absolute inset-0 rounded-md bg-active/25 ring-1 ring-active/70 shadow-[0_1px_2px_var(--k350),inset_0_1px_0_var(--w080)]"
                 transition={shouldReduceMotion ? { duration: 0 } : SPRING}
               />
             )}

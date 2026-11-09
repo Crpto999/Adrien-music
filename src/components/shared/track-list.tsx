@@ -542,7 +542,11 @@ const TrackRow = memo(function TrackRow({
               </span>
               {isActive ? (
                 playing ? (
-                  <IconVolumeFilled className="size-4 text-brand" />
+                  // "Live" indicator — the spec reserves the emphasis
+                  // hue for the playing state, so the row that is
+                  // actually sounding reads differently from the row
+                  // that is merely selected.
+                  <IconVolumeFilled className="size-4 text-status-live" />
                 ) : (
                   <IconPlayerPauseFilled className="size-4 text-brand" />
                 )
@@ -590,7 +594,10 @@ const TrackRow = memo(function TrackRow({
           <span
             className={cn(
               "truncate text-sm font-medium",
-              isActive && "text-brand font-bold",
+              // The soft brand colour is the spec's "primary-soft" —
+              // it lifts the active row off the surrounding text
+              // without the full-strength accent.
+              isActive && "text-brand-soft font-bold",
             )}
           >
             {t.title}

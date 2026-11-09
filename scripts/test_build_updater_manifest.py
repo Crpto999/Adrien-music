@@ -24,36 +24,36 @@ class FriendlyNameTest(unittest.TestCase):
 
     def test_windows_installers(self):
         self.assertEqual(
-            mod.friendly_name("YTubic_0.13.0_x64-setup.exe", "0.13.0"),
-            "YTubic_0.13.0_Windows_x64_Setup.exe",
+            mod.friendly_name("adrify_0.13.0_x64-setup.exe", "0.13.0"),
+            "adrify_0.13.0_Windows_x64_Setup.exe",
         )
         self.assertEqual(
-            mod.friendly_name("YTubic_0.13.0_aarch64-setup.exe", "0.13.0"),
-            "YTubic_0.13.0_Windows_arm64_Setup.exe",
+            mod.friendly_name("adrify_0.13.0_aarch64-setup.exe", "0.13.0"),
+            "adrify_0.13.0_Windows_arm64_Setup.exe",
         )
 
     def test_linux_packages(self):
         self.assertEqual(
-            mod.friendly_name("YTubic_0.13.0_amd64.AppImage", "0.13.0"),
-            "YTubic_0.13.0_Linux_x86_64.AppImage",
+            mod.friendly_name("adrify_0.13.0_amd64.AppImage", "0.13.0"),
+            "adrify_0.13.0_Linux_x86_64.AppImage",
         )
         self.assertEqual(
-            mod.friendly_name("YTubic_0.13.0_amd64.deb", "0.13.0"),
-            "YTubic_0.13.0_Linux_x86_64.deb",
+            mod.friendly_name("adrify_0.13.0_amd64.deb", "0.13.0"),
+            "adrify_0.13.0_Linux_x86_64.deb",
         )
         self.assertEqual(
-            mod.friendly_name("YTubic-0.13.0-1.x86_64.rpm", "0.13.0"),
-            "YTubic_0.13.0_Linux_x86_64.rpm",
+            mod.friendly_name("adrify-0.13.0-1.x86_64.rpm", "0.13.0"),
+            "adrify_0.13.0_Linux_x86_64.rpm",
         )
 
     def test_macos_bundles(self):
         self.assertEqual(
-            mod.friendly_name("YTubic_universal.app.tar.gz", "0.13.0"),
-            "YTubic_0.13.0_macOS_Universal.app.tar.gz",
+            mod.friendly_name("adrify_universal.app.tar.gz", "0.13.0"),
+            "adrify_0.13.0_macOS_Universal.app.tar.gz",
         )
         self.assertEqual(
-            mod.friendly_name("YTubic_0.13.0_universal.dmg", "0.13.0"),
-            "YTubic_0.13.0_macOS_Universal.dmg",
+            mod.friendly_name("adrify_0.13.0_universal.dmg", "0.13.0"),
+            "adrify_0.13.0_macOS_Universal.dmg",
         )
 
     def test_unknown_asset_keeps_its_name(self):
@@ -65,17 +65,17 @@ class PlatformKeysTest(unittest.TestCase):
 
     def test_windows_publishes_both_key_formats(self):
         self.assertEqual(
-            mod.platform_keys("YTubic_0.13.0_x64-setup.exe"),
+            mod.platform_keys("adrify_0.13.0_x64-setup.exe"),
             ["windows-x86_64", "windows-x86_64-nsis"],
         )
         self.assertEqual(
-            mod.platform_keys("YTubic_0.13.0_aarch64-setup.exe"),
+            mod.platform_keys("adrify_0.13.0_aarch64-setup.exe"),
             ["windows-aarch64", "windows-aarch64-nsis"],
         )
 
     def test_universal_macos_covers_both_architectures(self):
         self.assertEqual(
-            mod.platform_keys("YTubic_universal.app.tar.gz"),
+            mod.platform_keys("adrify_universal.app.tar.gz"),
             [
                 "darwin-aarch64",
                 "darwin-x86_64",
@@ -86,34 +86,34 @@ class PlatformKeysTest(unittest.TestCase):
 
     def test_linux_publishes_one_entry_per_format(self):
         self.assertEqual(
-            mod.platform_keys("YTubic_0.13.0_amd64.AppImage"),
+            mod.platform_keys("adrify_0.13.0_amd64.AppImage"),
             ["linux-x86_64", "linux-x86_64-appimage"],
         )
         self.assertEqual(
-            mod.platform_keys("YTubic_0.13.0_amd64.deb"),
+            mod.platform_keys("adrify_0.13.0_amd64.deb"),
             ["linux-x86_64-deb"],
         )
         self.assertEqual(
-            mod.platform_keys("YTubic-0.13.0-1.x86_64.rpm"),
+            mod.platform_keys("adrify-0.13.0-1.x86_64.rpm"),
             ["linux-x86_64-rpm"],
         )
 
     def test_dmg_is_not_an_updater_artifact(self):
         # The .dmg is a download for humans; the updater installs the
         # .app.tar.gz.
-        self.assertEqual(mod.platform_keys("YTubic_0.13.0_universal.dmg"), [])
+        self.assertEqual(mod.platform_keys("adrify_0.13.0_universal.dmg"), [])
 
     def test_key_set_matches_a_real_release(self):
         """The keys the script produces must cover exactly the set the
         updater looks up -- the same set the published v0.13.0
         manifest carried."""
         names = [
-            "YTubic_0.13.0_x64-setup.exe",
-            "YTubic_0.13.0_aarch64-setup.exe",
-            "YTubic_0.13.0_amd64.AppImage",
-            "YTubic_0.13.0_amd64.deb",
-            "YTubic-0.13.0-1.x86_64.rpm",
-            "YTubic_universal.app.tar.gz",
+            "adrify_0.13.0_x64-setup.exe",
+            "adrify_0.13.0_aarch64-setup.exe",
+            "adrify_0.13.0_amd64.AppImage",
+            "adrify_0.13.0_amd64.deb",
+            "adrify-0.13.0-1.x86_64.rpm",
+            "adrify_universal.app.tar.gz",
         ]
         keys = set()
         for name in names:

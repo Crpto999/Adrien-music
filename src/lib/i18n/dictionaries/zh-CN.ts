@@ -9,7 +9,7 @@ import type { en } from "./en";
  */
 export const zhCN: typeof en = {
   app: {
-    name: "YTubic",
+    name: "adrify",
     tagline: "一款运行在桌面上的 YouTube Music 客户端",
   },
 
@@ -79,7 +79,6 @@ export const zhCN: typeof en = {
     volume: "音量",
     mute: "静音",
     unmute: "取消静音",
-    fullScreen: "全屏",
     lyrics: "歌词",
     share: "分享",
     about: "关于",
@@ -245,6 +244,7 @@ export const zhCN: typeof en = {
     title: "主题",
     light: "浅色",
     dark: "深色",
+    cyberpunk: "赛博朋克",
     system: "跟随系统",
   },
 
@@ -262,7 +262,7 @@ export const zhCN: typeof en = {
   },
 
   about: {
-    title: "关于 YTubic",
+    title: "关于 adrify",
     version: "版本 {version}",
     betaFor: "{platform} 测试版",
     description:
@@ -291,7 +291,7 @@ export const zhCN: typeof en = {
   channel: {
     chooseTitle: "选择频道",
     chooseDesc:
-      "你的媒体库、喜欢的歌曲和推荐内容属于频道而非账号。请选择 YTubic 要使用的频道。",
+      "你的媒体库、喜欢的歌曲和推荐内容属于频道而非账号。请选择 adrify 要使用的频道。",
     couldNotLoad: "无法加载频道列表。请检查网络连接后重试。",
     brandChannel: "品牌频道",
     personalChannel: "个人频道",
@@ -504,7 +504,7 @@ export const zhCN: typeof en = {
     commandCopied: "更新命令已复制",
     couldNotOpenBrowser: "无法打开浏览器",
     reportThanks: "感谢反馈！请在浏览器中完成问题提交。",
-    lastfmAuthorized: "请在打开的浏览器标签页中授权 YTubic — 授权完成后将自动完成关联。",
+    lastfmAuthorized: "请在打开的浏览器标签页中授权 adrify — 授权完成后将自动完成关联。",
     lastfmDisconnected: "已断开与 Last.fm 的连接",
     lastfmMissingCredentials: "请先输入你的 Last.fm API 密钥和共享密钥。",
     lastfmTimeout: "等待 Last.fm 授权超时。",
@@ -549,13 +549,13 @@ export const zhCN: typeof en = {
     },
     general: {
       launchAtStartup: "开机自启动",
-      launchAtStartupDesc: "登录系统后自动启动 YTubic。",
+      launchAtStartupDesc: "登录系统后自动启动 adrify。",
       playbackNotifications: "播放通知",
       playbackNotificationsDesc: "在后台切换歌曲时显示系统通知。",
       closeToTray: "关闭到托盘",
       closeToMenuBar: "关闭到菜单栏",
-      closeToTrayDesc: "点击 ✕ 时将 YTubic 隐藏到托盘，而不是退出程序。",
-      closeToMenuBarDesc: "关闭窗口时将 YTubic 隐藏到菜单栏，而不是退出程序。",
+      closeToTrayDesc: "点击 ✕ 时将 adrify 隐藏到托盘，而不是退出程序。",
+      closeToMenuBarDesc: "关闭窗口时将 adrify 隐藏到菜单栏，而不是退出程序。",
       automaticUpdates: "自动更新",
       automaticUpdatesDesc: "在后台下载更新，并在下次重启时安装。",
       pacmanManaged: "此安装由 pacman（AUR）管理 — 请使用 {command} 刷新。",
@@ -585,7 +585,7 @@ export const zhCN: typeof en = {
       equalizer: "均衡器",
       equalizerDesc: "使用预设调整音色，或自行调节各频段。",
       outputDevice: "输出设备",
-      outputDeviceDesc: "YTubic 开始播放时将音频输出到何处。",
+      outputDeviceDesc: "adrify 开始播放时将音频输出到何处。",
       backButton: "上一首按钮",
       backButtonDesc: "在播放途中点击上一首时的行为。",
       resumeWhereYouLeftOff: "继续上次播放",
@@ -608,7 +608,7 @@ export const zhCN: typeof en = {
     },
     appearance: {
       theme: "主题",
-      themeDesc: "选择浅色或深色，或跟随系统设置。",
+      themeDesc: "选择主题，或跟随系统设置。",
       ambientBackground: "氛围背景",
       ambientBackgroundDesc: "用当前专辑封面为窗口染色，或保持纯色。",
       windowGlow: "窗口辉光",
@@ -700,7 +700,7 @@ export const zhCN: typeof en = {
       scrobbleTracks: "记录播放",
       scrobbleTracksDesc: "将播放记录和正在播放状态发送到 Last.fm。",
       loveLikedTracks: "同步喜欢的歌曲",
-      loveLikedTracksDesc: "在 YTubic 中喜欢的歌曲，也会同时标记为 Last.fm 上的 Love。",
+      loveLikedTracksDesc: "在 adrify 中喜欢的歌曲，也会同时标记为 Last.fm 上的 Love。",
       syncLovedTracks: "同步已标记的歌曲",
       apiKey: "你的 Last.fm API 密钥",
       apiSecret: "你的 Last.fm 共享密钥",
@@ -743,7 +743,7 @@ export const zhCN: typeof en = {
       presenceNameHint:
         "“<动词> 名称”中的名称，与上方 Discord 应用的实际名称无关。",
       clientIdHint:
-        "已预填 YTubic 自带的 Discord 应用。除非你清楚后果，否则请勿修改 — 仅当你要以另一个 Discord 应用（例如你自己注册的）身份展示时才需要更改。",
+        "已预填 adrify 自带的 Discord 应用。除非你清楚后果，否则请勿修改 — 仅当你要以另一个 Discord 应用（例如你自己注册的）身份展示时才需要更改。",
       listening: "正在聆听",
       playing: "正在播放",
       watching: "正在观看",

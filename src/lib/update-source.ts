@@ -25,7 +25,7 @@ export type UpdateSource = {
   helper: string;
 };
 
-export const AUR_URL = "https://aur.archlinux.org/packages/ytubic";
+export const AUR_URL = "https://aur.archlinux.org/packages/adrify";
 export const RELEASES_URL =
   "https://github.com/Crpto999/Adrien-music/releases";
 /** Refresh command for the given helper; unknown helpers fall back. */
@@ -34,7 +34,7 @@ export function aurUpdateCmd(helper: string): string {
     helper === "paru" || helper === "yay" || helper === "pikaur"
       ? helper
       : "yay";
-  return `${h} -Syu ytubic`;
+  return `${h} -Syu adrify`;
 }
 
 const IN_APP: UpdateSource = { kind: "inApp", manager: "unknown", helper: "" };

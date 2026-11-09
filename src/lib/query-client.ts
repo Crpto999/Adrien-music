@@ -34,7 +34,7 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
 
 const idbStore =
   typeof window !== "undefined"
-    ? createStore("ytubic-cache", "query-cache")
+    ? createStore("adrify-cache", "query-cache")
     : undefined;
 
 const idbStorage = {
@@ -57,7 +57,7 @@ const idbStorage = {
  */
 export const persister = createAsyncStoragePersister({
   storage: idbStorage,
-  key: "ytubic-query-cache",
+  key: "adrify-query-cache",
   throttleTime: 5000,
 });
 
@@ -66,7 +66,7 @@ export const persister = createAsyncStoragePersister({
 // it in place would defeat the point of moving to IndexedDB.
 if (typeof window !== "undefined") {
   try {
-    window.localStorage.removeItem("ytubic-query-cache");
+    window.localStorage.removeItem("adrify-query-cache");
   } catch {
     // Nothing to reclaim if this throws — same best-effort shape as
     // `safeLocalStorage`.

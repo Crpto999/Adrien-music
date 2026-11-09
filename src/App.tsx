@@ -1,6 +1,5 @@
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { ThemeProvider } from "next-themes";
 import {
   PERSIST_MAX_AGE,
   fitsInPersistBudget,
@@ -11,6 +10,7 @@ import {
 import { routeTree } from "@/routeTree.gen";
 import { isFloatingPlayerWindow } from "@/lib/floating-player";
 import FloatingPlayerApp from "@/components/layout/floating-player-app";
+import { ThemeProvider } from "@/lib/theme";
 
 const router = createRouter({
   routeTree,
@@ -38,13 +38,7 @@ export default function App() {
     return <FloatingPlayerApp />;
   }
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      enableSystem
-      storageKey="ytm-theme"
-      disableTransitionOnChange
-    >
+    <ThemeProvider>
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={{
