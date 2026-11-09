@@ -229,7 +229,7 @@ pub fn init(app: &AppHandle) {
     let Some(hwnd) = app
         .get_webview_window("main")
         .and_then(|w| w.hwnd().ok())
-        .map(|h| HWND(h.0 as *mut c_void))
+        .map(|h| HWND(h.0))
     else {
         crate::log!("[thumbbar] no main window HWND; skipping");
         return;
@@ -538,7 +538,7 @@ unsafe extern "system" fn subclass_proc(
             return LRESULT(0);
         }
     } else if msg == WM_SETTINGCHANGE || msg == WM_THEMECHANGED || msg == WM_DPICHANGED {
-        let dpi = (msg == WM_DPICHANGED).then(|| (wparam.0 as u32) & 0xffff);
+        let dpi = (msg == WM_DPICHANGED).then_some((wparam.0 as u32) & 0xffff);
         refresh_icons(dpi);
     } else if msg == WM_NCDESTROY {
         unsafe {
@@ -655,7 +655,7 @@ const HEART_FILLED: Glyph = Glyph {
 
 fn build_icons(light: bool, dpi: u32) -> Option<Icons> {
     // 16px at 100%, the size the shell asks for, scaled to the window's DPI.
-    let size = (16 * dpi / 96).clamp(16, 64) as u32;
+    let size = (16 * dpi / 96).clamp(16, 64);
     let fg: u32 = if light { 0x1B1B1B } else { 0xFFFFFF };
     Some(Icons {
         prev: make_icon(&PREV, size, fg)?,
@@ -713,15 +713,17 @@ fn make_icon(glyph: &Glyph, size: u32, rgb: u32) -> Option<HICON> {
     );
 
     let size = size as i32;
-    let mut info = BITMAPINFO::default();
-    info.bmiHeader = BITMAPINFOHEADER {
-        biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-        biWidth: size,
-        // Negative height: top-down rows, so pixel 0 is the top-left.
-        biHeight: -size,
-        biPlanes: 1,
-        biBitCount: 32,
-        biCompression: BI_RGB.0,
+    let info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: size,
+            // Negative height: top-down rows, so pixel 0 is the top-left.
+            biHeight: -size,
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -758,7 +760,7 @@ fn make_icon(glyph: &Glyph, size: u32, rgb: u32) -> Option<HICON> {
     }
 
     // 1bpp AND mask, all zeros: the colour bitmap's alpha does the masking.
-    let mask_stride = ((px + 15) / 16) * 2;
+    let mask_stride = px.div_ceil(16) * 2;
     let mask_bits = vec![0u8; mask_stride * px];
     let mask = unsafe { CreateBitmap(size, size, 1, 1, Some(mask_bits.as_ptr() as *const c_void)) };
 

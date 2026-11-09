@@ -99,7 +99,7 @@ fn aur_helper() -> &'static str {
 pub fn update_source() -> UpdateSource {
     #[cfg(not(target_os = "linux"))]
     {
-        return IN_APP;
+        IN_APP
     }
 
     #[cfg(target_os = "linux")]

@@ -28,6 +28,17 @@ mod appid;
 mod discord;
 #[cfg(target_os = "linux")]
 mod linux_graphics;
+// `#[macro_use]`, not a plain `mod`: `log!` is `#[macro_export]`ed, which
+// puts it at the crate root (`crate::log`) — but a *bare* `log!` is
+// resolved through textual macro scope, which only covers macros defined
+// earlier in the same file. Without this, a bare `log!` inside a nested
+// module (like `secure_store` below) fails to compile, and because such
+// code is usually behind a `cfg(...)` for one platform, the break only
+// shows up on that platform's CI runner.
+//
+// `crate::log!` works everywhere regardless — that is what the other
+// modules use. This import is the safety net for the bare form.
+#[macro_use]
 mod logging;
 mod media;
 mod progressive;
@@ -256,7 +267,14 @@ mod secure_store {
             Err(e) => {
                 // No unlocked Secret Service — degrade to plaintext so the
                 // user can still sign in. Marked so reads don't guess.
-                log!(
+                //
+                // `crate::log!`, not a bare `log!`: the macro is exported
+                // at the crate root, so it resolves unqualified only in
+                // the crate-root module. This is a nested module, so it
+                // needs the path — and because the call is under
+                // `cfg(not(windows))`, only a non-Windows build (CI's
+                // Linux runner) ever compiles it.
+                crate::log!(
                     "[auth] secret service unavailable ({e}); storing cookies unencrypted"
                 );
                 return Ok(wrap(SCHEME_PLAINTEXT, plain));
@@ -923,7 +941,7 @@ async fn dedup_accounts_by_identity(app: &tauri::AppHandle) {
                 .ok()
                 .and_then(|m| m.modified().ok());
             if let Some(t) = mtime {
-                if best_mtime.map_or(true, |b| t > b) {
+                if best_mtime.is_none_or(|b| t > b) {
                     best_mtime = Some(t);
                     freshest = i;
                 }
@@ -3283,11 +3301,11 @@ async fn sniff_audio_mime(path: &std::path::Path) -> &'static str {
     if let Ok(mut f) = tokio::fs::File::open(path).await {
         let _ = f.read(&mut buf).await;
     }
-    if &buf[4..8] == b"ftyp" {
+    if buf[4..8] == *b"ftyp" {
         "audio/mp4"
-    } else if &buf[..4] == &[0x1A, 0x45, 0xDF, 0xA3] {
+    } else if buf[..4] == [0x1A, 0x45, 0xDF, 0xA3] {
         "audio/webm"
-    } else if &buf[..3] == b"ID3" {
+    } else if buf[..3] == *b"ID3" {
         "audio/mpeg"
     } else {
         "audio/webm"
@@ -4063,16 +4081,33 @@ fn generate_stream_token() -> String {
     out
 }
 
+/// The directories the stream server works in.
+///
+/// They are one thing — the on-disk layout of the cache — so they travel
+/// together as a struct rather than as three more arguments on a
+/// function that already had too many.
+struct StreamDirs {
+    /// The persistent audio cache.
+    cache: PathBuf,
+    /// The legacy ephemeral pool, wiped at startup.
+    ephemeral: PathBuf,
+    /// The cover-image cache.
+    covers: PathBuf,
+}
+
 async fn start_stream_server(
     app: tauri::AppHandle,
     port_state: Arc<Mutex<Option<u16>>>,
     token_state: Arc<Mutex<Option<String>>>,
-    cache_dir: PathBuf,
-    ephemeral_dir: PathBuf,
-    cover_dir: PathBuf,
+    dirs: StreamDirs,
     ytdlp_bin: PathBuf,
     cache_limit: Arc<AtomicU64>,
 ) {
+    let StreamDirs {
+        cache: cache_dir,
+        ephemeral: ephemeral_dir,
+        covers: cover_dir,
+    } = dirs;
     if let Err(e) = tokio::fs::create_dir_all(&cache_dir).await {
         log!("[stream-server] mkdir {cache_dir:?}: {e}");
     }
@@ -4468,9 +4503,11 @@ pub fn run() {
                     handle,
                     port,
                     token,
-                    cache_dir,
-                    ephemeral_dir,
-                    cover_dir,
+                    StreamDirs {
+                        cache: cache_dir,
+                        ephemeral: ephemeral_dir,
+                        covers: cover_dir,
+                    },
                     ytdlp_bin,
                     cache_limit,
                 )

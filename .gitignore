@@ -36,3 +36,8 @@ src-tauri/gen/
 # Python (release tooling)
 __pycache__/
 *.pyc
+sign-test.txt
+
+
+scripts/
+

@@ -48,7 +48,7 @@
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4NDc3OTBDN0M3OUQxQUQKUldTdDBYbDhESGxIYUpxenFGRU9sZDB4eXlUZG1IY1NtM282VDFKS0ZsMlpwRlc0ZjdObmVoR3kK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1vbmlzaWduIHB1YmxpYyBrZXk6IERFM0M0NDZFQUMyNzE2NzEKUldSeEZpZXNia1E4M25QeHpxc0dZaGZmeXRpZVp3NzJzOWhQSlZzYzFPcjF3MzVKeW1neFFGcFcK",
       "endpoints": [
         "https://github.com/Crpto999/Adrien-music/releases/latest/download/latest.json"
       ],

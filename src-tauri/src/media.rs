@@ -73,7 +73,7 @@ pub fn init(app: &AppHandle) {
         let hwnd: Option<*mut std::ffi::c_void> = app
             .get_webview_window("main")
             .and_then(|w| w.hwnd().ok())
-            .map(|h| h.0 as *mut std::ffi::c_void);
+            .map(|h| h.0);
 
         let config = PlatformConfig {
             dbus_name: "adrify",
