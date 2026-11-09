@@ -36,8 +36,12 @@ src-tauri/gen/
 # Python (release tooling)
 __pycache__/
 *.pyc
+
+# Local signing self-test scratch files. The release tooling under
+# scripts/ IS tracked: the release workflow checks the repo out and runs
+# scripts/build-updater-manifest.py and scripts/verify-published-updater.py.
+# Ignoring scripts/ would break the release with a bare "file not found".
 sign-test.txt
-
-
-scripts/
+*.sig
+adrify-updater-selftest.bin
 
