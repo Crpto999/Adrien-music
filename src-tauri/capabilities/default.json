@@ -20,7 +20,8 @@
         { "url": "https://apic-desktop.musixmatch.com/*" },
         { "url": "https://genius.com/*" },
         { "url": "https://lrclib.net/*" },
-        { "url": "https://ws.audioscrobbler.com/*" }
+        { "url": "https://ws.audioscrobbler.com/*" },
+        { "url": "https://cdn.jsdelivr.net/*" }
       ]
     },
     "store:default",

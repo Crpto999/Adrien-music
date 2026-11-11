@@ -1,10 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { canonicalFromQueueTrack } from "@/lib/providers/queue";
-import { findAlternativeSources } from "@/lib/providers/playback";
-import { getProviderOrder } from "@/lib/providers/play";
+import {
+  AVAILABILITY_GC_TIME,
+  AVAILABILITY_STALE_TIME,
+  availabilityKey,
+  getAvailability,
+  peekAvailability,
+} from "@/lib/providers/availability";
+import { canPlayFrom } from "@/lib/providers/probe";
+import { getProviderOrder } from "@/lib/providers/order";
+import { useNetEaseIdStore } from "@/lib/store/netease-ids";
 import type { QueueTrack } from "@/lib/store/playback";
-import type { CanonicalTrack, ProviderRef } from "@/lib/providers/types";
+import type {
+  CanonicalTrack,
+  ProviderRef,
+} from "@/lib/providers/types";
 
 /**
  * The alternative sources for a track, cached.
@@ -26,44 +37,15 @@ import type { CanonicalTrack, ProviderRef } from "@/lib/providers/types";
  *     through a different path reuses the same entry.
  *   - A background refetch still happens when the entry goes stale, so
  *     a provider that was temporarily down recovers on its own.
- */
-
-/**
- * How long a fetched alternative list is considered fresh.
  *
- * A track's availability on other platforms barely changes, but the
- * upstream services do come and go, so the list is refreshed in the
- * background rather than frozen forever.
- */
-const STALE_TIME = 10 * 60 * 1000;
-
-/**
- * How long an unused entry is kept around.
+ * ## One search, two readers
  *
- * Long enough that skipping back and forth between two tracks does not
- * re-fetch, short enough that the cache does not grow without bound
- * over a long listening session.
+ * The fetch itself goes through `./availability`, which is the *same*
+ * search the player used to choose the track's source. So the panel
+ * can never offer a source the player never considered, and opening
+ * the panel never costs a second round of five requests — the answer
+ * is already cached from the moment the track started playing.
  */
-const GC_TIME = 30 * 60 * 1000;
-
-/**
- * A stable key for a track's alternative sources.
- *
- * The provider and the provider's own id are deliberately *not* part
- * of the key: the alternatives are "everywhere else this song lives",
- * which does not depend on where it is currently playing from. The
- * title, the artists and the duration do, because they are what the
- * matcher uses to decide what counts as the same recording.
- */
-export function alternativesKey(canonical: CanonicalTrack): string {
-  const title = canonical.title.trim().toLowerCase();
-  const artists = canonical.artists
-    .map((a) => a.trim().toLowerCase())
-    .sort()
-    .join(",");
-  const duration = canonical.duration ? Math.round(canonical.duration) : "";
-  return `alternatives:${title}|${artists}|${duration}`;
-}
 
 /**
  * The canonical form of a queue track, or `null` when the track has
@@ -89,9 +71,9 @@ export async function fetchAlternatives(
   canonical: CanonicalTrack,
   signal?: AbortSignal,
 ): Promise<ProviderRef[]> {
-  return findAlternativeSources(canonical, {
-    priority: getProviderOrder(),
+  return getAvailability(canonical, {
     signal,
+    priority: getProviderOrder(),
   });
 }
 
@@ -102,30 +84,112 @@ export async function fetchAlternatives(
  * identity, so an empty player does not fire a pointless search.
  */
 export function useAlternativeSources(track: QueueTrack | undefined) {
-  const canonical = canonicalFor(track);
+  // The canonical form depends on the registry — a NetEase pick the
+  // user hearted is a YouTube row that is also a known NetEase
+  // recording, and the switcher must offer that *exact* record. The
+  // registry is read through a subscription so a mapping written
+  // moments ago (the heart flow) still reaches the panel.
+  const registryVersion = useNetEaseIdStore((s) =>
+    track?.videoId ? s.byVideoId[track.videoId] : undefined,
+  );
+  // The canonical form is recomputed when the registry changes, because
+  // the known ids are part of it.
+  const canonical = useMemo(
+    () => canonicalFor(track),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [track, registryVersion],
+  );
+  const [cached, setCached] = useState<ProviderRef[] | null>(null);
+
+  // The key is the track's identity. The canonical object itself is a
+  // fresh object on every render, so keying the effect on it would
+  // re-run the effect on every render — and each run sets new state,
+  // which renders again.
+  const key = canonical ? availabilityKey(canonical) : null;
+
+  // Show whatever the availability search already knows, before the
+  // query has even started. The search that chose the track's source
+  // is the same search, so its answer is usually already there.
+  useEffect(() => {
+    setCached(canonical ? peekAvailability(canonical) : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   const query = useQuery({
     queryKey: canonical
-      ? [alternativesKey(canonical)]
-      : ["alternatives:none"],
+      ? [availabilityKey(canonical)]
+      : ["availability:none"],
     queryFn: ({ signal }) =>
       canonical
         ? fetchAlternatives(canonical, signal)
         : Promise.resolve([]),
     enabled: canonical !== null,
-    staleTime: STALE_TIME,
-    gcTime: GC_TIME,
+    staleTime: AVAILABILITY_STALE_TIME,
+    gcTime: AVAILABILITY_GC_TIME,
     retry: false,
   });
 
   return {
     /** The known alternatives. Empty until the first fetch lands. */
-    alternatives: query.data ?? [],
+    alternatives: query.data ?? cached ?? [],
     /** True while the very first fetch is in flight. */
-    isLoading: query.isLoading && canonical !== null,
+    isLoading: query.isLoading && canonical !== null && !cached,
     /** True while a background refresh is running over an existing list. */
     isRefreshing: query.isFetching && !query.isLoading,
   };
+}
+
+/**
+ * Whether each of a track's sources can actually play it.
+ *
+ * A source that *has* a track is not the same as a source that will
+ * *serve* it — NetEase without a membership will not hand over its VIP
+ * tracks, and the same goes for the paid tiers on the Chinese
+ * platforms. The panel shows the difference, so the user can see what
+ * the switch would actually give them.
+ *
+ * The answers are cached (see `./probe`), so opening the panel does not
+ * fire a round of resolution requests.
+ */
+export function usePlayability(
+  refs: ProviderRef[],
+): Map<string, boolean> {
+  const [status, setStatus] = useState<Map<string, boolean>>(new Map());
+
+  // The identity of the set of sources being asked about. The array is
+  // a fresh object on every render, so the sources are keyed by their
+  // own identity instead.
+  const identity = refs
+    .map((r) => `${r.provider}:${r.providerTrackId}`)
+    .join("|");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // The answers for the *previous* set of sources are dropped: they
+    // say nothing about this track.
+    setStatus(new Map());
+
+    for (const ref of refs) {
+      const key = `${ref.provider}:${ref.providerTrackId}`;
+      void canPlayFrom(ref)
+        .then((ok) => {
+          if (cancelled) return;
+          setStatus((prev) => new Map(prev).set(key, ok));
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setStatus((prev) => new Map(prev).set(key, false));
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity]);
+
+  return status;
 }
 
 /**
@@ -142,15 +206,15 @@ export function useAlternativeSources(track: QueueTrack | undefined) {
 export function useAlternativeSourcesPrefetch(track: QueueTrack | undefined) {
   const queryClient = useQueryClient();
   const canonical = canonicalFor(track);
-  const key = canonical ? alternativesKey(canonical) : null;
+  const key = canonical ? availabilityKey(canonical) : null;
 
   useEffect(() => {
     if (!canonical || !key) return;
     void queryClient.prefetchQuery({
       queryKey: [key],
       queryFn: ({ signal }) => fetchAlternatives(canonical, signal),
-      staleTime: STALE_TIME,
-      gcTime: GC_TIME,
+      staleTime: AVAILABILITY_STALE_TIME,
+      gcTime: AVAILABILITY_GC_TIME,
     });
     // `key` is the track's identity: re-running on the same track would
     // re-fetch the same list, and the canonical object is a fresh

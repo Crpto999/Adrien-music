@@ -1023,6 +1023,21 @@ pub struct Resolved {
 /// Tiers are tried in order (SVIP first, unstable accounts last) and
 /// within a tier the quality ladder is walked from best to worst. The
 /// first endpoint that hands back a playable URL wins.
+///
+/// ## The endpoints of one tier are asked at the same time
+///
+/// The endpoints of a tier are independent third parties, and asking
+/// them one after another costs the *sum* of their latencies: measured
+/// against the live pool, one endpoint took 24s to answer a Hi-Res
+/// request while its sibling answered the same song in 2.7s. Since the
+/// pool is the preferred resolution path, that serial walk would put
+/// the slowest endpoint's latency on the critical path of every play.
+///
+/// So at each step of the quality ladder the whole tier is asked
+/// concurrently and the first answer with a URL wins. The ladder itself
+/// is unchanged — the tier is only asked at a lower quality once every
+/// endpoint has refused the higher one — so a track nobody will serve
+/// in Hi-Res still falls back to lossless, and then to standard.
 pub async fn resolve(app: &tauri::AppHandle, song_id: &str) -> Option<Resolved> {
     let pool = app.state::<Arc<Pool>>().inner().clone();
     let endpoints = pool.resolvable();
@@ -1036,15 +1051,29 @@ pub async fn resolve(app: &tauri::AppHandle, song_id: &str) -> Option<Resolved> 
     for tier in by_tier {
         let tier_endpoints: Vec<&'static Endpoint> =
             endpoints.iter().copied().filter(|e| e.tier == tier).collect();
+
         for quality in QUALITIES {
+            // Every endpoint of this tier is asked at this quality at
+            // the same time. The first answer with a URL wins.
+            let mut set = tokio::task::JoinSet::new();
             for ep in &tier_endpoints {
                 let key = pool.key_for(ep.id);
                 let client = match proxy::build_client(reqwest::Client::builder()) {
                     Ok(c) => c,
                     Err(_) => continue,
                 };
-                let probe =
-                    request_endpoint(ep, song_id, quality, &key, &client).await;
+                let song_id = song_id.to_string();
+                let ep: &'static Endpoint = ep;
+                let quality = quality.to_string();
+                set.spawn(async move {
+                    let probe =
+                        request_endpoint(ep, &song_id, &quality, &key, &client).await;
+                    (ep, quality, probe)
+                });
+            }
+
+            while let Some(joined) = set.join_next().await {
+                let Ok((ep, quality, probe)) = joined else { continue };
                 if let Some(url) = probe.url {
                     crate::log!(
                         "[unblock] {song_id} resolved via {} ({quality})",
@@ -1061,7 +1090,7 @@ pub async fn resolve(app: &tauri::AppHandle, song_id: &str) -> Option<Resolved> 
                         url,
                         endpoint: ep.id.to_string(),
                         tier: ep.tier,
-                        quality: quality.to_string(),
+                        quality,
                         latency_ms: probe.latency_ms,
                     });
                 }

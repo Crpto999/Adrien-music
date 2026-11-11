@@ -47,10 +47,10 @@ import {
 const YTM_API_BASE = "https://music.youtube.com/youtubei/v1";
 
 /**
- * The client that unlocks timed lyrics. Version pinned rather than
- * floated: this is a reverse-engineered surface, and a version YTM stops
- * recognising fails loudly here rather than silently degrading to plain
- * text somewhere else.
+ * The client that unlocks timed lyrics on the `/browse` hop. Version
+ * pinned rather than floated: this is a reverse-engineered surface, and
+ * a version YTM stops recognising fails loudly here rather than silently
+ * degrading to plain text somewhere else.
  */
 const ANDROID_MUSIC = {
   clientName: "ANDROID_MUSIC",
@@ -60,7 +60,50 @@ const ANDROID_MUSIC = {
   gl: "US",
 };
 
-const CLIENT_NAME_ID = "21";
+/**
+ * The client for the `/next` hop — and the *only* reason this is a
+ * separate client is latency.
+ *
+ * The `/next` hop asks "does this track have a lyrics tab, and what is
+ * its browseId?". The answer does not depend on the client: the same
+ * tab, the same browseId, the same `unselectable` flag. But the
+ * *time* it takes to answer differs by an order of magnitude, and that
+ * turns out to decide whether lyrics work at all.
+ *
+ * Measured against the live API, for the same videoIds:
+ *
+ *   /next via ANDROID_MUSIC   5.7 s - 9.8 s
+ *   /next via WEB_REMIX       0.2 s        (30-50x faster)
+ *
+ * And the whole lookup is bounded by one wall-clock budget
+ * (`PROVIDER_TIMEOUT_MS`, 8 s in `lyrics/http.ts`). With the mobile
+ * client on *both* hops, every single successful lookup measured
+ * overran that budget:
+ *
+ *   /next ANDROID + /browse ANDROID   9.1 s - 14.5 s   -> TIMEOUT, always
+ *   /next WEB_REMIX + /browse ANDROID 2.9 s - 3.6 s   -> fits, always
+ *
+ * The timed-line count is identical either way (57, 47, 39, 66, 61,
+ * 48 …), so the mobile client is only needed for the *shape* of the
+ * lyrics response, not for finding them.
+ *
+ * So: the fast client finds the tab, the mobile client reads it.
+ */
+const WEB_REMIX = {
+  clientName: "WEB_REMIX",
+  clientVersion: "1.20240101.01.00",
+  hl: "en",
+  gl: "US",
+};
+
+/**
+ * InnerTube identifies the client by a numeric id alongside the name.
+ * WEB_REMIX is 67, ANDROID_MUSIC is 21.
+ */
+const CLIENT_IDS = {
+  WEB_REMIX: "67",
+  ANDROID_MUSIC: "21",
+} as const;
 
 /**
  * The exact header set the probe ran with. A desktop User-Agent alongside
@@ -70,13 +113,20 @@ const CLIENT_NAME_ID = "21";
  */
 const HEADERS: Record<string, string> = {
   "Content-Type": "application/json",
-  "X-YouTube-Client-Name": CLIENT_NAME_ID,
+  "X-YouTube-Client-Name": CLIENT_IDS.ANDROID_MUSIC,
   "X-YouTube-Client-Version": ANDROID_MUSIC.clientVersion,
   Origin: "https://music.youtube.com",
   Referer: "https://music.youtube.com/",
   Accept: "*/*",
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+};
+
+/** The headers for the fast client, which differ only in the two id headers. */
+const WEB_REMIX_HEADERS: Record<string, string> = {
+  ...HEADERS,
+  "X-YouTube-Client-Name": CLIENT_IDS.WEB_REMIX,
+  "X-YouTube-Client-Version": WEB_REMIX.clientVersion,
 };
 
 type YtNode = Record<string, unknown>;
@@ -99,19 +149,40 @@ export async function fetchYtMusicLyrics(
   }
 }
 
+/**
+ * One InnerTube request.
+ *
+ * The client context is a parameter rather than a constant because the
+ * two hops need different ones: `/next` uses the fast client (the
+ * answer is the same either way, but the latency is not), and `/browse`
+ * uses the mobile client (only that one returns line-synced lyrics).
+ */
 async function innertube(
   endpoint: string,
   body: Record<string, unknown>,
   deadline: Deadline,
+  client: { context: typeof ANDROID_MUSIC | typeof WEB_REMIX; headers: Record<string, string> },
 ): Promise<YtNode> {
   const url = `${YTM_API_BASE}/${endpoint}?prettyPrint=false`;
-  const r = await lyricsFetch(url, deadline, HEADERS, {
+  const r = await lyricsFetch(url, deadline, client.headers, {
     ...body,
-    context: { client: ANDROID_MUSIC },
+    context: { client: client.context },
   });
   if (!r.ok) throwForStatus(r.status, `YouTube Music ${endpoint}`);
   return (await r.json()) as YtNode;
 }
+
+/** The fast client: used for the `/next` hop. */
+const FAST_CLIENT = {
+  context: WEB_REMIX,
+  headers: WEB_REMIX_HEADERS,
+};
+
+/** The mobile client: used for the `/browse` hop, for timed lyrics. */
+const TIMED_CLIENT = {
+  context: ANDROID_MUSIC,
+  headers: HEADERS,
+};
 
 /**
  * Walk the response for every value stored under `key`, at any depth.
@@ -137,7 +208,9 @@ function findLyricsBrowseId(
   videoId: string,
   deadline: Deadline,
 ): Promise<string | null> {
-  return innertube("next", { videoId }, deadline).then((res) => {
+  // The fast client: this hop's answer is identical under either client,
+  // and it is the difference between 0.2 s and 9 s. See `WEB_REMIX`.
+  return innertube("next", { videoId }, deadline, FAST_CLIENT).then((res) => {
     for (const tab of collect(res, "tabRenderer") as YtNode[]) {
       const endpoint = (tab?.endpoint as YtNode)?.browseEndpoint as YtNode;
       if (!endpoint) continue;
@@ -163,7 +236,8 @@ async function fetchLyricsPage(
   browseId: string,
   deadline: Deadline,
 ): Promise<Lyrics | null> {
-  const res = await innertube("browse", { browseId }, deadline);
+  // The mobile client: only it returns line-synced lyrics.
+  const res = await innertube("browse", { browseId }, deadline, TIMED_CLIENT);
 
   const timed = parseTimed(res);
   if (timed) return timed;

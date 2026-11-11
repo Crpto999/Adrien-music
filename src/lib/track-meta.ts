@@ -46,9 +46,17 @@ export function stripTopicSuffix(s: string): string {
 /**
  * Bracket forms that CJK uploads use where latin ones use parentheses.
  * NFKC already folds the fullwidth （）［］, but leaves these alone.
+ *
+ * `《》` and `〈〉` are deliberately **not** in these lists. They are
+ * *quotation* marks in Chinese — they wrap a work's name ("电影《雄狮
+ * 少年》主题曲") — and turning them into parentheses nests one bracket
+ * inside another, which no bracket stripper can read: the title
+ * "无名的人 (电影《雄狮少年》主题曲/片尾曲)" became "无名的人
+ * (电影(雄狮少年)主题曲/片尾曲)", and the annotation could no longer
+ * be stripped, so the song could not be matched at all.
  */
-const CJK_OPEN = /[【〔〖「『〈《]/g;
-const CJK_CLOSE = /[】〕〗」』〉》]/g;
+const CJK_OPEN = /[【〔〖「『]/g;
+const CJK_CLOSE = /[】〕〗」』]/g;
 
 /**
  * Bracket contents that describe the *upload* rather than the recording.
@@ -81,8 +89,29 @@ const TRAILING_NOISE = new RegExp(
  *
  * Returns the original when cleaning would empty the string, so a track
  * genuinely named "Audio" still gets looked up.
+ *
+ * ## The `keepCredit` option
+ *
+ * The `(feat. …)` bracket is dropped by default, because the lyrics
+ * databases index the *plain* title and the credit narrows the result
+ * set (measured: "Die For You (feat. Ariana Grande)" → 5 hits against
+ * "Die For You" → 20).
+ *
+ * The **matcher** wants the opposite. The credit is evidence: it is
+ * what separates the two releases of "We Don't Talk Anymore" — the one
+ * whose title carries "(feat. Selena Gomez)" and the plain one — and
+ * the credit tier is a whole level of the cascade. Dropping the credit
+ * at the source made that tier inert: the source never named a
+ * performer, so every candidate looked equally (not) credited and the
+ * wrong release won. Measured: with the credit dropped the app picked
+ * NetEase `401249910` ("We Don't Talk Anymore"); with it kept, the
+ * app picks `2166151146` ("We Don't Talk Anymore (feat. Selena
+ * Gomez)"), which is the record the user confirmed by hand.
  */
-export function cleanTrackTitle(title: string): string {
+export function cleanTrackTitle(
+  title: string,
+  options?: { keepCredit?: boolean },
+): string {
   if (!title) return title;
 
   // NFKC folds fullwidth latin and （） to ASCII; the CJK bracket families
@@ -92,7 +121,7 @@ export function cleanTrackTitle(title: string): string {
     .replace(CJK_OPEN, "(")
     .replace(CJK_CLOSE, ")");
 
-  out = dropMatchingBrackets(out);
+  out = dropMatchingBrackets(out, options?.keepCredit === true);
   out = out.replace(TRAILING_NOISE, "");
   out = out.replace(/\s{2,}/g, " ").trim();
   // A dangling separator left behind by a removed tail.
@@ -105,8 +134,11 @@ export function cleanTrackTitle(title: string): string {
  * Remove bracket groups whose body is upload noise or a featuring credit.
  * Written as a scan rather than one regex so nesting and unbalanced
  * brackets (both common in user uploads) cannot make it eat the title.
+ *
+ * `keepCredit` leaves the featuring brackets alone, for the matcher —
+ * the credit is evidence there, where it is noise in a lyrics lookup.
  */
-function dropMatchingBrackets(s: string): string {
+function dropMatchingBrackets(s: string, keepCredit = false): string {
   let out = "";
   let i = 0;
   while (i < s.length) {
@@ -125,7 +157,10 @@ function dropMatchingBrackets(s: string): string {
       continue;
     }
     const body = s.slice(i + 1, end).trim();
-    if (!NOISE_BRACKET.test(body) && !FEAT_BRACKET.test(body)) {
+    const isCredit = FEAT_BRACKET.test(body);
+    const drop =
+      !keepCredit && (NOISE_BRACKET.test(body) || isCredit);
+    if (!drop) {
       out += s.slice(i, end + 1);
     }
     i = end + 1;

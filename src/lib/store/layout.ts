@@ -30,8 +30,9 @@ type State = {
 
 /**
  * Player layout preference. Three modes:
- *  - `right`    — fixed card on the right side of the window (default)
- *  - `bottom`   — compact horizontal bar pinned to the bottom of the page
+ *  - `right`    — fixed card on the right side of the window
+ *  - `bottom`   — compact horizontal bar pinned to the bottom of the
+ *                 page (default)
  *  - `floating` — separate Tauri window that floats independently
  *
  * Persisted in localStorage so the user's choice survives restarts. The
@@ -41,7 +42,7 @@ type State = {
 export const useLayoutStore = create<State>()(
   persist(
     (set) => ({
-      mode: "right",
+      mode: "bottom",
       sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       playerWidth: DEFAULT_PLAYER_WIDTH,
       floatingPinned: false,

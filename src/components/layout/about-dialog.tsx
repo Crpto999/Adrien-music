@@ -213,10 +213,10 @@ export function AboutDialog({
           {/* Right padding clears the close button. */}
           <div className="flex items-center gap-4 pr-[34px]">
             <AppLogo
-              // The design draws a 16px squircle here, but our icon is a
-              // circular disc — a box-shadow follows the element's radius,
-              // so at 16px the accent glow leaked out as square corners.
-              className="size-14 shrink-0 rounded-full shadow-[0_6px_18px_-6px_rgba(var(--acc1rgb),0.35)]"
+              // The mark is a letterform, not a disc, so the old
+              // `rounded-full` + circular glow would have cropped it into
+              // a circle. The glow now follows the mark's own box.
+              className="size-14 shrink-0 object-contain drop-shadow-[0_6px_18px_-6px_rgba(var(--acc1rgb),0.45)]"
             />
             <div className="flex min-w-0 flex-col gap-[9px]">
               <DialogTitle className="text-[23px] font-bold leading-none tracking-[-0.02em] text-t1">

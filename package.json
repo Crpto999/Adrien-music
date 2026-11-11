@@ -4,25 +4,24 @@
   "version": "0.13.0",
   "license": "GPL-3.0-only",
   "description": "adrify — fast, responsive YouTube Music desktop client",
-  "packageManager": "pnpm@10.33.1",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "pnpm": ">=12"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build && tsc --noEmit",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "//tauri:dev": "Runs the desktop app in dev with its OWN bundle identifier (see src-tauri/tauri.dev.conf.json). Without the override, a dev run and the installed release share %APPDATA%\\com.github.crpto999.adrify, so both their session-refresh loops write the same accounts.json and cookies.enc and each overwrites the other's snapshot. Costs one extra sign-in for the dev instance.",
-    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "//tauri": "Wrapper around the Tauri CLI (scripts/tauri-cli.mjs). For the `dev` subcommand it injects --config src-tauri/tauri.dev.conf.json, which switches the bundle identifier to com.github.crpto999.adrify.dev. Without that override a dev run uses the release identifier, so it shares the release's WebView2 profile (localStorage), app-data dir (accounts.json, cookie jars) and Windows single-instance mutex (<identifier>-sim) — it either exits silently because the release is already running, or it opens the release's cached state. Every other subcommand (build, info, ...) is passed through untouched, so releases and CI keep the release identity.",
+    "tauri": "node scripts/tauri-cli.mjs",
+    "tauri:dev": "node scripts/tauri-cli.mjs dev",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@fontsource-variable/google-sans-flex": "^5.3.1",
-    "@fontsource-variable/ibm-plex-sans": "^5.3.0",
-    "@fontsource-variable/inter": "^5.3.0",
-    "@fontsource-variable/roboto": "^5.3.0",
     "@tabler/icons-react": "^3.46.0",
     "@tanstack/query-async-storage-persister": "^5.101.2",
     "@tanstack/react-query": "^5.99.2",

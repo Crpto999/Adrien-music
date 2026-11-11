@@ -6,16 +6,21 @@ Tauri needs a multi-resolution icon set: a `.ico` for Windows, an
 tiles for the Windows Store packaging, plus the plain PNGs the
 bundler embeds.
 
-The source is the app's colorful logo (`repo/cyberpunk_app_logo.png`),
-which is a square RGBA image with transparent margins. Windows icons
-must not be fully transparent, so the artwork is composited onto the
-theme's deep-void background (#080A12) before it is written out --
-an unpadded transparent .ico renders as an invisible square in the
-Start Menu on Windows.
+The source is the brand artwork (`assets/branding/tauri-icons/icon.png`),
+a square RGBA image. It is used as-is: the artwork already reaches the
+edges of its canvas, so cropping to the ink would rescale the mark and
+change its framing, and squaring it onto a fresh transparent canvas
+would darken every semi-transparent pixel.
+
+Transparency is kept throughout. The `.ico` frames carry their own
+alpha channel, and only the Windows Store tiles -- which the shell
+draws on an opaque background -- are composited onto the theme's
+deep-void colour (#080A12).
 
 Usage:
 
-    python scripts/generate-icons.py [--source repo/cyberpunk_app_logo.png]
+    python scripts/generate-icons.py \
+        --source assets/branding/tauri-icons/icon.png
 """
 
 from __future__ import annotations
@@ -56,21 +61,37 @@ PNG_SIZES = {
 
 
 def load_source(path: str) -> Image.Image:
-    """The source artwork, cropped to its opaque bounds and squared."""
+    """The source artwork, cropped to its opaque bounds and squared.
+
+    Two details matter here, and both bite on the current brand artwork:
+
+    - The crop uses the *alpha* channel's bounding box rather than
+      `Image.getbbox()`, which looks at every band and so reports the
+      full canvas whenever a single stray pixel has a non-zero RGB value
+      under a fully transparent pixel.
+    - The squaring uses `alpha_composite` rather than `paste` with the
+      image as its own mask. `paste` multiplies the source's RGB by its
+      alpha and never divides it back out, so every semi-transparent
+      pixel comes out darker than it started — invisible on an artwork
+      that is nearly opaque, very visible on a soft-edged glow.
+    """
     image = Image.open(path)
     if image.mode != "RGBA":
         image = image.convert("RGBA")
     # Trim the transparent margin so the logo fills the icon the way the
     # app icon does on every platform.
-    bbox = image.getbbox()
+    bbox = image.getchannel("A").point(lambda a: 255 if a > 2 else 0).getbbox()
     if bbox:
         image = image.crop(bbox)
     side = max(image.size)
+    if image.size == (side, side):
+        # Already square: compositing it onto a fresh transparent square
+        # would be a no-op at best.
+        return image
     square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    square.paste(
+    square.alpha_composite(
         image,
         ((side - image.width) // 2, (side - image.height) // 2),
-        image,
     )
     return square
 
@@ -97,6 +118,26 @@ def write_ico(images: list[Image.Image], path: str) -> None:
     down, which Windows Explorer renders fine but older shell surfaces
     mishandle. Writing the container by hand keeps every frame
     BMP-encoded, which is what the platform expects.
+
+    A BMP-in-ICO frame is laid out as:
+
+        BITMAPINFOHEADER   (40 bytes)
+        colour data        (the XOR bitmap, bottom-up)
+        AND mask           (1 bit per pixel, after ALL the colour rows)
+
+    Two things about that layout are easy to get wrong, and both
+    produce a sheared image rather than an obvious failure:
+
+    - The DIB header declares the height *doubled* (colour bitmap +
+      mask), which is how a decoder knows the frame carries
+      transparency rather than being opaque.
+    - The AND mask comes after the whole colour bitmap, not after
+      each row. And each of its rows is one bit per pixel padded to a
+      4-byte boundary -- 32 bytes for a 256px-wide frame, not 1024.
+
+    Interleaving the mask with the colour rows, or sizing it as
+    4 bytes per pixel, shifts every row but the first and the mark
+    comes out stretched and skewed.
     """
     frames = sorted(images, key=lambda im: im.width)
     count = len(frames)
@@ -112,16 +153,20 @@ def write_ico(images: list[Image.Image], path: str) -> None:
         rgba = frame.convert("RGBA")
         # The .ico's BMP rows are bottom-up and carry a doubled alpha.
         pixels = rgba.tobytes()
-        rows = []
+        colour_rows = []
         for y in range(height - 1, -1, -1):
             row = pixels[y * width * 4 : (y + 1) * width * 4]
             bgr = bytearray(row)
             for x in range(width):
                 r, g, b, a = row[x * 4 : x * 4 + 4]
                 bgr[x * 4 : x * 4 + 4] = bytes((b, g, r, a))
-            and_mask = b"\x00" * (4 * width)
-            rows.append(bytes(bgr) + and_mask)
-        pixels_blob = b"".join(rows)
+            colour_rows.append(bytes(bgr))
+        # The AND mask follows the whole colour bitmap. One bit per
+        # pixel, each row padded to a 4-byte boundary. The alpha channel
+        # already carries the transparency, so every bit is zero.
+        mask_row_bytes = ((width + 31) // 32) * 4
+        and_mask = b"\x00" * (mask_row_bytes * height)
+        pixels_blob = b"".join(colour_rows) + and_mask
         mask_header = struct.pack("<IiiHHIIiiII", 40, width, height * 2, 1, 32, 0, len(pixels_blob), 0, 0, 0, 0)
         blob = mask_header + pixels_blob
         entries.append(struct.pack("<BBBBHHII", w, h, 0, 0, 1, 32, len(blob), offset))
@@ -182,7 +227,7 @@ def main() -> int:
         write_png(frame, os.path.join(args.out, name))
         print(f"  {name} ({size}x{size})")
 
-    ico_frames = [matte(resize(source, s)) for s in (16, 32, 48, 64, 128, 256)]
+    ico_frames = [resize(source, s) for s in (16, 24, 32, 48, 64, 128, 256)]
     write_ico(ico_frames, os.path.join(args.out, "icon.ico"))
     print("  icon.ico (16..256)")
 

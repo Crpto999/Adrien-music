@@ -3,7 +3,7 @@ import {
   getProviderOrder,
   setProviderOrder,
   subscribeProviderOrder,
-} from "@/lib/providers/play";
+} from "@/lib/providers/order";
 import {
   PROVIDER_PRIORITY,
   type ProviderId,

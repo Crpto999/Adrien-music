@@ -98,6 +98,32 @@ describe("cleanTrackTitle", () => {
       "Blinding Lights",
     );
   });
+
+  it("does not turn a Chinese quotation mark into a bracket", () => {
+    // 《》 are *quotation* marks in Chinese — they wrap a work's name
+    // ("电影《雄狮少年》主题曲"). Turning them into parentheses nests
+    // one bracket inside another, and no bracket stripper can read
+    // that: the annotation "电影《雄狮少年》主题曲/片尾曲" became
+    // "电影(雄狮少年)主题曲/片尾曲", so the annotation could no
+    // longer be stripped and the song could not be matched at all.
+    expect(cleanTrackTitle("无名的人 (电影《雄狮少年》主题曲/片尾曲)")).toBe(
+      "无名的人 (电影《雄狮少年》主题曲/片尾曲)",
+    );
+  });
+
+  it("keeps the featuring credit when asked", () => {
+    // The matcher needs the credit: it is what separates the two
+    // releases of "We Don't Talk Anymore". The lyrics path does not,
+    // so the option exists rather than one behaviour being hard-coded.
+    expect(
+      cleanTrackTitle("We Don't Talk Anymore (feat. Selena Gomez)", {
+        keepCredit: true,
+      }),
+    ).toBe("We Don't Talk Anymore (feat. Selena Gomez)");
+    expect(cleanTrackTitle("We Don't Talk Anymore (feat. Selena Gomez)")).toBe(
+      "We Don't Talk Anymore",
+    );
+  });
 });
 
 describe("stripTopicSuffix", () => {

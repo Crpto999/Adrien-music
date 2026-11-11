@@ -112,14 +112,14 @@ export const en = {
   },
 
   /**
-    * The right-click / "more" menus on a track row and on an album
-    * card.
-    *
-    * A namespace of its own rather than a pile of top-level keys,
-    * because these two menus are rendered from one shared component
-    * that is used in half a dozen places — a flat `menu.play` would
-    * read as a global.
-    */
+   * The right-click / "more" menus on a track row and on an album
+   * card.
+   *
+   * A namespace of its own rather than a pile of top-level keys,
+   * because these two menus are rendered from one shared component
+   * that is used in half a dozen places — a flat `menu.play` would
+   * read as a global.
+   */
   trackMenu: {
     play: "Play",
     playWithCrossfade: "Play with crossfade",
@@ -239,6 +239,7 @@ export const en = {
     couldNotReach: "Couldn't reach {sources}.",
     showLyrics: "Show lyrics",
     auto: "Auto",
+    matchingSource: "matching",
     turnOn: "Turn lyrics on",
   },
 
@@ -268,7 +269,7 @@ export const en = {
     version: "Version {version}",
     betaFor: "beta for {platform}",
     description:
-      "Fast, responsive YouTube Music desktop client. Unofficial — not affiliated with, endorsed by, or sponsored by Google or YouTube. \"YouTube\" and \"YouTube Music\" are trademarks of Google LLC.",
+      'Fast, responsive YouTube Music desktop client. Unofficial — not affiliated with, endorsed by, or sponsored by Google or YouTube. "YouTube" and "YouTube Music" are trademarks of Google LLC.',
     betaNotice:
       "The {platform} build is in beta. If something breaks, please report it via the window menu (⋯ → Report an issue) or on",
     poweredBy: "Powered by",
@@ -306,8 +307,7 @@ export const en = {
     description:
       "Tell us what went wrong or what you'd like to see. Submitting opens a prefilled GitHub issue in your browser.",
     summaryPlaceholder: "Short summary (optional)",
-    bodyPlaceholder:
-      "What happened? Steps to reproduce, expected vs actual…",
+    bodyPlaceholder: "What happened? Steps to reproduce, expected vs actual…",
     submit: "Submit",
     cancel: "Cancel",
     thanks: "Thanks! Finish submitting the issue in your browser.",
@@ -483,7 +483,8 @@ export const en = {
     addFailed: "Add failed: {error}",
     playingNext: "Playing next: {title}",
     albumLoadFailed: "Couldn't load album: {error}",
-    couldNotLoadQuality: "Couldn't load {quality}p, staying on {activeQuality}p",
+    couldNotLoadQuality:
+      "Couldn't load {quality}p, staying on {activeQuality}p",
     couldNotLoadVersionStillPlaying:
       "Couldn't load that version, still playing the current one",
     signedOut: "Signed out",
@@ -501,21 +502,20 @@ export const en = {
     playlistIsEmpty: "This playlist is empty",
     noArtistPage: "No artist page for this album",
     cacheFolderUpdated: "Cache folder updated",
-    nothingToClear:
-      "Nothing to clear — everything cached is in your library.",
+    nothingToClear: "Nothing to clear — everything cached is in your library.",
     couldNotCopyCommand: "Couldn't copy the command",
     commandCopied: "Update command copied",
     couldNotOpenBrowser: "Couldn't open the browser",
-    reportThanks:
-      "Thanks! Finish submitting the issue in your browser.",
+    reportThanks: "Thanks! Finish submitting the issue in your browser.",
     lastfmAuthorized:
       "Authorize adrify in the browser tab that opened — linking will finish automatically.",
     lastfmDisconnected: "Disconnected from Last.fm",
     lastfmMissingCredentials:
       "Enter your Last.fm API key and shared secret first.",
     lastfmTimeout: "Timed out waiting for Last.fm authorization.",
-    playlistCreated: "Created \"{name}\"",
+    playlistCreated: 'Created "{name}"',
     playlistCreateFailed: "Create failed: {error}",
+    playlistNoTrack: "none of these tracks could be added",
     playlistOneTrack: "The track will be added as the first entry.",
     playlistManyTracks: "The {count} tracks will be added in order.",
     playlistPrivateHint:
@@ -532,7 +532,8 @@ export const en = {
     youtubeLikeNoMatch:
       "Couldn't find “{title}” on YouTube Music, so the heart wasn't mirrored",
     youtubeLikeFailed: "Couldn't mirror the heart to YouTube Music: {detail}",
-    likeFailedNoId: "Couldn't heart this track — it has no id on its own platform",
+    likeFailedNoId:
+      "Couldn't heart this track — it has no id on its own platform",
     dislikeRemoved: "Dislike removed",
     disliked: "Disliked",
     coverSavedWithPath: "Cover saved",
@@ -560,6 +561,7 @@ export const en = {
       home: "Home",
       sources: "Sources",
       storage: "Storage",
+      shortcuts: "Shortcuts",
       integrations: "Integrations",
     },
     language: {
@@ -588,18 +590,20 @@ export const en = {
       proxy: "Proxy",
       proxyDesc:
         "Route network traffic through an HTTP/HTTPS or SOCKS proxy. Leave empty to connect directly.",
-      proxyPlaceholder: "socks5://127.0.0.1:1080",
+      proxyPlaceholder: "Support socks5/http/https",
       proxyInvalid: "That doesn't look like a valid proxy URL.",
       proxyUnsupportedScheme:
         "Unsupported scheme — use http, https, socks4, socks4a, socks5 or socks5h.",
       logPath: "Log file",
       logPathDesc:
         "A packaged build has no console, so the log is the only record. Click to copy its path.",
+      matchDebugLog: "Match diagnostics",
+      matchDebugLogDesc:
+        "Record every cross-source search in the log: the query, the candidates, their scores and why one was chosen or rejected.",
     },
     playback: {
       crossfade: "Crossfade",
-      crossfadeDesc:
-        "Fade the end of a track into the start of the next one.",
+      crossfadeDesc: "Fade the end of a track into the start of the next one.",
       crossfadeSeconds: "Crossfade seconds",
       djBassSwap: "DJ bass swap",
       djBassSwapDesc:
@@ -646,8 +650,7 @@ export const en = {
       ambientBackgroundDesc:
         "Tint the window with the current album art, or keep it plain.",
       windowGlow: "Window glow",
-      windowGlowDesc:
-        "A soft glowing accent outline around the window edge.",
+      windowGlowDesc: "A soft glowing accent outline around the window edge.",
       glowMatchesCover: "Glow matches cover",
       glowMatchesCoverDesc:
         "Tint the window glow with the current cover's dominant color.",
@@ -666,6 +669,17 @@ export const en = {
       interfaceFontDesc:
         "Applies to the whole app. Track and artist names use it too.",
       fontSystem: "System default",
+      fontPingfang: "PingFang SC",
+      fontPingfangDesc:
+        "A complete Chinese typeface, downloaded on demand. It is about {size} — the download happens once and the files are kept on disk.",
+      fontPingfangDownload: "Download ({size})",
+      fontPingfangDownloading: "Downloading… {percent}%",
+      fontPingfangDownloaded: "Downloaded",
+      fontPingfangRemove: "Remove downloaded font",
+      fontPingfangRemoveConfirm:
+        "Delete the downloaded PingFang SC files? You can download them again later.",
+      fontPingfangFailed: "The font download failed: {error}",
+      fontPingfangInstalled: "Installed on this device",
     },
     home: {
       sectionOrder: "Section order",
@@ -705,12 +719,13 @@ export const en = {
       healthDegraded: "alive, no link",
       healthDown: "unreachable",
       healthUnknown: "not tested",
-    },    providers: {
+    },
+    providers: {
       priority: "Source priority",
       priorityDesc:
         "The order sources are tried in when a track can be played from more than one of them.",
       priorityHint:
-        "YouTube is first by default: it has no membership gate, so a track it carries plays for anyone. Put NetEase first if your account has a membership — the stream is lossless there. Migu, Kugou and QQ Music all search and play anonymously; their paid tracks go through the third-party resolver pool.",
+        "The top source wins whenever more than one of them has the track. A source that carries the track but will not serve it — a NetEase VIP track without a membership, say — is skipped and the next one is tried. NetEase's daily picks are the one exception: they play from NetEase whenever NetEase will serve them, because the pick *is* the NetEase recording. Changing the order re-points the tracks already queued.",
       neteaseDaily: "Daily picks",
       neteaseDailyCount: "{count} tracks",
       neteaseDailySubtitle:
@@ -719,13 +734,14 @@ export const en = {
         "Sign in to NetEase Cloud Music to see the daily playlist it picks for you every day.",
       neteaseSignInAction: "Open NetEase",
       noPlayableSource:
-        "\"{title}\" is not available from any of your sources right now.",
+        '"{title}" is not available from any of your sources right now.',
       playingFrom: "Playing from {provider}",
       discoveredOn: "Found on {provider}",
       currentSource: "Current source",
       switchSource: "Switch source",
       searchingSources: "Looking for other sources…",
       noOtherSource: "No other source has this track.",
+      sourceUnavailable: "Not playable",
       switchedTo: "Now playing from {source}.",
       switchFailed: "{source} could not play this track.",
     },
@@ -744,8 +760,7 @@ export const en = {
       limitRemoved: "Storage limit removed",
       limitSetTo: "Storage limit set to {size}",
       autoClean: "Auto-clean tracks not in library",
-      autoCleanDesc:
-        "Periodically delete cached tracks you haven't saved.",
+      autoCleanDesc: "Periodically delete cached tracks you haven't saved.",
       cleanOff: "Off",
       cleanDaily: "Daily",
       cleanWeekly: "Weekly",
@@ -757,8 +772,7 @@ export const en = {
       coverArtCacheDesc: "Cached album art images.",
       cachedTracks: "Cached tracks",
       searchCachedTracks: "Search cached tracks",
-      searchCachedTracksPlaceholder:
-        "Search cached tracks by title or artist…",
+      searchCachedTracksPlaceholder: "Search cached tracks by title or artist…",
       filterAll: "All",
       filterOther: "Other",
       inLibrary: "In library",
@@ -775,8 +789,7 @@ export const en = {
         "Delete all {count} cached tracks ({size})? Tracks from your library will be removed too.",
       confirmDeleteOthers:
         "Delete {count} cached tracks that aren't in your library?",
-      confirmDeleteCovers:
-        "Delete {count} cached cover images ({size})?",
+      confirmDeleteCovers: "Delete {count} cached cover images ({size})?",
       coverCacheCleared: "Cover cache cleared — freed {size}",
       couldNotReadCache: "Couldn't read the cache folder.",
       cacheEmpty: "Cache is empty — tracks land here as you play them.",
@@ -791,14 +804,35 @@ export const en = {
       sortOldestFirst: "Oldest first",
       sortLargestFirst: "Largest first",
     },
+    shortcuts: {
+      toggle: "Play / pause",
+      toggleDesc: "Start or pause playback from anywhere on the system.",
+      next: "Next track",
+      nextDesc: "Skip to the next track from anywhere on the system.",
+      like: "Like track",
+      likeDesc: "Heart the current track from anywhere on the system.",
+      record: "Record shortcut",
+      recording: "Press a key…",
+      unbound: "Not set",
+      clear: "Clear shortcut",
+      inputType: "Shortcut input type",
+      keyboard: "Keyboard",
+      mouse: "Mouse",
+      resetAll: "Reset all",
+      registerFailed:
+        "The shortcut could not be registered with the system — another app may already use it.",
+      windowsHint:
+        "These shortcuts are registered with the operating system, so they keep working while adrify is in the tray. Mouse shortcuts are available on Windows.",
+      genericHint:
+        "These shortcuts are registered with the operating system, so they keep working while adrify is in the tray. Mouse shortcuts are only available on Windows.",
+    },
     integrations: {
       lastfm: "Last.fm",
       lastfmDesc:
         "Scrobble what you play and share your now-playing status. Uses your own Last.fm API account.",
       enableScrobbling: "Enable scrobbling",
       scrobbleTracks: "Scrobble tracks",
-      scrobbleTracksDesc:
-        "Send plays and now-playing updates to Last.fm.",
+      scrobbleTracksDesc: "Send plays and now-playing updates to Last.fm.",
       loveLikedTracks: "Love liked tracks",
       loveLikedTracksDesc:
         "When you like a song in adrify, also love it on Last.fm.",
@@ -811,6 +845,23 @@ export const en = {
         "Sign in to NetEase to get the daily picks in your sidebar, and to play your own lossless catalogue.",
       neteaseSignedInHint:
         "Signed in. The sidebar now has a Daily picks entry with the playlist NetEase chooses for you each day, and NetEase serves your account's own catalogue — including lossless.",
+      neteaseQrTitle: "Sign in to NetEase",
+      neteaseQrDesc:
+        "Scan this code with the NetEase Cloud Music app on your phone, then confirm the sign-in there. This dialog closes by itself once you're signed in.",
+      neteaseQrAlt: "NetEase sign-in QR code",
+      neteaseQrRefresh: "New code",
+      neteaseQrFailed:
+        "Couldn't sign in to NetEase. Please try again with a new code.",
+      neteaseQrExpired:
+        "The NetEase QR code expired before it was scanned. Please try again with a new code.",
+      neteaseQrBlocked:
+        "NetEase refused this sign-in (risk control). Please wait a few minutes and try again.",
+      neteaseQrNoCredential:
+        "NetEase accepted the sign-in but didn't return a credential. Please try again with a new code.",
+      neteaseQrClientFailed:
+        "Couldn't reach NetEase. Please check your connection and try again.",
+      neteaseQrStorageFailed:
+        "Signed in to NetEase, but the credential couldn't be saved. Please try again.",
       discord: "Discord Rich Presence",
       discordDesc:
         "Show what you're playing on your Discord profile. Talks directly to your local Discord app.",
@@ -827,11 +878,9 @@ export const en = {
       showAlbumName: "Show album name",
       showAlbumNameDesc: "Shown when hovering the cover.",
       showElapsedTime: "Show elapsed time",
-      showElapsedTimeDesc:
-        "Live progress bar (e.g. 01:36 / 02:51).",
+      showElapsedTimeDesc: "Live progress bar (e.g. 01:36 / 02:51).",
       showListenButton: "Show Listen button",
-      showListenButtonDesc:
-        "Links back to the track on YouTube Music.",
+      showListenButtonDesc: "Links back to the track on YouTube Music.",
       onlyForSongs: "Only show for songs",
       onlyForSongsDesc:
         "Hide presence for standalone music videos — only share real album songs.",
@@ -852,7 +901,7 @@ export const en = {
       waitingForAuth: "Waiting for authorization…",
       presenceName: "Presence name",
       presenceNameHint:
-        "The name in \"<verb> NAME\" — independent of whatever the Discord application above is actually named.",
+        'The name in "<verb> NAME" — independent of whatever the Discord application above is actually named.',
       clientIdHint:
         "Pre-filled with adrify's own Discord application. Don't change this unless you know what you're doing — it only needs to change if you're intentionally presenting as a different Discord app (e.g. one you registered yourself).",
       listening: "Listening",

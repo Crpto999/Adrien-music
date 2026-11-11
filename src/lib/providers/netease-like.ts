@@ -1,12 +1,24 @@
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import { scoreMatch, artistsAgree } from "@/lib/providers/match";
+import {
+  compareKeys,
+  scoreCandidate,
+  decideConfidence,
+  artistsAgree,
+  failureReason,
+  type MatchKey,
+} from "@/lib/providers/match";
+import {
+  logMatchReport,
+  type MatchDebugCandidate,
+} from "@/lib/providers/match/debug";
 import { neteaseSearch } from "@/lib/providers/adapters/netease";
 import { searchYouTube } from "@/lib/providers/adapters/youtube";
 import { toSimplified } from "@/lib/chinese";
 import { translate } from "@/lib/i18n";
 import type { LastfmTrackMeta } from "@/lib/lastfm/track";
 import type { QueueTrack } from "@/lib/store/playback";
+import { rememberNeteaseSong } from "@/lib/store/netease-ids";
 import type { ProviderId } from "@/lib/providers/types";
 
 /**
@@ -49,11 +61,20 @@ import type { ProviderId } from "@/lib/providers/types";
  */
 
 /**
- * The score a candidate must reach before the heart is mirrored to it.
+ * The confidence a candidate must reach before the heart is written to
+ * the user's NetEase library.
  *
- * See the module comment for how the scorer's scale maps onto this.
+ * Lighting the heart on the wrong song in the user's own library is
+ * worse than not mirroring at all: the user would have to notice the
+ * wrong track appearing in their NetEase collection and clean it up.
+ *
+ * So the bar is the doc's `high` or `medium` — the two stages the doc
+ * says to "采用并缓存" (adopt and cache). The `low` stage is not
+ * enough: the doc marks it "采用但标记需确认" (adopt, but flag for
+ * confirmation), and a heart in the user's own library has no way to
+ * ask for confirmation.
  */
-export const LIKE_SYNC_THRESHOLD = 5;
+export const LIKE_SYNC_CONFIDENCE = new Set(["high", "medium"]);
 
 /** The track the heart was pressed on. */
 export type LikeSyncTrack = {
@@ -102,21 +123,23 @@ function buildQuery(track: LikeSyncTrack): string {
 }
 
 /**
- * Score a candidate against the track, and say how good the match is.
+ * The same decision, given an already-computed score.
  *
- * Returns `null` when the candidate is not a confident enough match to
- * write into the user's own library.
+ * Split out so the diagnostics can see *every* candidate's score —
+ * including the ones that were rejected — without scoring them
+ * twice.
  */
-function confidentScore(
+function confidentScoreOf(
+  scored: ReturnType<typeof scoreCandidate>,
   candidate: { title: string; artists: string[]; duration?: number },
   subject: LikeSyncTrack,
-): number | null {
-  const score = scoreMatch(candidate, {
-    title: subject.title,
-    artists: subject.artists,
-    duration: subject.duration,
-  });
-  if (score === null || score < LIKE_SYNC_THRESHOLD) return null;
+): MatchKey | null {
+  // The cascade's confidence stages, decided on the components and the
+  // comparison key together. A single candidate has no runner-up, so
+  // the margin is waived — but the *stage* still has to be reached, and
+  // the artist still has to agree.
+  const confidence = decideConfidence(scored, null);
+  if (!LIKE_SYNC_CONFIDENCE.has(confidence)) return null;
   // The scorer is lenient about the artist when the lengths match — a
   // cover is a fine substitute for *playback*. It is not fine for a
   // *library*: hearting a cover would put the wrong recording into the
@@ -130,7 +153,97 @@ function confidentScore(
   ) {
     return null;
   }
-  return score;
+  return scored.key;
+}
+
+/**
+ * Score every candidate, and record what happened.
+ *
+ * The rejected candidates are recorded too — a heart that was *not*
+ * mirrored is exactly the case where the user needs to see why, and
+ * "the search returned 100 rows and none of them looked like the
+ * song" is the whole story.
+ */
+function scoreAndReport(
+  provider: string,
+  query: string,
+  subject: LikeSyncTrack,
+  rows: {
+    id: string;
+    title: string;
+    artists: string[];
+    duration?: number;
+    album?: string | null;
+    aliases?: string[];
+  }[],
+): Map<string, MatchKey> {
+  const accepted = new Map<string, MatchKey>();
+  const top: MatchDebugCandidate[] = [];
+
+  for (const row of rows) {
+    const scored = scoreCandidate(
+      {
+        title: row.title,
+        artists: row.artists,
+        duration: row.duration,
+        album: row.album,
+        aliases: row.aliases,
+      },
+      {
+        title: subject.title,
+        artists: subject.artists,
+        duration: subject.duration,
+      },
+    );
+    const confidence = decideConfidence(scored, null);
+    const score = confidentScoreOf(scored, row, subject);
+    if (score !== null) accepted.set(row.id, score);
+
+    top.push({
+      id: row.id,
+      title: row.title,
+      artists: row.artists,
+      album: row.album,
+      duration: row.duration,
+      aliases: row.aliases,
+      score: scored.key[0],
+      t: scored.components.title,
+      cr: scored.components.credit,
+      a: scored.components.artist,
+      v: scored.components.version,
+      d: scored.components.duration,
+      al: scored.components.album,
+      rk: scored.components.rank,
+      extraVersions: scored.extraVersions,
+      confidence,
+      reason:
+        confidence === "failed"
+          ? failureReason(scored, null)
+          : score === null
+            ? "below_like_sync_threshold"
+            : undefined,
+    });
+  }
+
+  top.sort((a, b) => b.t - a.t);
+
+  const best = top[0];
+  logMatchReport({
+    provider,
+    query,
+    source: {
+      title: subject.title,
+      artists: subject.artists,
+      duration: subject.duration,
+    },
+    candidateCount: rows.length,
+    top: top.slice(0, 8),
+    pickedId: best && accepted.has(best.id) ? best.id : undefined,
+    confidence: best?.confidence,
+    reason: accepted.size === 0 ? "no_confident_match" : undefined,
+  });
+
+  return accepted;
 }
 
 /**
@@ -162,31 +275,47 @@ export async function findNeteaseSongId(
     // artist, and covers, above the one the user meant. The scorer
     // picks from the whole page.
     const songs = await neteaseSearch(query, 100);
-    const scored = songs
-      .map((song) => ({
-        song,
-        score: confidentScore(
-          {
-            title: song.title,
-            artists: song.artists,
-            duration: song.duration,
-          },
-          { title, artists, duration: track.duration },
-        ),
-      }))
-      .filter((row): row is { song: (typeof songs)[number]; score: number } =>
-        row.score !== null,
-      )
-      // The best match wins; ties go to the shorter difference, which
-      // the scorer already accounts for in its total.
-      .sort((a, b) => b.score - a.score);
+    const accepted = scoreAndReport(
+      "netease",
+      query,
+      { title, artists, duration: track.duration },
+      songs.map((song) => ({
+        id: song.id,
+        title: song.title,
+        artists: song.artists,
+        duration: song.duration,
+        album: song.album,
+        aliases: song.aliases,
+      })),
+    );
 
-    found = scored[0]?.song.id ?? null;
-  } catch {
+    // The best match wins. The comparison key is a tuple, so the
+    // winner is the one with the lexicographically greatest key.
+    let bestId: string | null = null;
+    let bestKey: MatchKey | null = null;
+    for (const song of songs) {
+      const key = accepted.get(song.id);
+      if (key === undefined) continue;
+      if (bestKey === null || compareKeys(key, bestKey) > 0) {
+        bestKey = key;
+        bestId = song.id;
+      }
+    }
+    found = bestId;
+  } catch (e) {
     // A search that fails is not a reason to fail the heart — the
     // YouTube heart is what the user asked for, and it has already
     // happened by the time this runs. The answer stays `null`, which
     // is also what "not in the NetEase catalogue" means.
+    logMatchReport({
+      provider: "netease",
+      query,
+      source: { title, artists, duration: track.duration },
+      candidateCount: 0,
+      top: [],
+      reason: "search_failed",
+      error: e instanceof Error ? e.message : String(e),
+    });
   }
 
   matchCache.set(key, found);
@@ -217,27 +346,49 @@ export async function findYouTubeVideoId(
   let found: string | null = null;
   try {
     const candidates = await searchYouTube(query);
-    const scored = candidates
-      .map((candidate) => ({
-        candidate,
-        score: confidentScore(
-          {
-            title: candidate.title,
-            artists: candidate.artists,
-            duration: candidate.duration,
-          },
-          { title: track.title, artists: track.artists, duration: track.duration },
-        ),
-      }))
-      .filter(
-        (row): row is { candidate: (typeof candidates)[number]; score: number } =>
-          row.score !== null,
-      )
-      .sort((a, b) => b.score - a.score);
+    const accepted = scoreAndReport(
+      "youtube",
+      query,
+      {
+        title: track.title,
+        artists: track.artists,
+        duration: track.duration,
+      },
+      candidates.map((candidate) => ({
+        id: candidate.providerTrackId,
+        title: candidate.title,
+        artists: candidate.artists,
+        duration: candidate.duration,
+        album: candidate.album,
+      })),
+    );
 
-    found = scored[0]?.candidate.providerTrackId ?? null;
-  } catch {
+    let bestId: string | null = null;
+    let bestKey: MatchKey | null = null;
+    for (const candidate of candidates) {
+      const key = accepted.get(candidate.providerTrackId);
+      if (key === undefined) continue;
+      if (bestKey === null || compareKeys(key, bestKey) > 0) {
+        bestKey = key;
+        bestId = candidate.providerTrackId;
+      }
+    }
+    found = bestId;
+  } catch (e) {
     // Same as the NetEase side: a failed lookup is "no match".
+    logMatchReport({
+      provider: "youtube",
+      query,
+      source: {
+        title: track.title,
+        artists: track.artists,
+        duration: track.duration,
+      },
+      candidateCount: 0,
+      top: [],
+      reason: "search_failed",
+      error: e instanceof Error ? e.message : String(e),
+    });
   }
 
   matchCache.set(key, found);
@@ -276,6 +427,11 @@ export function setNeteaseLikeSyncAvailable(available: boolean): void {
  * recommendation, and skipping the search is both faster and more
  * accurate than matching the track against NetEase's own catalogue to
  * arrive back where it started.
+ *
+ * The *discovery* origin counts too: a daily pick that was redirected
+ * to YouTube still knows the NetEase record it came from, and that
+ * record is the authoritative one — a fresh catalogue search could
+ * land on a cover of the same song.
  */
 function nativeId(
   track: QueueTrack | LastfmTrackMeta | undefined,
@@ -283,8 +439,13 @@ function nativeId(
 ): string | null {
   if (!track) return null;
   const candidate = track as Partial<QueueTrack>;
-  if (candidate.provider !== provider) return null;
-  return candidate.providerTrackId ?? null;
+  if (candidate.provider === provider) {
+    return candidate.providerTrackId ?? null;
+  }
+  if (candidate.discoveredOn === provider) {
+    return candidate.discoveredTrackId ?? null;
+  }
+  return null;
 }
 
 /**
@@ -361,6 +522,13 @@ export async function syncNeteaseLike(
  * to, so the track has to be looked up in YouTube's catalogue first
  * and matched with the same scorer and the same threshold.
  *
+ * The lookup also establishes something worth keeping: the pick is one
+ * recording under two ids, and from now on the app knows which
+ * YouTube video holds which NetEase record. That is what lets the
+ * track keep its NetEase lyrics when it plays from YouTube, and what
+ * lets the source switcher offer the *exact* NetEase record rather
+ * than a search result that might be a cover.
+ *
  * Returns whether the heart was mirrored.
  */
 export async function syncYouTubeLike(
@@ -381,6 +549,14 @@ export async function syncYouTubeLike(
       translate("toast.youtubeLikeNoMatch", { title: subject.title }),
     );
     return false;
+  }
+
+  // The NetEase side of the same recording, when the track knows it.
+  // Recorded before the heart is submitted, so the correspondence is
+  // already there if the user plays the track a moment later.
+  const neteaseSongId = nativeId(track as QueueTrack, "netease");
+  if (neteaseSongId) {
+    rememberNeteaseSong(videoId, neteaseSongId);
   }
 
   try {

@@ -4,6 +4,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import { clearLikeSyncCache, setNeteaseLikeSyncAvailable } from "@/lib/providers/netease-like";
+import { clearAvailability } from "@/lib/providers/availability";
+import { clearMatchCache } from "@/lib/providers/match/cache";
+import { clearProbeCache } from "@/lib/providers/probe";
+import { translate } from "@/lib/i18n";
 
 /**
  * The NetEase account, as the backend reports it.
@@ -46,15 +50,37 @@ export function useNeteaseSession() {
 }
 
 /**
- * Open the NetEase sign-in window.
+ * The QR code the backend drew for the sign-in.
  *
- * The window is NetEase's own login page; the user types their own
- * credentials into it. The app reads the cookie the browser ends up
- * holding — it never sees a password.
+ * `image` is a `data:` URL of a PNG rendered on this machine — the
+ * picture never leaves the app; only the key it encodes did.
  */
-export async function startNeteaseLogin(): Promise<void> {
+export type NeteaseQrCode = {
+  image: string;
+  key: string;
+};
+
+/**
+ * Start the NetEase sign-in.
+ *
+ * The backend asks the platform for a one-time key, renders it as a QR
+ * code locally and polls for the scan state. The code comes straight
+ * back from the call, so the dialog can show it without waiting for an
+ * event to arrive.
+ */
+export async function startNeteaseLogin(): Promise<NeteaseQrCode | null> {
   try {
-    await invoke("netease_start_login");
+    return await invoke<NeteaseQrCode>("netease_start_login");
+  } catch (e) {
+    toast.error(String(e));
+    return null;
+  }
+}
+
+/** Give up on a sign-in that is in progress. */
+export async function cancelNeteaseLogin(): Promise<void> {
+  try {
+    await invoke("netease_cancel_login");
   } catch (e) {
     toast.error(String(e));
   }
@@ -67,6 +93,49 @@ export async function logoutNetease(): Promise<void> {
   } catch (e) {
     toast.error(String(e));
   }
+}
+
+/**
+ * Why a sign-in attempt failed, as the backend reports it.
+ *
+ * The backend sends a code rather than a sentence, so the sentence
+ * can be in the user's own language. `detail` carries the technical
+ * detail (a network error, say) when there is one worth showing.
+ */
+export type NeteaseLoginFailure = {
+  code:
+    | "expired"
+    | "blocked"
+    | "noCredential"
+    | "client"
+    | "storage"
+    | "unknown";
+  detail?: string | null;
+};
+
+/**
+ * Turn a failure into a sentence.
+ *
+ * The code decides the sentence; the detail is appended when there is
+ * one, so a network error shows what actually went wrong instead of
+ * being swallowed by a generic message.
+ */
+function neteaseFailureMessage(payload: unknown): string {
+  const failure = payload as NeteaseLoginFailure | undefined;
+  const code = failure?.code ?? "unknown";
+
+  const key = {
+    expired: "settings.integrations.neteaseQrExpired",
+    blocked: "settings.integrations.neteaseQrBlocked",
+    noCredential: "settings.integrations.neteaseQrNoCredential",
+    client: "settings.integrations.neteaseQrClientFailed",
+    storage: "settings.integrations.neteaseQrStorageFailed",
+    unknown: "settings.integrations.neteaseQrFailed",
+  }[code];
+
+  const message = translate(key) || key;
+  const detail = failure?.detail;
+  return detail ? `${message} (${detail})` : message;
 }
 
 /**
@@ -94,11 +163,15 @@ export function useNeteaseAuthListener(): void {
     const subscribes: Array<Promise<() => void>> = [
       listen("netease-login-success", refresh),
       listen("netease-login-cancelled", refresh),
+      // The backend fills in the account's name and avatar after the
+      // sign-in window has already closed, so the session has to be
+      // re-read once those land.
+      listen("netease-profile-ready", refresh),
       // The backend gives up when the sign-in window stops responding
       // (a crashed WebView2, say). Without this the user would stare at
       // a button that spins forever with no explanation.
       listen("netease-login-failed", (e) => {
-        toast.error(String(e.payload));
+        toast.error(neteaseFailureMessage(e.payload));
         refresh();
       }),
     ];
@@ -120,25 +193,15 @@ export function useNeteaseAuthListener(): void {
 }
 
 /**
- * The sign-in / sign-out control, with its own pending state.
+ * The sign-out control, with its own pending state.
  *
- * The button stays disabled while the sign-in window is open: the
- * backend closes that window itself once the cookie lands, so the
- * user cannot meaningfully "cancel" from here — and a second click
- * would just re-focus the same window.
+ * The sign-in lives in its own dialog (see `NeteaseLoginDialog`), which
+ * closes itself once the credential lands — so there is nothing for
+ * this hook to do about signing in.
  */
 export function useNeteaseAuthActions() {
   const [pending, setPending] = useState(false);
   const qc = useQueryClient();
-
-  const signIn = useCallback(async () => {
-    setPending(true);
-    try {
-      await startNeteaseLogin();
-    } finally {
-      setPending(false);
-    }
-  }, []);
 
   const signOut = useCallback(async () => {
     setPending(true);
@@ -146,12 +209,19 @@ export function useNeteaseAuthActions() {
       await logoutNetease();
       void qc.invalidateQueries({ queryKey: ["netease-session"] });
       void qc.invalidateQueries({ queryKey: ["netease-daily-recommend"] });
-      // The cached answers are the account's, so they go with it.
+      // The cached answers are the account's, so they go with it: which
+      // tracks NetEase will serve depends on the membership that just
+      // went away.
       clearLikeSyncCache();
+      clearAvailability();
+      clearProbeCache();
+      // The cached searches are the account's too — NetEase's catalogue
+      // and its ranking differ for a signed-in member.
+      clearMatchCache();
     } finally {
       setPending(false);
     }
   }, [qc]);
 
-  return { pending, signIn, signOut };
+  return { pending, signOut };
 }

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { IconCircleFilled, IconLoader2 } from "@tabler/icons-react";
+import { IconCircleFilled, IconCircleOff, IconLoader2 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,7 @@ import {
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { type QueueTrack } from "@/lib/store/playback";
-import { useAlternativeSources } from "@/lib/providers/alternatives";
+import { useAlternativeSources, usePlayability } from "@/lib/providers/alternatives";
 import { switchTrackProvider } from "@/lib/providers/switch";
 import {
   PROVIDER_LABELS,
@@ -57,11 +57,12 @@ export type SourceIndicatorProps = {
   className?: string;
   /**
    * `chip` for the full-screen player, `ghost` for the side card,
-   * `icon` for the bottom bar — where the row of secondary actions is
-   * dense and a labelled pill would push the transport cluster off
-   * centre.
+   * `bar` for the bottom bar. All three name the source in words —
+   * the dot alone cannot tell a 128 kbps YouTube rip from a lossless
+   * NetEase stream — and all three open the same list of alternative
+   * sources to switch to.
    */
-  variant?: "chip" | "ghost" | "icon";
+  variant?: "chip" | "ghost" | "bar";
 };
 
 export function SourceIndicator({
@@ -76,6 +77,11 @@ export function SourceIndicator({
   // state: the list is a property of the track, so re-opening the
   // menu reads the cache instead of firing a fresh search every time.
   const { alternatives, isLoading } = useAlternativeSources(track);
+
+  // Which of those sources will actually serve the track. A source
+  // that merely lists it is not the same as one that will play it, and
+  // the difference is worth showing before the user switches.
+  const playability = usePlayability(alternatives);
 
   const provider = track?.provider ?? "youtube";
   const providerTrackId = track?.providerTrackId ?? track?.videoId ?? "";
@@ -119,16 +125,17 @@ export function SourceIndicator({
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              size={variant === "icon" ? "icon" : "sm"}
+              size="sm"
               disabled={switching !== null}
               aria-label={t("settings.providers.currentSource")}
               className={cn(
                 "h-7 gap-1.5 px-2 text-[11.5px] font-medium text-muted-foreground hover:text-foreground",
                 variant === "chip" &&
                   "h-8 rounded-full border border-hairline bg-surface/60 px-3",
-                // The icon variant keeps the dot but drops the label —
-                // the tooltip and the dropdown carry the name.
-                variant === "icon" && "size-8 p-0",
+                // The bottom bar's row of secondary actions is dense, so
+                // the label is capped rather than allowed to push the
+                // transport cluster off centre.
+                variant === "bar" && "max-w-[7.5rem]",
                 className,
               )}
             >
@@ -137,18 +144,15 @@ export function SourceIndicator({
               ) : (
                 <IconCircleFilled className="size-2 text-brand" />
               )}
-              {variant === "icon" ? null : (
-                <span className="max-w-[9rem] truncate">
-                  {PROVIDER_LABELS[provider]}
-                </span>
-              )}
+              <span className="max-w-[9rem] truncate">
+                {PROVIDER_LABELS[provider]}
+              </span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          {variant === "icon"
-            ? `${t("settings.providers.currentSource")} · ${PROVIDER_LABELS[provider]}`
-            : t("settings.providers.currentSource")}
+          {t("settings.providers.currentSource")} ·{" "}
+          {PROVIDER_LABELS[provider]}
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" side="top" className="w-60">
@@ -188,20 +192,35 @@ export function SourceIndicator({
             {t("settings.providers.noOtherSource")}
           </DropdownMenuItem>
         ) : (
-          others.map((ref) => (
-            <DropdownMenuItem
-              key={`${ref.provider}:${ref.providerTrackId}`}
-              onSelect={() => void switchTo(ref)}
-              className="gap-2"
-            >
-              {switching === ref.provider ? (
-                <IconLoader2 className="size-3.5 animate-spin" />
-              ) : (
-                <IconCircleFilled className="size-2 shrink-0 text-t8" />
-              )}
-              <span className="truncate">{PROVIDER_LABELS[ref.provider]}</span>
-            </DropdownMenuItem>
-          ))
+          others.map((ref) => {
+            const key = `${ref.provider}:${ref.providerTrackId}`;
+            // `undefined` means the answer is not in yet.
+            const canPlay = playability.get(key);
+            return (
+              <DropdownMenuItem
+                key={key}
+                onSelect={() => void switchTo(ref)}
+                className="gap-2"
+              >
+                {switching === ref.provider ? (
+                  <IconLoader2 className="size-3.5 animate-spin" />
+                ) : canPlay === false ? (
+                  // The source has the track but will not serve it — a
+                  // membership gate, most likely. Switching to it would
+                  // fail, so it is dimmed and marked.
+                  <IconCircleOff className="size-3.5 shrink-0 text-t8" />
+                ) : (
+                  <IconCircleFilled className="size-2 shrink-0 text-t8" />
+                )}
+                <span className="truncate">{PROVIDER_LABELS[ref.provider]}</span>
+                {canPlay === false ? (
+                  <span className="ml-auto shrink-0 text-[10.5px] text-t8">
+                    {t("settings.providers.sourceUnavailable")}
+                  </span>
+                ) : null}
+              </DropdownMenuItem>
+            );
+          })
         )}
       </DropdownMenuContent>
     </DropdownMenu>

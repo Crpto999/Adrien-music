@@ -75,11 +75,25 @@ tower = "0.5"
 cookie = "0.18"
 time = "0.3"
 base64 = "0.22"
+# The NetEase sign-in draws its own QR code locally, so the picture
+# never leaves the machine — only the one-time key it encodes does.
+# `qrcode`'s `image` feature renders into an `image` buffer; `image`'s
+# PNG encoder turns that into the bytes the frontend shows.
+qrcode = { version = "0.14", default-features = false, features = ["image"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+# The NetEase sign-in builds a device fingerprint (`sDeviceId`) that the
+# platform uses to tie a scanned code to the request that issued it.
+getrandom = "0.3"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-autostart = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
+# Global keyboard shortcuts. `global-hotkey` registers a system-wide
+# hotkey per binding (RegisterHotKey on Windows, Carbon on macOS, X11
+# elsewhere); the mouse-button side of the feature is a native
+# low-level hook we install ourselves — see src/hotkeys.rs.
+global-hotkey = "0.8"
 # Native media controls: SMTC on Windows, MPRIS on Linux, and Now Playing on
 # macOS. We create the Windows SMTC from the host process so the tile resolves
 # to adrify's identity instead of the msedgewebview2.exe child. See media.rs.
@@ -110,6 +124,12 @@ windows-sys = { version = "0.59", features = [
     # hasn't reassociated yet after a resume. See src/power.rs.
     "Win32_NetworkManagement_IpHelper",
     "Win32_Networking_WinSock",
+    # GetAsyncKeyState / VK_* — reading the modifier state when a global
+    # mouse-button shortcut fires. See src/hotkeys.rs.
+    "Win32_UI_Input_KeyboardAndMouse",
+    # GetCurrentThreadId — identifying the thread that owns the low-level
+    # mouse hook, so it can be asked to stop. See src/hotkeys.rs.
+    "Win32_System_Threading",
 ] }
 # The taskbar thumbnail toolbar (shuffle / prev / play-pause / next / repeat /
 # like under the taskbar preview) is COM: ITaskbarList3 plus a window subclass

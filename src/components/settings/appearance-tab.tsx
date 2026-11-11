@@ -10,7 +10,6 @@ import {
   IconSparkles,
   IconThumbDown,
   IconThumbUp,
-  IconTypography,
 } from "@tabler/icons-react";
 import {
   DropdownMenu,
@@ -22,7 +21,7 @@ import { SegmentedControl } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Group, SettingRow, TabPane } from "@/components/settings/primitives";
-import { INTERFACE_FONTS, interfaceFontStack } from "@/lib/interface-font";
+import { InterfaceFontRow } from "@/components/settings/interface-font-row";
 import {
   ThemeGlyph,
   useThemeChoices,
@@ -704,48 +703,3 @@ const FS_TILES: {
 ];
 
 /** Menu of the bundled typefaces, each entry set in its own face. */
-function InterfaceFontRow() {
-  const t = useT();
-  const font = useSettingsStore((s) => s.interfaceFont);
-  const setFont = useSettingsStore((s) => s.setInterfaceFont);
-  const current = INTERFACE_FONTS.find((f) => f.id === font);
-
-  return (
-    <SettingRow
-      icon={IconTypography}
-      settingId="interface-font"
-      title={t("settings.appearance.interfaceFont")}
-      description={t("settings.appearance.interfaceFontDesc")}
-      control={
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="flex h-8 w-[196px] cursor-pointer items-center gap-2 rounded-[10px] border border-w090 bg-w040 px-3 text-[13px] text-t2 transition-colors duration-[140ms] hover:bg-w070 data-[state=open]:border-w200"
-              style={{ fontFamily: interfaceFontStack(font) }}
-            >
-              <span className="min-w-0 flex-1 truncate text-left">
-                {current?.label ?? t("settings.appearance.fontSystem")}
-              </span>
-              <IconChevronDown className="size-3 shrink-0 text-t6" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[232px]">
-            {INTERFACE_FONTS.map((f) => (
-              <DropdownMenuItem
-                key={f.id}
-                onSelect={() => setFont(f.id)}
-                style={{ fontFamily: f.stack }}
-              >
-                <span className="flex-1 truncate">{f.label}</span>
-                {font === f.id ? (
-                  <IconCheck className="size-4 text-active!" stroke={2.4} />
-                ) : null}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      }
-    />
-  );
-}

@@ -7,6 +7,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   IconBellFilled,
   IconBoltFilled,
+  IconBug,
   IconCheck,
   IconChevronDown,
   IconCircleArrowDownFilled,
@@ -214,6 +215,8 @@ function ProxyRow() {
  */
 function DiagnosticsRow() {
   const t = useT();
+  const matchDebugLog = useSettingsStore((s) => s.matchDebugLog);
+  const setMatchDebugLog = useSettingsStore((s) => s.setMatchDebugLog);
   const { data: logPath } = useQuery({
     queryKey: ["log-path"],
     queryFn: () => invoke<string | null>("get_log_path"),
@@ -221,31 +224,43 @@ function DiagnosticsRow() {
     retry: false,
   });
 
-  if (!logPath) return null;
-
   return (
     <Group>
       <SettingRow
-        icon={IconFileText}
-        settingId="diagnostics"
-        title={t("settings.general.logPath")}
-        description={t("settings.general.logPathDesc")}
+        icon={IconBug}
+        settingId="matchDebugLog"
+        title={t("settings.general.matchDebugLog")}
+        description={t("settings.general.matchDebugLogDesc")}
         control={
-          <button
-            type="button"
-            title={logPath}
-            onClick={() => {
-              void copyToClipboard(logPath).then((ok) => {
-                if (ok) toast.success(t("toast.logPathCopied"));
-                else toast.error(t("toast.couldNotCopyLink"));
-              });
-            }}
-            className="w-[280px] cursor-pointer truncate rounded-[10px] border border-w090 bg-w040 px-3 py-1.5 text-start text-[12px] text-t4 transition-colors duration-[140ms] hover:bg-w070"
-          >
-            {logPath}
-          </button>
+          <Switch
+            checked={matchDebugLog}
+            onCheckedChange={setMatchDebugLog}
+          />
         }
       />
+      {logPath ? (
+        <SettingRow
+          icon={IconFileText}
+          settingId="diagnostics"
+          title={t("settings.general.logPath")}
+          description={t("settings.general.logPathDesc")}
+          control={
+            <button
+              type="button"
+              title={logPath}
+              onClick={() => {
+                void copyToClipboard(logPath).then((ok) => {
+                  if (ok) toast.success(t("toast.logPathCopied"));
+                  else toast.error(t("toast.couldNotCopyLink"));
+                });
+              }}
+              className="w-[280px] cursor-pointer truncate rounded-[10px] border border-w090 bg-w040 px-3 py-1.5 text-start text-[12px] text-t4 transition-colors duration-[140ms] hover:bg-w070"
+            >
+              {logPath}
+            </button>
+          }
+        />
+      ) : null}
     </Group>
   );
 }

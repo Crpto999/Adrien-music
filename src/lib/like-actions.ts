@@ -14,7 +14,9 @@ import {
   syncNeteaseLike,
   syncYouTubeLike,
 } from "@/lib/providers/netease-like";
+import { isYouTubeVideoId } from "@/lib/providers/queue";
 import { useDislikesStore } from "@/lib/store/dislikes";
+import { rememberPlatformPair } from "@/lib/store/netease-ids";
 import { translate } from "@/lib/i18n";
 import type { QueueTrack } from "@/lib/store/playback";
 
@@ -45,11 +47,7 @@ export function isNativeYouTubeId(
   // An explicit provider wins: a YouTube track keeps its YouTube id
   // even when it was discovered on another platform.
   const provider = (track as Partial<QueueTrack> | undefined)?.provider;
-  if (provider) return provider === "youtube";
-  // Without provider metadata, the id's own shape decides. A YouTube
-  // id is 11 characters of base64-ish alphabet; the synthetic ids are
-  // `provider_<id>` and are longer or plainly namespaced.
-  return !/^[a-z]+_/.test(videoId);
+  return isYouTubeVideoId(videoId, provider);
 }
 
 /**
@@ -69,11 +67,20 @@ function providerOf(
  *
  * A NetEase track carries its own song id, so there is nothing to look
  * up: the heart can be submitted straight to NetEase.
+ *
+ * The *discovery* origin counts too: a NetEase daily pick that was
+ * redirected to YouTube still knows the NetEase record it came from,
+ * and that record is the authoritative one — a fresh catalogue search
+ * could land on a cover of the same song.
  */
 function providerTrackIdOf(
   track: LastfmTrackMeta | QueueTrack | undefined,
 ): string | undefined {
-  return (track as Partial<QueueTrack> | undefined)?.providerTrackId;
+  const candidate = track as Partial<QueueTrack> | undefined;
+  if (!candidate) return undefined;
+  if (candidate.provider === "netease") return candidate.providerTrackId;
+  if (candidate.discoveredOn === "netease") return candidate.discoveredTrackId;
+  return undefined;
 }
 
 /**
@@ -184,6 +191,21 @@ export async function toggleLiked({
       // A like replaces a dislike on the server; mirror that locally.
       useDislikesStore.getState().remove(videoId);
     }
+    // A track the app knows on NetEase — a daily pick that was
+    // redirected to YouTube — keeps the correspondence alive, so the
+    // track can still be recognised as the NetEase recording it came
+    // from when it comes back out of the liked list.
+    rememberPlatformPair(
+      {
+        provider: "youtube",
+        providerTrackId: videoId,
+        videoId,
+      },
+      {
+        provider: "netease",
+        providerTrackId: providerTrackIdOf(track),
+      },
+    );
   } else {
     // A track from a platform that has no heart of its own yet (the
     // other Chinese platforms, Spotify, Apple). YouTube is where the

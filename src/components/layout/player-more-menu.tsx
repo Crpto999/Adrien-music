@@ -104,7 +104,7 @@ export function PlayerMoreMenu({
           open={controller.newPlaylistOpen}
           onOpenChange={controller.setNewPlaylistOpen}
           defaultTitle={item.title}
-          videoIds={[item.id]}
+          tracks={[item]}
         />
       ) : null}
     </>

@@ -51,6 +51,14 @@ pub struct NeteaseSong {
     pub title: String,
     pub artists: Vec<String>,
     pub album: Option<String>,
+    /// The platform's other names for the recording.
+    ///
+    /// NetEase files a song under an alias as well as its title, and
+    /// the alias is often the name the recording is known by *elsewhere*
+    /// — "晴天" is also "Sunny Day". Matching against the aliases is
+    /// what connects a YouTube upload filed under one name to the
+    /// NetEase record filed under another.
+    pub aliases: Vec<String>,
     /// Milliseconds, as NetEase reports it.
     pub duration_ms: u64,
     /// Seconds, for the app's own duration fields.
@@ -303,12 +311,13 @@ fn parse_song(raw: &serde_json::Value) -> Option<NeteaseSong> {
         .and_then(|a| a.get("name"))
         .and_then(|n| n.as_str())
         .map(|s| s.trim().to_string());
+    let aliases = parse_aliases(raw.get("alias"));
     let duration_ms = raw.get("duration").and_then(|d| d.as_u64()).unwrap_or(0);
     let cover_url = raw
         .get("album")
         .and_then(|a| a.get("picUrl"))
         .and_then(|p| p.as_str())
-        .map(|s| s.to_string());
+        .map(crate::cover_url::to_https);
     let fee = raw.get("fee").and_then(|f| f.as_i64()).unwrap_or(0);
 
     Some(NeteaseSong {
@@ -316,12 +325,30 @@ fn parse_song(raw: &serde_json::Value) -> Option<NeteaseSong> {
         title,
         artists,
         album,
+        aliases,
         duration_ms,
         duration: duration_ms / 1000,
         cover_url,
         fee,
         playable: true,
     })
+}
+
+/// The platform's other names for a recording.
+///
+/// The search endpoint reports them as `alias`; the compact
+/// recommendation payload uses `alia`. Both are lists of strings, and
+/// both are optional.
+fn parse_aliases(raw: Option<&serde_json::Value>) -> Vec<String> {
+    raw.and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|a| a.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The daily recommendation playlist.
@@ -449,12 +476,14 @@ fn parse_recommend_song(raw: &serde_json::Value) -> Option<NeteaseSong> {
         .and_then(|a| a.get("name"))
         .and_then(|n| n.as_str())
         .map(|s| s.trim().to_string());
+    // The compact payload spells the aliases `alia`.
+    let aliases = parse_aliases(raw.get("alia"));
     let duration_ms = raw.get("dt").and_then(|d| d.as_u64()).unwrap_or(0);
     let cover_url = raw
         .get("al")
         .and_then(|a| a.get("picUrl"))
         .and_then(|p| p.as_str())
-        .map(|s| s.to_string());
+        .map(crate::cover_url::to_https);
     let fee = raw.get("fee").and_then(|f| f.as_i64()).unwrap_or(0);
 
     Some(NeteaseSong {
@@ -462,6 +491,7 @@ fn parse_recommend_song(raw: &serde_json::Value) -> Option<NeteaseSong> {
         title,
         artists,
         album,
+        aliases,
         duration_ms,
         duration: duration_ms / 1000,
         cover_url,
@@ -490,16 +520,24 @@ pub struct NeteaseLyric {
 
 /// Fetch the lyrics for a song.
 ///
-/// The word-by-word form comes from the platform's `/api/song/lyric/v1`
-/// endpoint, which is the only one that carries it — the plain
-/// endpoint answers with `lrc` alone, and the eapi v0 answers with an
-/// empty `klyric`. Measured against the live platform: a song with
-/// word-level timings returns a populated `yrc` from v1 and nothing
-/// from v0.
+/// Two endpoints are asked, concurrently, and both are anonymous — the
+/// platform serves lyrics to a signed-out client exactly as it serves
+/// them to a signed-in one, so the account's cookie is not needed and
+/// not used. The endpoints are the ones the platform documents:
 ///
-/// The line-level form comes from the same v1 response when it is
-/// there, and from the v0 endpoint otherwise, so a song without
-/// word-level timings still gets its words.
+///   * `/api/song/lyric` — the line-level form, in standard LRC, plus
+///     the translation.
+///   * `/api/song/lyric/v1` — the same, plus the word-by-word (`yrc`)
+///     form. Measured against the live platform: a song with
+///     word-level timings returns a populated `yrc` from v1 and
+///     nothing from v0, and v0 never carries it at all.
+///
+/// The two are asked at the same time rather than one after the other,
+/// because the answer is a union: the line-level text comes from v0
+/// (which answers with real LRC for every song that has lyrics) and
+/// the word-by-word text from v1 (which is the only one that has it).
+/// Asking them serially would cost two round trips where one is
+/// enough.
 #[tauri::command]
 pub async fn netease_lyric(song_id: String) -> Result<Option<NeteaseLyric>, String> {
     let song_id = song_id.trim();
@@ -511,7 +549,7 @@ pub async fn netease_lyric(song_id: String) -> Result<Option<NeteaseLyric>, Stri
 
     // The word-by-word endpoint. `tv`/`lv`/`rv`/`kv`/`yv`/`ytv`/`yrv`
     // are the per-kind switches; `0` asks for all of them.
-    let v1 = eapi_post(
+    let v1_fut = eapi_post(
         &client,
         LYRIC_V1_URI,
         LYRIC_V1_URL,
@@ -522,9 +560,25 @@ pub async fn netease_lyric(song_id: String) -> Result<Option<NeteaseLyric>, Stri
             "yv": 0, "ytv": 0, "yrv": 0,
         }),
         None,
-    )
-    .await
-    .unwrap_or(serde_json::Value::Null);
+    );
+
+    // The line-level endpoint. `tv`/`lv`/`rv`/`kv` are the per-kind
+    // switches and `_nmclfl` is the newer-format flag.
+    let v0_fut = eapi_post(
+        &client,
+        LYRIC_URI,
+        LYRIC_EAPI_URL,
+        serde_json::json!({
+            "id": song_id,
+            "tv": -1, "lv": -1, "rv": -1, "kv": -1,
+            "_nmclfl": 1,
+        }),
+        None,
+    );
+
+    let (v1, v0) = tokio::join!(v1_fut, v0_fut);
+    let v1 = v1.unwrap_or(serde_json::Value::Null);
+    let v0 = v0.unwrap_or(serde_json::Value::Null);
 
     let lyric_of = |body: &serde_json::Value, key: &str| -> Option<String> {
         body.get(key)
@@ -535,45 +589,51 @@ pub async fn netease_lyric(song_id: String) -> Result<Option<NeteaseLyric>, Stri
             .map(|t| t.to_string())
     };
 
+    // The word-by-word form. Only v1 carries it.
     let yrc = lyric_of(&v1, "yrc");
-    let mut lrc = lyric_of(&v1, "lrc");
-    let mut tlyric = lyric_of(&v1, "tlyric");
 
-    // The v1 response's `lrc` is JSON Lines (one JSON object per line)
-    // rather than standard LRC, so it is only useful as a fallback
-    // when the v0 endpoint — which answers with real LRC — is
-    // unreachable.
-    let v1_lrc_is_json_lines = lrc
-        .as_deref()
-        .map(|t| t.lines().next().map(|l| l.trim_start().starts_with('{')).unwrap_or(false))
-        .unwrap_or(false);
-
-    if lrc.is_none() || v1_lrc_is_json_lines {
-        let v0 = eapi_post(
-            &client,
-            LYRIC_URI,
-            LYRIC_EAPI_URL,
-            serde_json::json!({
-                "id": song_id,
-                "tv": -1, "lv": -1, "rv": -1, "kv": -1,
-                "_nmclfl": 1,
-            }),
-            None,
-        )
-        .await
-        .unwrap_or(serde_json::Value::Null);
-        if let Some(v0_lrc) = lyric_of(&v0, "lrc") {
-            lrc = Some(v0_lrc);
-        }
-        if tlyric.is_none() {
-            tlyric = lyric_of(&v0, "tlyric");
-        }
+    // The line-level form. v0 answers with real LRC for every song
+    // that has lyrics, so it is the primary source; the v1 body is the
+    // fallback, and it has to be stripped of its JSON rows first (see
+    // `lrc_rows_from_v1`).
+    let mut lrc = lyric_of(&v0, "lrc");
+    if lrc.is_none() {
+        lrc = lyric_of(&v1, "lrc").and_then(|body| lrc_rows_from_v1(&body));
     }
+
+    // The translation, from whichever endpoint answered with one.
+    let tlyric = lyric_of(&v0, "tlyric").or_else(|| lyric_of(&v1, "tlyric"));
 
     if lrc.is_none() && yrc.is_none() {
         return Ok(None);
     }
     Ok(Some(NeteaseLyric { lrc, yrc, tlyric }))
+}
+
+/// The standard-LRC rows inside a v1 `lrc` body.
+///
+/// The v1 body mixes two formats in one string: the entity rows at the
+/// top — the credits, which the platform keeps as structured objects —
+/// are JSON Lines (`{"t":…,"c":[…]}`), and the song's own lines follow
+/// in standard LRC. Only the LRC rows carry timings the player can use,
+/// so the JSON rows are dropped.
+///
+/// The credits are not lost by this: v0 carries the same credits as
+/// ordinary LRC lines, and v0 is the primary source for the line-level
+/// form.
+fn lrc_rows_from_v1(body: &str) -> Option<String> {
+    let mut rows: Vec<&str> = Vec::new();
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('{') {
+            continue;
+        }
+        rows.push(line);
+    }
+    if rows.is_empty() {
+        return None;
+    }
+    Some(rows.join("\n"))
 }
 
 /// The song ids in the account's "我喜欢的音乐" collection.
@@ -943,11 +1003,13 @@ async fn like_request(
 ///
 /// Walks two sources in order:
 ///
-///  1. The official endpoint, with the user's own cookie. This is the
-///     path that yields the best quality — a member account gets
-///     lossless and hires.
-///  2. The third-party unblock pool (`unblock.rs`), for tracks the
-///     official endpoint refuses.
+///  1. The third-party unblock pool (`unblock.rs`). This is the
+///     preferred path: the pool is a shared set of member accounts
+///     that serve the whole catalogue, so it answers for the paid
+///     tracks the platform gates as well as the free ones.
+///  2. The official endpoint, with the user's own cookie — the
+///     fallback, for when the pool has no endpoint that will serve the
+///     track.
 ///
 /// Returns the URL together with where it came from, so the UI can
 /// tell the user which path served the track.
@@ -966,7 +1028,27 @@ async fn resolve_direct(app: &tauri::AppHandle, song_id: &str) -> Option<Netease
         return None;
     }
 
-    // 1. The official endpoint, with the user's own cookie.
+    // 1. The third-party pool.
+    //
+    // The pool is asked first on purpose. Its endpoints are member
+    // accounts that serve the catalogue as a whole, so they answer for
+    // the gated tracks too — which is exactly what the official path
+    // cannot do for a user without a membership of their own.
+    //
+    // The official path is the fallback rather than the first choice:
+    // it is bound to *one* account, so it can only serve what that
+    // account is entitled to, and it needs a signed-in user to serve
+    // anything above the free tier at all.
+    if let Some(resolved) = crate::unblock::resolve(app, &song_id).await {
+        return Some(NeteaseResolved {
+            url: resolved.url,
+            source: resolved.endpoint,
+            quality: resolved.quality,
+            size: None,
+        });
+    }
+
+    // 2. The official endpoint, with the user's own cookie.
     let client = proxy::build_client(reqwest::Client::builder()).ok()?;
     let cookie = crate::netease_cookie(app).await;
     for level in LEVELS {
@@ -993,14 +1075,7 @@ async fn resolve_direct(app: &tauri::AppHandle, song_id: &str) -> Option<Netease
         });
     }
 
-    // 2. The third-party pool.
-    let resolved = crate::unblock::resolve(app, &song_id).await?;
-    Some(NeteaseResolved {
-        url: resolved.url,
-        source: resolved.endpoint,
-        quality: resolved.quality,
-        size: None,
-    })
+    None
 }
 
 /// Resolve a NetEase song id to a directly-fetchable audio stream.
@@ -1439,6 +1514,28 @@ mod tests {
         assert!(sent.contains("appver=3.1.17.204416"), "{sent}");
     }
 
+    /// The lyric request is anonymous.
+    ///
+    /// The platform serves lyrics to a signed-out client exactly as it
+    /// serves them to a signed-in one — the catalogue's lyrics are not
+    /// behind the membership — so the account's cookie is not needed
+    /// and not used. Sending it would tie the lyrics to the account for
+    /// no gain, and would make the words unavailable to a user who has
+    /// not signed in.
+    ///
+    /// The request goes out with the anonymous cookie and a header with
+    /// no `MUSIC_U` in it, which is what `eapi_post(.., None)` produces.
+    #[test]
+    fn the_lyric_request_is_anonymous() {
+        let header = account_header(None);
+        assert!(header.get("MUSIC_U").is_none());
+        let cookie = anonymous_cookie();
+        assert!(!cookie.contains("MUSIC_U="), "{cookie}");
+        // The device cookies are still there — the platform's own client
+        // sends them too, and a request without them is treated oddly.
+        assert!(cookie.contains("deviceId=pyncm!"), "{cookie}");
+    }
+
     #[test]
     fn a_search_row_parses_into_our_shape() {
         let raw = serde_json::json!({
@@ -1458,10 +1555,59 @@ mod tests {
         assert_eq!(song.fee, 1);
     }
 
+    /// The platform's other names for a recording come through.
+    ///
+    /// "晴天" is also "Sunny Day" on NetEase, and that alias is often
+    /// the name the recording is known by on the platform the user
+    /// came from — which is exactly the name the matching side
+    /// carries. So the alias has to survive the parsing.
+    #[test]
+    fn a_search_row_keeps_its_aliases() {
+        let raw = serde_json::json!({
+            "id": 186016,
+            "name": "晴天",
+            "artists": [{"name": "周杰伦"}],
+            "album": {"name": "叶惠美"},
+            "duration": 269800,
+            "alias": ["Sunny Day"],
+            "fee": 8
+        });
+        let song = parse_song(&raw).expect("parsed");
+        assert_eq!(song.aliases, vec!["Sunny Day"]);
+    }
+
+    /// The compact payload spells the aliases `alia`.
+    #[test]
+    fn a_recommendation_row_keeps_its_aliases() {
+        let raw = serde_json::json!({
+            "id": 186016,
+            "name": "晴天",
+            "ar": [{"id": 6452, "name": "周杰伦"}],
+            "al": {"id": 1872809, "name": "叶惠美"},
+            "dt": 269800,
+            "alia": ["Sunny Day"],
+            "fee": 8
+        });
+        let song = parse_recommend_song(&raw).expect("parsed");
+        assert_eq!(song.aliases, vec!["Sunny Day"]);
+    }
+
+    /// A row without aliases is not an error.
+    #[test]
+    fn a_row_without_aliases_parses() {
+        let raw = serde_json::json!({
+            "id": 186016,
+            "name": "晴天",
+            "artists": [{"name": "周杰伦"}],
+            "duration": 269800
+        });
+        let song = parse_song(&raw).expect("parsed");
+        assert!(song.aliases.is_empty());
+    }
+
     /// The recommendation payload uses the compact key names.
     #[test]
-    fn a_recommendation_row_parses_into_our_shape() {
-        let raw = serde_json::json!({
+    fn a_recommendation_row_parses_into_our_shape() {        let raw = serde_json::json!({
             "id": 27511488,
             "name": "你瞒我瞒",
             "ar": [{"id": 2127, "name": "陈柏宇"}],
@@ -1883,5 +2029,48 @@ mod tests {
 
         println!("collection: {} songs", ids.len());
         assert!(!ids.is_empty(), "the account's collection is empty");
+    }
+
+    /// The v1 lyric body mixes two formats, and only one of them is
+    /// standard LRC.
+    ///
+    /// The credits at the top are JSON Lines — one JSON object per line —
+    /// and the song's own lines follow in standard LRC. A parser handed
+    /// the whole body would find no timestamps on the JSON rows and
+    /// would have to skip them; the helper drops them explicitly so the
+    /// LRC the frontend receives is nothing but LRC.
+    #[test]
+    fn the_v1_body_yields_only_its_lrc_rows() {
+        let body = concat!(
+            r#"{"t":0,"c":[{"tx":"作词: "},{"tx":"周杰伦"}]}"#,
+            "\n",
+            r#"{"t":1000,"c":[{"tx":"作曲: "},{"tx":"周杰伦"}]}"#,
+            "\n",
+            "[00:06.876]OP：北京合纵时代科技有限公司\n",
+            "[00:09.000]第一行歌词\n",
+        );
+
+        let lrc = lrc_rows_from_v1(body).expect("some LRC rows");
+        assert!(!lrc.contains('{'), "a JSON row survived: {lrc}");
+        assert!(lrc.contains("[00:06.876]"), "an LRC row was lost: {lrc}");
+        assert!(lrc.contains("[00:09.000]"), "an LRC row was lost: {lrc}");
+        // Only the LRC rows survive.
+        assert_eq!(lrc.lines().count(), 2, "{lrc}");
+    }
+
+    /// A body with no LRC rows at all is no answer — the caller falls
+    /// through to the v0 endpoint rather than handing the frontend an
+    /// empty string.
+    #[test]
+    fn a_v1_body_with_only_json_rows_yields_nothing() {
+        let body = r#"{"t":0,"c":[{"tx":"作词: "},{"tx":"周杰伦"}]}"#;
+        assert!(lrc_rows_from_v1(body).is_none());
+    }
+
+    /// An empty body is no answer either.
+    #[test]
+    fn an_empty_v1_body_yields_nothing() {
+        assert!(lrc_rows_from_v1("").is_none());
+        assert!(lrc_rows_from_v1("   \n  \n").is_none());
     }
 }

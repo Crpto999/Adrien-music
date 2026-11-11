@@ -6,8 +6,13 @@ import { persist } from "zustand/middleware";
 export type CloseButtonAction = "tray" | "quit";
 export type CacheAutoCleanPeriod = "off" | "daily" | "weekly" | "monthly";
 export type BackgroundMode = "ambient" | "plain";
-/** Typeface for the whole UI. Stacks live in `lib/interface-font.ts`. */
-export type InterfaceFont = "system" | "gsans" | "inter" | "roboto" | "plex";
+/**
+ * Typeface for the whole UI. Stacks live in `lib/interface-font.ts`.
+ *
+ * `pingfang` is not bundled: the family is downloaded on demand when
+ * the user picks it (see `lib/pingfang-font.ts`).
+ */
+export type InterfaceFont = "system" | "pingfang";
 /** One heart, or a thumbs-up / thumbs-down pair. */
 export type RatingButtons = "heart" | "both";
 /** How the full-screen now-playing view fills the window
@@ -33,6 +38,16 @@ type State = {
   /** Body of the full-screen player: cover centred, cover with the
    *  lyrics beside it, or the art itself behind the title. */
   fullscreenLayout: FullscreenLayout;
+  /**
+   * Whether the cross-provider matcher records what it saw.
+   *
+   * On by default: the log is the only record of *why* a song was (or
+   * was not) matched, and it is what makes a "this song has no source"
+   * bug report actionable. The volume is bounded — one report per
+   * provider per search, with only the best few candidates in full —
+   * so it is not a flood.
+   */
+  matchDebugLog: boolean;
   /** System toast on track change while the app is in the background
    *  (see `lib/playback-notifications.ts`). */
   playbackNotifications: boolean;
@@ -63,6 +78,7 @@ type State = {
   setInterfaceFont: (v: InterfaceFont) => void;
   setRatingButtons: (v: RatingButtons) => void;
   setFullscreenLayout: (v: FullscreenLayout) => void;
+  setMatchDebugLog: (v: boolean) => void;
   setPlaybackNotifications: (v: boolean) => void;
   setLyricsEnabled: (v: boolean) => void;
   setAutoUpdate: (v: boolean) => void;
@@ -87,6 +103,7 @@ export const useSettingsStore = create<State>()(
       interfaceFont: "system",
       ratingButtons: "heart",
       fullscreenLayout: "cover",
+      matchDebugLog: true,
       playbackNotifications: false,
       lyricsEnabled: true,
       autoUpdate: true,
@@ -100,6 +117,7 @@ export const useSettingsStore = create<State>()(
       setInterfaceFont: (interfaceFont) => set({ interfaceFont }),
       setRatingButtons: (ratingButtons) => set({ ratingButtons }),
       setFullscreenLayout: (fullscreenLayout) => set({ fullscreenLayout }),
+      setMatchDebugLog: (matchDebugLog) => set({ matchDebugLog }),
       setPlaybackNotifications: (playbackNotifications) =>
         set({ playbackNotifications }),
       setLyricsEnabled: (lyricsEnabled) => set({ lyricsEnabled }),
@@ -141,4 +159,24 @@ export function useCloseBehaviorSync(): void {
       /* plain-vite dev without a Tauri backend — nothing to sync */
     });
   }, [closeAction]);
+}
+
+/**
+ * Mirror the match-diagnostics preference into the matcher.
+ *
+ * The matcher is not a React component and cannot read the store
+ * itself, so the setting is pushed into it here. Mounted once in
+ * AppShell.
+ */
+export function useMatchDebugSync(): void {
+  const matchDebugLog = useSettingsStore((s) => s.matchDebugLog);
+  useEffect(() => {
+    void import("@/lib/providers/match/debug").then((m) => {
+      m.setMatchDebugEnabled(matchDebugLog);
+      // The history is cleared with the switch, so a report that was
+      // suppressed while the switch was off is written again once it
+      // comes back on.
+      m.clearMatchDebugHistory();
+    });
+  }, [matchDebugLog]);
 }

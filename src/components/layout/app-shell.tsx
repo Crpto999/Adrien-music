@@ -47,7 +47,11 @@ import {
   CARD_CONTENT_GAP,
   CARD_EDGE_GAP,
 } from "@/lib/store/panels";
-import { useCloseBehaviorSync, useSettingsStore } from "@/lib/store/settings";
+import {
+  useCloseBehaviorSync,
+  useMatchDebugSync,
+  useSettingsStore,
+} from "@/lib/store/settings";
 import { useDiscordPresenceSync } from "@/lib/store/discord";
 import {
   useAccountMetaBackfill,
@@ -59,6 +63,10 @@ import { useSessionStatusListener } from "@/lib/store/session-status";
 import { useProxySync } from "@/lib/proxy";
 import { useAlternativeSourcesPrefetch } from "@/lib/providers/alternatives";
 import { useNeteaseAuthListener } from "@/lib/providers/netease-auth";
+import {
+  useGlobalHotkeysListener,
+  useGlobalHotkeysSync,
+} from "@/lib/global-hotkeys";
 
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -135,12 +143,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   useAccountMetaBackfill();
   useGlobalShortcuts();
   useCloseBehaviorSync();
+  useMatchDebugSync();
   useProxySync();
   useDiscordPresenceSync();
   useCacheAutoClean();
   usePlaybackNotifications();
   useLastfmScrobbler();
   useNeteaseAuthListener();
+  // Registers the user's shortcuts with the OS, and reacts to the
+  // events the OS sends back when one of them is pressed.
+  useGlobalHotkeysSync();
+  useGlobalHotkeysListener();
   // Keeps the source switcher's list warm, so opening it shows the
   // alternatives instead of a spinner.
   useAlternativeSourcesPrefetch(usePlaybackStore(currentTrack));

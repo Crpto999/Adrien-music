@@ -1,2 +1,12 @@
-onlyBuiltDependencies:
-  - esbuild
+allowBuilds:
+  esbuild: true
+
+# The `packageManager` field in package.json pins the version CI installs,
+# so every build is reproducible. Locally we want the pnpm that is already
+# on the PATH instead: pnpm would otherwise download and run the pinned
+# version on its own.
+#
+# `ignore` tells pnpm to skip that check entirely rather than downloading
+# the pinned version or failing when it does not match. It replaces the
+# removed `managePackageManagerVersions` setting.
+pmOnFail: ignore

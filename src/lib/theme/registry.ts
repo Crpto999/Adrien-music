@@ -33,8 +33,15 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   },
 ];
 
-/** The theme the app starts on when nothing has been chosen yet. */
-export const DEFAULT_THEME_ID = "dark";
+/**
+ * The theme the app starts on when nothing has been chosen yet.
+ *
+ * Following the system is the neutral default: it is what the app did
+ * before a theme was ever picked, and it means a fresh install looks
+ * right on a dark machine and on a light one without the user having
+ * to say so.
+ */
+export const DEFAULT_THEME_ID = SYSTEM_THEME_ID;
 
 /**
  * The theme whose token block in `index.css` is the base for a given

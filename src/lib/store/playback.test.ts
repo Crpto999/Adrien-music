@@ -381,4 +381,61 @@ describe("setTrackProvider", () => {
     expect(usePlaybackStore.getState().queue[0].provider).toBeUndefined();
     expect(usePlaybackStore.getState().status).toBe("ready");
   });
+
+  it("locks the source when the user chose it by hand", () => {
+    // The source switcher marks its choice as locked, so the priority
+    // order will not undo it the next time the track is re-resolved.
+    setup({
+      queue: [
+        { ...track("yt123"), provider: "youtube", providerTrackId: "yt123" },
+      ],
+      index: 0,
+    });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(
+        0,
+        { provider: "netease", providerTrackId: "185709" },
+        undefined,
+        true,
+      );
+
+    expect(usePlaybackStore.getState().queue[0].sourceLocked).toBe(true);
+  });
+
+  it("leaves the lock alone when the source is resolved automatically", () => {
+    setup({
+      queue: [
+        { ...track("yt123"), provider: "youtube", providerTrackId: "yt123" },
+      ],
+      index: 0,
+    });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(0, { provider: "netease", providerTrackId: "185709" });
+
+    expect(usePlaybackStore.getState().queue[0].sourceLocked).toBeUndefined();
+  });
+
+  it("remembers where the track was found when it moves provider", () => {
+    // The origin's own id is what the platform's lyrics are filed
+    // under, so it has to travel with the track.
+    setup({
+      queue: [
+        { ...track("yt123"), provider: "youtube", providerTrackId: "yt123" },
+      ],
+      index: 0,
+    });
+    usePlaybackStore
+      .getState()
+      .setTrackProvider(
+        0,
+        { provider: "netease", providerTrackId: "185709" },
+        { discoveredOn: "youtube", discoveredTrackId: "yt123" },
+      );
+
+    const t = usePlaybackStore.getState().queue[0];
+    expect(t.discoveredOn).toBe("youtube");
+    expect(t.discoveredTrackId).toBe("yt123");
+  });
 });

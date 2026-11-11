@@ -30,6 +30,26 @@ export type WordSpan = {
   end: number;
 };
 
+/**
+ * A set of lyrics, and optionally its translation.
+ *
+ * `translation` is the same lyrics in another language, when the
+ * platform has them. NetEase serves a separate `tlyric` for the songs
+ * whose catalogue entry carries one; the other platforms do not, so
+ * the field is optional everywhere.
+ */
 export type Lyrics =
-  | { kind: "timed"; lines: TimedLine[]; source?: string }
-  | { kind: "plain"; text: string; source?: string };
+  | {
+      kind: "timed";
+      lines: TimedLine[];
+      source?: string;
+      /** The same lines, translated. */
+      translation?: TimedLine[];
+    }
+  | {
+      kind: "plain";
+      text: string;
+      source?: string;
+      /** The same text, translated. */
+      translation?: string;
+    };

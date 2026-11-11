@@ -16,6 +16,8 @@ import { analyzeTrack, peekAnalysis, planMix } from "@/lib/track-analysis";
 import { consumeFadeInto } from "@/lib/fade-request";
 import { usePlaybackStore, type QueueTrack } from "@/lib/store/playback";
 import { eqGains, usePlaybackSettings } from "@/lib/store/playback-settings";
+import { resolveSlotSource } from "@/lib/providers/source-resolution";
+import type { ProviderRef } from "@/lib/providers/types";
 // Fork: Discord toggle lives in the dedicated discord store (not settings).
 import { useDiscordStore, isDiscordConfigured } from "@/lib/store/discord";
 import { pickThumbnail } from "@/components/shared/thumbnail";
@@ -73,6 +75,93 @@ type Fade = {
 
 /** Perceived-loudness curve for the volume slider (see the volume effect). */
 const elementVolume = (volume: number) => Math.max(0, Math.min(1, volume)) ** 3;
+
+/**
+ * The source a track plays from, resolved by the user's priority order.
+ *
+ * A track that arrives in the queue without a source — an ordinary
+ * song, picked wherever the user picked it — has to be matched against
+ * the other sources before its stream URL can be asked for, because the
+ * source decides which stream route the request takes. This hook does
+ * that match and returns the winner.
+ *
+ * The queue slot is rewritten to carry the winner, so the player bar,
+ * the source panel and the storage tab all describe the same source
+ * the audio is actually coming from.
+ *
+ * The resolution is keyed on the track's *identity* rather than the
+ * track object, so a re-render does not restart it, and a stale answer
+ * from a previous track is never used for the current one.
+ *
+ * `settled` says whether the answer is final. The stream request must
+ * not go out before it is: asking for the YouTube stream of a track
+ * that the priority order is about to send to NetEase would start the
+ * wrong audio — and the first bytes of it would win the race.
+ */
+function useResolvedSource(
+  track: QueueTrack | undefined,
+  index: number,
+): { source: ProviderRef | null; settled: boolean } {
+  const [state, setState] = useState<{
+    identity: string;
+    source: ProviderRef | null;
+    settled: boolean;
+  }>({ identity: "", source: null, settled: false });
+
+  // The identity the answer belongs to: provider + id. The track
+  // object itself changes identity on every store update, and keying
+  // on it would restart the search every time the position ticked.
+  const identity = track
+    ? `${track.provider ?? ""}:${track.providerTrackId ?? track.videoId}`
+    : "";
+
+  // A track that already has a source needs no resolution: it is
+  // either a daily pick (NetEase's own recording) or a track the user
+  // pointed at a source by hand. That answer is available during the
+  // render, so the stream request is not held back by a round trip
+  // through an effect.
+  const hasSource = !!track?.provider && !!track.providerTrackId;
+
+  useEffect(() => {
+    if (!track || index < 0) return;
+
+    let cancelled = false;
+
+    // A track that already has a source needs no resolution: the
+    // render above answers it directly, so there is nothing to wait
+    // for and nothing to store.
+    if (track.provider && track.providerTrackId) return;
+
+    setState({ identity, source: null, settled: false });
+    void resolveSlotSource(index, track).then((ref) => {
+      if (cancelled) return;
+      setState({ identity, source: ref, settled: true });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // `identity` is the track's identity; the track object itself is a
+    // fresh object on every store update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity, index]);
+
+  if (hasSource) {
+    return {
+      source: {
+        provider: track!.provider!,
+        providerTrackId: track!.providerTrackId!,
+      },
+      settled: true,
+    };
+  }
+
+  // An answer for a different track is no answer at all.
+  if (state.identity !== identity) {
+    return { source: null, settled: false };
+  }
+  return { source: state.source, settled: state.settled };
+}
 
 export function useAudioEngine() {
   // The element currently owning playback; `audioRef` keeps the name the
@@ -499,6 +588,26 @@ export function useAudioEngine() {
 
   // Fork note: upstream's Premium subscription removed — no gate in this fork.
 
+  // The source this track plays from, when it is not settled yet.
+  //
+  // A track that arrives without a source — an ordinary song picked on
+  // YouTube, say — has to be matched against the other sources before
+  // its stream URL can be asked for, because the *source* decides
+  // which stream route the request goes to. The user's priority order
+  // decides that match, so this is where the setting is applied.
+  //
+  // The effect below waits for this to settle before it asks for a
+  // stream URL, so the track really does play from the source the
+  // order picked. Once the queue slot carries a source, the value
+  // below is that source and nothing more is searched.
+  const { source: resolvedSource, settled: sourceSettled } = useResolvedSource(
+    track,
+    index,
+  );
+  const effectiveProvider = resolvedSource?.provider ?? streamProvider;
+  const effectiveProviderTrackId =
+    resolvedSource?.providerTrackId ?? streamProviderTrackId;
+
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
@@ -559,7 +668,7 @@ export function useAudioEngine() {
       );
       const fade: Fade = { from, to, timer: 0 };
       fadeRef.current = fade;
-      streamUrlForProvider(streamProvider, streamProviderTrackId)
+      streamUrlForProvider(effectiveProvider, effectiveProviderTrackId)
         .then((src) => {
           if (token !== resolveTokenRef.current) return;
           to.src = src;
@@ -607,6 +716,12 @@ export function useAudioEngine() {
       usePlaybackStore.getState().setStreamUrl(undefined);
       return;
     }
+    // The source has to be settled before the stream URL is asked for.
+    // The stream route depends on the source, so asking early would
+    // start the wrong provider's audio — and the first bytes of it
+    // would win the race against the right one. A track whose source
+    // is already known is never delayed by this.
+    if (!sourceSettled) return;
     // Fork note: upstream's Premium gate removed — signed-out / Free
     // accounts stream like Premium ones in this fork.
     // Drop the previous track's src immediately. Otherwise a paused→playing
@@ -636,7 +751,7 @@ export function useAudioEngine() {
     // yt-dlp subprocess starts emitting bytes). A NetEase track takes
     // the same route: the server resolves the song id to a CDN URL and
     // serves the bytes with the same Range support.
-    streamUrlForProvider(streamProvider, streamProviderTrackId)
+    streamUrlForProvider(effectiveProvider, effectiveProviderTrackId)
       .then((src) => {
         if (token !== resolveTokenRef.current) return;
         if (import.meta.env.DEV) {
@@ -699,8 +814,9 @@ export function useAudioEngine() {
     // for the current track after a transient failure without changing id.
   }, [
     streamVideoId,
-    streamProvider,
-    streamProviderTrackId,
+    effectiveProvider,
+    effectiveProviderTrackId,
+    sourceSettled,
     index,
     retryNonce,
   ]);
@@ -956,18 +1072,37 @@ export function useAudioEngine() {
   // chunk); by the time the user hits "next" the file is cached on
   // disk and playback starts instantly with full seek support.
   const status = usePlaybackStore((s) => s.status);
-  const { nextVideoId, nextProvider, nextProviderTrackId } = usePlaybackStore(
-    useShallow((s) => {
-      const next = s.index >= 0 && s.index + 1 < s.queue.length
-        ? s.queue[s.index + 1]
-        : undefined;
-      return {
-        nextVideoId: next?.videoId,
-        nextProvider: next?.provider ?? "youtube",
-        nextProviderTrackId: next?.providerTrackId ?? next?.videoId,
-      };
-    }),
-  );
+  const { nextVideoId, nextProvider, nextProviderTrackId, nextIndex } =
+    usePlaybackStore(
+      useShallow((s) => {
+        const hasNext = s.index >= 0 && s.index + 1 < s.queue.length;
+        const next = hasNext ? s.queue[s.index + 1] : undefined;
+        return {
+          nextVideoId: next?.videoId,
+          nextProvider: next?.provider ?? "youtube",
+          nextProviderTrackId: next?.providerTrackId ?? next?.videoId,
+          nextIndex: hasNext ? s.index + 1 : -1,
+        };
+      }),
+    );
+
+  // Resolve the *next* track's source ahead of time.
+  //
+  // The next track has to be played from the source the priority order
+  // picks, and that match takes a round trip. Doing it while the
+  // current track plays means the crossfade's standby preload already
+  // knows which provider to ask for — and the switch, when it comes,
+  // is seamless rather than a stall.
+  useEffect(() => {
+    if (nextIndex < 0) return;
+    const st = usePlaybackStore.getState();
+    const next = st.queue[nextIndex];
+    if (!next) return;
+    // A track that already has a source needs no resolution.
+    if (next.provider && next.providerTrackId) return;
+    void resolveSlotSource(nextIndex, next);
+  }, [nextIndex, nextVideoId, nextProvider, nextProviderTrackId]);
+
   useEffect(() => {
     if (status !== "ready") return;
     if (!nextVideoId || !nextProviderTrackId) return;

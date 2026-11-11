@@ -162,6 +162,25 @@ pnpm tauri dev
 
 Frontend-only dev (no Tauri window): `pnpm dev`.
 
+### Dev runs get their own app identity
+
+`pnpm tauri dev` builds with the bundle identifier
+`com.github.crpto999.adrify.dev`, not the release one. The identifier
+decides the app-data directory, the WebView2 profile and the
+single-instance mutex, so a dev run keeps its own accounts, cookies and
+settings instead of sharing them with the installed release — and the two
+can run at the same time.
+
+The override lives in `src-tauri/tauri.dev.conf.json` and is injected by
+`scripts/tauri-cli.mjs`, a thin wrapper around the Tauri CLI: it adds
+`--config src-tauri/tauri.dev.conf.json` to the `dev` subcommand only and
+passes everything else (`build`, `info`, …) through untouched, so release
+builds and CI keep the release identity. An explicit `--config` on the
+command line always wins.
+
+One consequence: the dev instance is a separate install as far as the
+system is concerned, so it needs its own sign-in the first time.
+
 ## Quality checks
 
 ```bash

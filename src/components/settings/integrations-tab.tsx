@@ -37,6 +37,7 @@ import { SegmentedControl } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Group, SettingRow, TabPane } from "@/components/settings/primitives";
+import { NeteaseLoginDialog } from "@/components/settings/netease-login-dialog";
 import { useSettingsDialog } from "@/lib/store/settings-dialog";
 import { useLastfmStore, isLastfmLinked } from "@/lib/store/lastfm";
 import {
@@ -748,14 +749,17 @@ function DiscordGroup() {
  *      catalogue (including lossless) instead of the anonymous
  *      preview tier.
  *
- * The app never sees the password: the sign-in happens in NetEase's
- * own page, in a window the app opens, and the app only reads the
- * cookie the browser ends up holding.
+ * The app never sees the password: the sign-in is the platform's own
+ * QR-code protocol, spoken directly. The backend asks for a one-time
+ * key, draws the QR code locally, and polls for the scan state — no
+ * browser window, and the app is signed in within a fraction of a
+ * second of the user confirming on their phone.
  */
 function NeteaseGroup() {
   const t = useT();
   const { data, isLoading } = useNeteaseSession();
-  const { pending, signIn, signOut } = useNeteaseAuthActions();
+  const { pending, signOut } = useNeteaseAuthActions();
+  const [qrOpen, setQrOpen] = useState(false);
 
   return (
     <Group>
@@ -797,7 +801,7 @@ function NeteaseGroup() {
                 <Badge variant="outline">
                   {t("settings.integrations.notConnected")}
                 </Badge>
-                <Button onClick={() => void signIn()} disabled={pending}>
+                <Button onClick={() => setQrOpen(true)} disabled={pending}>
                   {pending ? (
                     <IconLoader2 className="animate-spin" />
                   ) : (
@@ -815,6 +819,7 @@ function NeteaseGroup() {
           {t("settings.integrations.neteaseSignedInHint")}
         </p>
       ) : null}
+      <NeteaseLoginDialog open={qrOpen} onOpenChange={setQrOpen} />
     </Group>
   );
 }

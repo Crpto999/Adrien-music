@@ -278,8 +278,11 @@ export function PlayerBarBottom({
           ) : null}
           {/* Which provider is serving the audio, and a way to switch to
               another one that carries the same recording. The control
-              reads its list from the cache, so opening it is instant. */}
-          <SourceIndicator track={track} variant="icon" />
+              reads its list from the cache, so opening it is instant.
+              It is the same control the side card uses, with the
+              source named in words — the dot alone cannot tell a
+              lossy YouTube rip from a lossless NetEase stream. */}
+          <SourceIndicator track={track} variant="bar" />
           <LyricsPopover state={lyricsState} />
           <QueuePopover />
           <VolumeControl />

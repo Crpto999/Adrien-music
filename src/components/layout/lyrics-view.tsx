@@ -91,6 +91,16 @@ export type LyricsViewState = {
    * the menu — noise that says nothing.
    */
   sources: LyricsSource[];
+  /**
+   * The provider's own lyrics source, when the track plays from a
+   * platform that has one.
+   *
+   * This is the pairing the app promises: the audio and the words come
+   * from the same platform. It is `null` for a track playing from
+   * YouTube on a build without YouTube Music lyrics, and for the
+   * metadata-only providers.
+   */
+  ownLyricsSource: LyricsSource | null;
   /** Master on/off, mirrored from the persisted `ytm-settings` store —
    *  shared across the side card and the floating window. */
   enabled: boolean;
@@ -100,6 +110,8 @@ export type LyricsViewState = {
   /** A retry is in flight. */
   isRetrying: boolean;
   retryFailed: () => void;
+  /** The NetEase song id the track is known by, when it has one. */
+  neteaseSongId?: string;
 };
 
 /**
@@ -128,8 +140,18 @@ export function useLyricsView(track: QueueTrack | undefined): LyricsViewState {
   const enabled = useSettingsStore((s) => s.lyricsEnabled);
   const setEnabled = useSettingsStore((s) => s.setLyricsEnabled);
 
-  const { queries, displayLyrics, best, isLoading, failed, isRetrying, retryFailed } =
-    useLyricsSources(track, !!track && enabled);
+  const {
+    queries,
+    displayLyrics,
+    best,
+    isLoading,
+    failed,
+    isRetrying,
+    retryFailed,
+    sourceOrder,
+    ownLyricsSource,
+    neteaseSongId,
+  } = useLyricsSources(track, !!track && enabled);
 
   const availability = useMemo(() => {
     const acc = {} as Record<LyricsSource, Availability>;
@@ -154,12 +176,27 @@ export function useLyricsView(track: QueueTrack | undefined): LyricsViewState {
   // shown in the same script.
   const active = activeSource ? (displayLyrics[activeSource] ?? null) : null;
 
-  // The Chinese platforms only apply to a track that came from one of
-  // them: they are keyed on the platform's own track id, so there is
-  // nothing to ask them about a YouTube track.
+  // The sources worth showing for this track, in the order they were
+  // tried.
+  //
+  // The provider's own source leads — that is the pairing the app
+  // promises: the audio and the words come from the same platform. The
+  // rest follow as fallbacks, so a track whose provider has no lyrics
+  // still has somewhere to go.
+  //
+  // The Chinese platforms' rows are dropped for a track that did not
+  // come from one of them: they are keyed on the platform's own track
+  // id, so there is nothing to ask them about a YouTube track, and
+  // listing them would put permanently-grey rows in the menu.
+  //
+  // NetEase is the exception, when the app knows the song's NetEase
+  // id: the daily pick the user hearted is a YouTube row that is also
+  // a known NetEase recording, and its NetEase words are exactly the
+  // right ones. So the row stays — the user can pick it, and get the
+  // platform's own lyrics.
   const sources = useMemo(() => {
     const provider = track?.provider;
-    const cn: LyricsSource[] =
+    const applicable: LyricsSource[] =
       provider === "netease"
         ? ["netease"]
         : provider === "migu"
@@ -169,8 +206,17 @@ export function useLyricsView(track: QueueTrack | undefined): LyricsViewState {
             : provider === "qq"
               ? ["qq"]
               : [];
-    return SOURCE_ORDER.filter((s) => cn.includes(s) || !CN_SOURCES.includes(s));
-  }, [track?.provider]);
+    if (applicable.includes("netease")) return sourceOrder;
+    // A YouTube track the app knows on NetEase keeps the NetEase row.
+    if (neteaseSongId) {
+      return sourceOrder.filter(
+        (s) => s === "netease" || !CN_SOURCES.includes(s),
+      );
+    }
+    return sourceOrder.filter(
+      (s) => applicable.includes(s) || !CN_SOURCES.includes(s),
+    );
+  }, [sourceOrder, track?.provider, neteaseSongId]);
 
   return {
     active,
@@ -181,6 +227,8 @@ export function useLyricsView(track: QueueTrack | undefined): LyricsViewState {
     best,
     availability,
     sources,
+    ownLyricsSource,
+    neteaseSongId,
     enabled,
     setEnabled,
     failed,
@@ -238,9 +286,21 @@ export function LyricsBody({
     );
   }
   if (state.active.kind === "timed") {
-    return <TimedLyrics lines={state.active.lines} large={large} />;
+    return (
+      <TimedLyrics
+        lines={state.active.lines}
+        translation={state.active.translation}
+        large={large}
+      />
+    );
   }
-  return <PlainLyrics text={state.active.text} large={large} />;
+  return (
+    <PlainLyrics
+      text={state.active.text}
+      translation={state.active.translation}
+      large={large}
+    />
+  );
 }
 
 /** How long before a line's actual start time we flip it to active.
@@ -328,9 +388,20 @@ const SEEK_SCROLL_DURATION_MS = 350;
 
 function TimedLyrics({
   lines,
+  translation,
   large = false,
 }: {
   lines: TimedLine[];
+  /**
+   * The same lines, translated.
+   *
+   * The translation is matched to the original by index rather than by
+   * time: the platform's translated lyric has its own timings, and
+   * they drift from the original's by a fraction of a second here and
+   * there. The two are the same lines of the same song, so the nth
+   * translation line belongs under the nth original line.
+   */
+  translation?: TimedLine[];
   large?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -541,6 +612,21 @@ function TimedLyrics({
               ) : (
                 line.text || "♪"
               )}
+              {/* The translation, under the line it belongs to. It is
+                  dimmer and smaller: it is a reading aid, not the
+                  thing the karaoke highlight is following. */}
+              {translation?.[i]?.text ? (
+                <span
+                  className={cn(
+                    "mt-0.5 block text-sm font-normal",
+                    isActive
+                      ? "text-muted-foreground"
+                      : "text-muted-foreground/50",
+                  )}
+                >
+                  {translation[i].text}
+                </span>
+              ) : null}
             </button>
           );
         })}
@@ -621,9 +707,12 @@ function KaraokeLine({
 
 function PlainLyrics({
   text,
+  translation,
   large = false,
 }: {
   text: string;
+  /** The same text, translated. Shown under the original. */
+  translation?: string;
   large?: boolean;
 }) {  return (
     <div
@@ -633,6 +722,11 @@ function PlainLyrics({
       )}
     >
       {text}
+      {translation ? (
+        <p className="mt-4 text-sm font-normal text-muted-foreground/70">
+          {translation}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -714,7 +808,17 @@ export function LyricsSourceButton({
                 // is how the user asks for another attempt.
                 disabled={!enabled || a === "none"}
               >
-                <span className="flex-1">{SOURCE_LABELS[s]}</span>
+                <span className="flex-1">
+                  {SOURCE_LABELS[s]}
+                  {/* The provider's own source is marked, because it is
+                      the one the app pairs with the audio: a NetEase
+                      track's words come from NetEase. */}
+                  {s === state.ownLyricsSource ? (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      ({t("lyrics.matchingSource")})
+                    </span>
+                  ) : null}
+                </span>
                 <span
                   className={cn("ml-2 size-1.5 shrink-0 rounded-full", dot)}
                 />

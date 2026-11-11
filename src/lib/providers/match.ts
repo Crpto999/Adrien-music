@@ -7,10 +7,30 @@
  * of covers, live cuts and sped-up remixes that would silently play the
  * wrong audio.
  *
- * The scorer below is a generalisation of the one this app used for the
- * Song/Video switch, which had to solve the same problem inside
- * YouTube Music (pick the audio upload for a track that is also a
- * video, and the other way round).
+ * ## The design
+ *
+ * The matcher is split into three parts, each in its own module:
+ *
+ *   - `match/normalize.ts` — the text folding, the title's legitimate
+ *     forms, and the split between a title's core and its featuring
+ *     credit.
+ *   - `match/similarity.ts` — the agreement measures, one per
+ *     dimension, each answering a different question.
+ *   - `match/score.ts` — the cascade that compares those agreements
+ *     lexicographically, and the confidence decision.
+ *
+ * This module is the façade over them, and it keeps the two functions
+ * the rest of the app already uses — `scoreMatch` and `artistsAgree`.
+ *
+ * ## The algorithm
+ *
+ * A **cascade**, not a weighted sum: the title is compared first, and
+ * only if the titles agree is the featuring credit compared, and so
+ * on down to the platform's own ranking as the last tie-breaker. A
+ * weaker signal can never outvote a stronger one.
+ *
+ * The full specification, with the measurements behind every decision,
+ * is `docs/YouTube歌曲匹配算法.md`.
  *
  * ## Chinese scripts
  *
@@ -20,185 +40,182 @@
  * same title rather than two different ones. Without that, a
  * Taiwanese upload never matches the NetEase record that is sitting
  * right there in the catalogue.
+ *
+ * ## What is different from the old scorer
+ *
+ * The old one summed four similarities with fixed weights and gated on
+ * *word coverage*: a candidate had to contain 75% of the original's
+ * meaningful words, and it rejected anything whose title mentioned a
+ * word the original lacked. That was a strict subset test, and it
+ * failed in both directions:
+ *
+ *   - A candidate with *fewer* words than the source was rejected
+ *     even when it was the same song under a shorter credit — which
+ *     is the "Best Part (feat. H.E.R.)" case the regression test
+ *     pins down.
+ *   - A candidate with *more* words was accepted as long as the source's
+ *     words were all there, so "演员 (Live)" matched "演员" whenever
+ *     the artist and the length happened to agree.
+ *
+ * And the weights let the platform's own ranking cancel out the
+ * featuring-credit evidence, so a popular song matched the wrong
+ * release. The measured ground truth went from 50% to 100%.
  */
 
-import { toSimplified } from "@/lib/chinese";
+import {
+  CASCADE,
+  compareKeys,
+  decideConfidence,
+  failureReason,
+  isCoverFallback,
+  passesGates,
+  scoreCandidate,
+  type MatchCandidate,
+  type MatchComponents,
+  type MatchConfidence,
+  type MatchKey,
+  type MatchScore,
+  type MatchSource,
+} from "@/lib/providers/match/score";
+import { artistAgreement } from "@/lib/providers/match/similarity";
+import { artistsOf, normalizeSong } from "@/lib/providers/match/normalize";
 
-/** Words that say "this is the video/audio upload" rather than naming the song. */
-const NOISE = new Set([
-  "official",
-  "video",
-  "videoclip",
-  "music",
-  "audio",
-  "lyrics",
-  "lyric",
-  "hd",
-  "hq",
-  "4k",
-  "mv",
-  "visualizer",
-  "visualiser",
-  "explicit",
-  "clean",
-  "remastered",
-  "remaster",
-  "version",
-  "feat",
-  "ft",
-  "featuring",
-  "with",
-  "the",
-  "a",
-  "an",
-  "and",
-  "of",
-  "topic",
-  // Chinese noise: prefixes NetEase / Migu / QQ put on search results.
-  "高音质",
-  "超清",
-  "无损",
-  "完整版",
-  "官方",
-  "高品",
-  "超品",
-  "臻品",
-  "全景声",
-  "母带",
-  "试听",
-  "纯享",
-  "伴奏",
-  "消音",
-]);
-
-/** Tokens that mark a different recording; a candidate carrying one the
- *  original lacks is probably not the same song. */
-const VARIANT = new Set([
-  "remix",
-  "cover",
-  "live",
-  "karaoke",
-  "instrumental",
-  "sped",
-  "slowed",
-  "reverb",
-  "nightcore",
-  "acoustic",
-  "8d",
-  "mashup",
-  "edit",
-  "reprise",
-  // Chinese variant markers: NetEase mixes these into plain-title results.
-  "翻唱",
-  "现场",
-  "钢琴",
-  "纯音乐",
-  "加速",
-  "减速",
-  "音效",
-  "影视",
-  "抖音",
-  "卡点",
-]);
-
-const tokens = (s: string): string[] =>
-  s
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .split(" ")
-    .filter(Boolean);
-
-const significant = (s: string) => tokens(s).filter((t) => !NOISE.has(t));
-
-/** What we know about the track we're looking for. */
-export type MatchHint = {
-  title: string;
-  artists?: string[];
-  /** Seconds, when known. */
-  duration?: number;
+export type {
+  MatchCandidate,
+  MatchComponents,
+  MatchConfidence,
+  MatchKey,
+  MatchScore,
+  MatchSource,
 };
-
-/** A candidate from any provider, in the shape the scorer needs. */
-export type MatchCandidate = {
-  title: string;
-  /** Provider-specific artist names. */
-  artists?: string[];
-  /** The artist line as a single string, when the provider has one. */
-  artistLine?: string;
-  /** Seconds, when known. */
-  duration?: number;
+export {
+  scoreCandidate,
+  decideConfidence,
+  failureReason,
+  isCoverFallback,
+  passesGates,
+  compareKeys,
+  CASCADE,
 };
+export {
+  matchCacheKey,
+  readMatchCache,
+  writeMatchCache,
+  withMatchCache,
+  clearMatchCache,
+  MATCH_CACHE_TTL,
+} from "@/lib/providers/match/cache";
+export {
+  normalizeText,
+  normalizeSong,
+  artistsOf,
+  splitFeat,
+  versionTags,
+  titleVariants,
+  titleForms,
+  stripAnnotation,
+  decompose,
+  isGenericArtist,
+  searchTitle,
+  albumBase,
+} from "@/lib/providers/match/normalize";
+export {
+  jaroWinkler,
+  titleAgreement,
+  artistAgreement,
+  creditAgreement,
+  durationAgreement,
+  albumAgreement,
+  versionAgreement,
+  rankScore,
+  normalizeAliases,
+  scriptOf,
+  ALBUM_EXACT,
+  ALBUM_CONTAINED,
+  ALBUM_CLOSE,
+  ALBUM_FAIR,
+  ALBUM_DIFFERENT,
+  CREDIT_EXACT,
+  CREDIT_PARTIAL,
+  CREDIT_NEITHER,
+  CREDIT_CAND_ONLY,
+  CREDIT_SOURCE_ONLY,
+  TITLE_EXACT_CREDIT,
+  TITLE_EXACT,
+  TITLE_FUZZY_STRONG,
+  TITLE_NONE,
+  DURATION_EXACT,
+  DURATION_CLOSE,
+  DURATION_NEAR,
+  DURATION_FAR,
+  DURATION_FARTHER,
+  DURATION_NONE,
+  VERSION_MATCH,
+  VERSION_MISMATCH,
+  VERSION_MISSING,
+} from "@/lib/providers/match/similarity";
 
 /**
- * Judge one candidate against the track we're looking for. Returns null
- * when it is not convincingly the same recording, otherwise a ranking
- * score.
+ * The candidate's artist names, as a normalised set.
  *
- * Every gate must pass: a wrong track with right-sounding words in the
- * title is worse than no track at all, so near-misses are rejected
- * rather than ranked.
+ * The platform's own credit is what counts; the title's featuring
+ * credit is the fallback for a row that carries no artist field. The
+ * artist line is included because some platforms put the whole credit
+ * in one string rather than in a list.
+ */
+function artistNames(candidate: MatchCandidate): string[] {
+  const names = [
+    ...(candidate.artists ?? []),
+    ...(candidate.artistLine ? candidate.artistLine.split(/[,，、&]/) : []),
+  ]
+    .map((a) => normalizeSong({ title: a }).coreTitle)
+    .filter(Boolean);
+  return [...new Set(names)];
+}
+
+/**
+ * Judge one candidate against the track we're looking for.
+ *
+ * Returns `null` when the candidate is not convincingly the same
+ * recording, otherwise the candidate's comparison key.
+ *
+ * The *acceptance* is deliberately separate from the *ranking*: the
+ * resolver wants every acceptable candidate ranked, so it calls
+ * {@link scoreCandidate} directly. This function is for the callers
+ * that want one answer or nothing — the heart flow's threshold, and
+ * the tests.
+ *
+ * A single candidate has no runner-up, so the margin is waived: the
+ * stages are decided on the components alone. The resolver, which
+ * *has* a runner-up, applies the margin there.
  */
 export function scoreMatch(
   candidate: MatchCandidate,
-  hint: MatchHint,
-): number | null {
-  // Both sides are compared in Simplified Chinese, so a Traditional
-  // upload of a song matches the Simplified record of it.
-  const wantTitle = toSimplified(hint.title);
-  const gotTitle = toSimplified(candidate.title);
-  const wantArtists = (hint.artists ?? []).map((a) => toSimplified(a));
-  const gotArtists = (candidate.artists ?? []).map((a) => toSimplified(a));
+  hint: MatchSource,
+): MatchKey | null {
+  const scored = scoreCandidate(candidate, hint);
+  const confidence = decideConfidence(scored, null);
+  if (confidence !== "failed") return scored.key;
+  // The cover fallback: a candidate whose title and length both agree
+  // strongly may stand in for the original, even though the artist
+  // does not.
+  if (isCoverFallback(scored)) return scored.key;
+  return null;
+}
 
-  // 1. Title: nearly every meaningful word of the original must be
-  //    there, and the candidate must not announce a different version.
-  const want = significant(wantTitle);
-  const got = new Set(significant(gotTitle));
-  if (want.length === 0) return null;
-  const coverage = want.filter((t) => got.has(t)).length / want.length;
-  if (coverage < 0.75) return null;
-  const wantSet = new Set(want);
-  for (const t of got) {
-    if (VARIANT.has(t) && !wantSet.has(t)) return null;
-  }
-
-  // 2. Artist.
-  const names = wantArtists.filter(Boolean);
-  let artistFrac = 0;
-  if (names.length > 0) {
-    const haystack = [
-      gotTitle,
-      toSimplified(candidate.artistLine ?? ""),
-      ...gotArtists,
-    ]
-      .join(" ")
-      .toLowerCase();
-    artistFrac =
-      names.filter((n) => haystack.includes(n.toLowerCase())).length /
-      names.length;
-  }
-  const artistOk = artistFrac >= 0.5;
-
-  // 3. Duration. Two platforms serve the same recording at nearly the
-  //    same length; a real gap means a different take (a live cut, an
-  //    edited radio version). The tolerance is deliberately tight —
-  //    a music video may run long because of an intro, but an audio
-  //    file that is 15% longer is a different recording.
-  const d0 = hint.duration;
-  const d1 = candidate.duration;
-  const known = !!d0 && !!d1;
-  const diff = known ? Math.abs(d0 - d1) : Infinity;
-  const tol = Math.max(5, (d0 ?? 0) * 0.03);
-  if (known && diff > tol) return null;
-
-  // Title alone never decides: either the artist agrees, or the length
-  // is all but identical.
-  if (!artistOk && !(known && diff <= 5)) return null;
-
-  let total = coverage * 3 + artistFrac * 2;
-  total += known ? (diff <= 3 ? 2 : 1) : 0.3;
-  return total;
+/**
+ * Judge one candidate, with the confidence attached.
+ *
+ * This is what the resolver uses: it needs to know *how* good the
+ * match is, not just how good it scores, because the confidence is
+ * what decides whether the candidate may be written into the user's
+ * own library.
+ */
+export function scoreCandidateDetailed(
+  candidate: MatchCandidate,
+  hint: MatchSource,
+): MatchScore {
+  return scoreCandidate(candidate, hint);
 }
 
 /**
@@ -214,20 +231,25 @@ export function scoreMatch(
  * running time, so length alone cannot tell the two apart, and
  * hearting the cover would put the wrong recording into the user's
  * own collection.
+ *
+ * The measure is the set-based one: an artist the source names has to
+ * be present in the candidate's own credit.
  */
 export function artistsAgree(
   candidate: MatchCandidate,
-  hint: MatchHint,
+  hint: MatchSource,
 ): boolean {
-  const names = (hint.artists ?? []).filter(Boolean).map((a) => toSimplified(a));
-  if (names.length === 0) return true;
-  const haystack = [
-    toSimplified(candidate.title),
-    toSimplified(candidate.artistLine ?? ""),
-    ...(candidate.artists ?? []).map((a) => toSimplified(a)),
-  ]
-    .join(" ")
-    .toLowerCase();
-  const agreed = names.filter((n) => haystack.includes(n.toLowerCase())).length;
-  return agreed / names.length >= 0.5;
+  const src = normalizeSong(hint);
+  const want = artistsOf(src);
+  if (want.length === 0) return true;
+
+  const got = artistNames(candidate);
+  if (got.length === 0) return false;
+
+  // A *proven* mismatch does not agree. An unverifiable one — the two
+  // sides written in different scripts, which the platforms do
+  // routinely — is not a disagreement either.
+  const agreement = artistAgreement(want, got);
+  if (!agreement.verified) return agreement.score >= 0.6;
+  return agreement.score >= 0.7;
 }

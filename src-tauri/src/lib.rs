@@ -25,7 +25,9 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::ServeFile;
 
 mod appid;
+mod cover_url;
 mod discord;
+mod hotkeys;
 #[cfg(target_os = "linux")]
 mod linux_graphics;
 // `#[macro_use]`, not a plain `mod`: `log!` is `#[macro_export]`ed, which
@@ -57,6 +59,8 @@ mod thumbbar;
 mod webview_permissions;
 mod netease;
 mod netease_auth;
+#[cfg(test)]
+mod netease_qr_test;
 mod cnproviders;
 mod unblock;
 mod update_source;
@@ -554,18 +558,6 @@ fn generate_account_id() -> String {
     // Unix-nanos is monotone within a process; a stray clock skew on
     // another machine isn't a concern (account ids stay local).
     format!("acct-{:x}", nanos)
-}
-
-/// A fresh, unique id for a one-shot login session (the NetEase
-/// sign-in webview's profile directory).
-///
-/// The NetEase flow needs an id that cannot collide with a *previous*
-/// attempt, so it cannot share the `acct-` prefix the account index
-/// uses — those ids are written to a file the user can see, and this
-/// one is not an account.
-pub(crate) fn generate_session_id() -> String {
-    let nanos = time::OffsetDateTime::now_utc().unix_timestamp_nanos();
-    format!("sess-{:x}", nanos)
 }
 
 /// Read the encrypted cookie jar for the active account and decrypt
@@ -1489,6 +1481,32 @@ fn quit_app(app: tauri::AppHandle) {
 #[tauri::command]
 fn get_log_path() -> Option<String> {
     logging::file_path()
+}
+
+/// Write lines from the frontend into the log file.
+///
+/// The backend's own diagnostics go through `crate::log!`, which writes
+/// to stderr *and* the file. The frontend has no stderr — a packaged
+/// build is launched detached from a console — so the frontend's own
+/// diagnostics need this command to reach the same file.
+///
+/// The point is that one bug report carries the whole story: the
+/// backend's `[unblock]` lines and the frontend's `[match]` lines in
+/// one file, in the order they happened.
+///
+/// The lines arrive as a list so that one report costs one round
+/// trip: a match report is a dozen lines, and a dozen IPC calls per
+/// match is a lot of overhead for something that only ever writes to
+/// a file.
+#[tauri::command]
+fn log_lines(lines: Vec<String>) {
+    for line in lines {
+        // A line with a newline in it would break the file's one-
+        // record-per-line format, and a line with a newline in the
+        // *middle* would look like two records. Both are flattened.
+        let flat = line.replace(['\r', '\n'], " ");
+        crate::log!("{}", flat);
+    }
 }
 
 /// What the title-bar ✕ does, mirrored from the frontend settings store
@@ -2629,11 +2647,11 @@ fn cover_cache_dir(app: &tauri::AppHandle) -> PathBuf {
 }
 
 /// SSRF guard for cover fetches: cover URLs come from remote metadata
-/// (iTunes/mzstatic + YT image hosts). Only https from those known CDNs
-/// is fetchable, so a crafted metadata field can't point the server-side
-/// fetch at an internal service (e.g. 169.254.169.254 or a LAN admin
-/// page). Callers must also disable redirects so a CDN-looking URL can't
-/// 302 into the allowlist.
+/// (iTunes/mzstatic + YT image hosts + the Chinese platforms' CDNs).
+/// Only https from those known CDNs is fetchable, so a crafted metadata
+/// field can't point the server-side fetch at an internal service (e.g.
+/// 169.254.169.254 or a LAN admin page). Callers must also disable
+/// redirects so a CDN-looking URL can't 302 into the allowlist.
 fn check_cover_url(url: &str) -> Result<(), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("bad url: {e}"))?;
     if parsed.scheme() != "https" {
@@ -2644,6 +2662,11 @@ fn check_cover_url(url: &str) -> Result<(), String> {
         "ytimg.com",
         "ggpht.com",
         "googleusercontent.com",
+        // The Chinese platforms' artwork CDNs: NetEase (p1.music.126.net
+        // and friends), Kugou (imge.kugou.com) and QQ Music (y.gtimg.cn).
+        "music.126.net",
+        "kugou.com",
+        "gtimg.cn",
     ];
     let host = parsed.host_str().unwrap_or("");
     let host_ok = ALLOWED_HOST_SUFFIXES
@@ -4346,6 +4369,7 @@ pub fn run() {
         .manage(CloseBehavior::default())
         .manage(JarWriteLock::default())
         .manage(discord::DiscordState::default())
+        .manage(hotkeys::HotkeyState::default())
         .manage(Arc::new(unblock::Pool::default()))
         .invoke_handler(tauri::generate_handler![
             ensure_ytdlp,
@@ -4377,6 +4401,7 @@ pub fn run() {
             clear_cover_cache,
             quit_app,
             get_log_path,
+            log_lines,
             set_close_behavior,
             autostart_set,
             autostart_is_enabled,
@@ -4391,6 +4416,7 @@ pub fn run() {
             close_player_window,
             media::media_update,
             media::media_clear,
+            hotkeys::set_global_hotkeys,
             discord::discord_set_config,
             discord::discord_update,
             discord::discord_clear,
@@ -4413,6 +4439,8 @@ pub fn run() {
             netease::netease_resolve,
             netease::netease_set_like,
             netease_auth::netease_start_login,
+            netease_auth::netease_qr_code,
+            netease_auth::netease_cancel_login,
             netease_auth::netease_logout,
             netease_auth::netease_session,
             cnproviders::migu_search_cmd,
@@ -4518,6 +4546,12 @@ pub fn run() {
             // thread, which souvlaki requires and where the main window's
             // HWND is available.
             media::init(app.handle());
+            // Global shortcuts (play/pause, next, like). The keyboard half
+            // registers system-wide hotkeys; the mouse half installs a
+            // low-level hook on its own thread. The manager's hidden window
+            // has to be created on the main thread, which is where setup()
+            // runs. See src/hotkeys.rs.
+            hotkeys::init(app.handle());
             // The third-party unblock pool: restore the persisted health
             // records and start the periodic probe loop. Both are cheap
             // and off the main thread.

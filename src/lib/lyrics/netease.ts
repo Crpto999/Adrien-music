@@ -68,24 +68,45 @@ export async function fetchNeteaseLyrics(
     if (signal?.aborted) return null;
     if (!lyric) return null;
 
+    // The translation, when the platform has one. It is timed as well,
+    // so it is parsed the same way as the original.
+    const translation = lyric.tlyric?.trim() ? parseLRC(lyric.tlyric) : [];
+
     // The word-by-word form first: it is the same text with better
     // timings, so there is nothing to gain from preferring the plain
     // one when both are there.
     if (lyric.yrc?.trim()) {
       const lines = parseYRC(lyric.yrc);
       if (lines.length > 0) {
-        return { kind: "timed", lines, source: SOURCE_LABEL };
+        return {
+          kind: "timed",
+          lines,
+          source: SOURCE_LABEL,
+          ...(translation.length > 0 ? { translation } : {}),
+        };
       }
     }
 
     if (lyric.lrc?.trim()) {
       const lines = parseLRC(lyric.lrc);
       if (lines.length > 0) {
-        return { kind: "timed", lines, source: SOURCE_LABEL };
+        return {
+          kind: "timed",
+          lines,
+          source: SOURCE_LABEL,
+          ...(translation.length > 0 ? { translation } : {}),
+        };
       }
       // A platform that hands back a body without timestamps is still
       // better than nothing: the plain text is the right song's words.
-      return { kind: "plain", text: lyric.lrc.trim(), source: SOURCE_LABEL };
+      return {
+        kind: "plain",
+        text: lyric.lrc.trim(),
+        source: SOURCE_LABEL,
+        ...(translation.length > 0
+          ? { translation: lyric.tlyric!.trim() }
+          : {}),
+      };
     }
 
     return null;

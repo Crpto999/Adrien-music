@@ -91,6 +91,18 @@ export function toCnCandidate(
  * because that is what these platforms' search endpoints accept. The
  * *matching* of the results against the track being looked for is the
  * resolver's job (`rankCandidates`), not the adapter's.
+ *
+ * ## The two-query strategy
+ *
+ * The doc's §7: search the title with the artist, and if that comes
+ * back nearly empty, search the title alone.
+ *
+ * These platforms return a much narrower page than NetEase does —
+ * twenty rows — and their ranking puts the authoritative recording
+ * below the covers when the artist name is part of the query. A second
+ * query without the artist is what gives a song the first query missed
+ * a second chance, and it only runs when the first query came back
+ * nearly empty, so the common case costs one request.
  */
 export function makeCnAdapter(provider: CnProviderId) {
   return async (
@@ -98,8 +110,20 @@ export function makeCnAdapter(provider: CnProviderId) {
     signal?: AbortSignal,
   ): Promise<ProviderCandidate[]> => {
     if (signal?.aborted) return [];
-    const songs = await cnSearch(provider, query);
+    let songs = await cnSearch(provider, query);
     if (signal?.aborted) return [];
+
+    // Too few rows: the query was too narrow. Try the title on its own.
+    if (songs.length < 3) {
+      const bare = query.split(/\s+/).slice(0, 2).join(" ");
+      if (bare && bare !== query) {
+        const wider = await cnSearch(provider, bare);
+        if (signal?.aborted) return [];
+        // The wider page is only better if it actually has more in it.
+        if (wider.length > songs.length) songs = wider;
+      }
+    }
+
     return songs.map((song) => toCnCandidate(provider, song));
   };
 }

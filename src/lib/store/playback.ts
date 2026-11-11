@@ -7,6 +7,7 @@ import { usePlaybackSettings } from "./playback-settings";
 import { safeLocalStorage } from "./safe-storage";
 import type { ProviderId, ProviderRef } from "@/lib/providers/types";
 import { syntheticQueueId } from "@/lib/providers/queue";
+import { rememberPlatformPair, useNetEaseIdStore } from "./netease-ids";
 
 export type QueueTrack = {
   videoId: string;
@@ -52,6 +53,16 @@ export type QueueTrack = {
    * would lose its lyrics the moment it was upgraded.
    */
   discoveredTrackId?: string;
+  /**
+   * The user picked this source by hand.
+   *
+   * The source switcher moves a track to another platform on purpose,
+   * and that choice outranks the priority order: a track the user
+   * pointed at NetEase keeps playing from NetEase even after the
+   * order changes. Without this flag the order would silently undo
+   * the switch the moment the track was re-resolved.
+   */
+  sourceLocked?: boolean;
 };
 
 export type RepeatMode = "off" | "all" | "one";
@@ -113,8 +124,16 @@ export type PlaybackState = {
    *
    * Used by the source switcher: the same recording on another
    * platform is a different file, and the user picks which one plays.
+   *
+   * `origin` says where the track was *found*, for the case where the
+   * source that will play it is not the one the user picked it on.
    */
-  setTrackProvider: (index: number, ref: ProviderRef) => void;
+  setTrackProvider: (
+    index: number,
+    ref: ProviderRef,
+    origin?: { discoveredOn?: ProviderId; discoveredTrackId?: string },
+    locked?: boolean,
+  ) => void;
   removeAt: (index: number) => void;
   moveTrack: (from: number, to: number) => void;
   /** Drop everything after the current track; it keeps playing. */
@@ -178,7 +197,33 @@ function shelfItemToTrack(item: ShelfItem | QueueTrack): QueueTrack | null {
     albumId: item.albumId,
     thumbnails: item.thumbnails,
     duration: item.duration,
+    // A YouTube row that the app knows is really a NetEase recording.
+    //
+    // This is the case the heart flow creates: a NetEase daily pick
+    // hearted on YouTube lives in the YouTube liked list under a
+    // YouTube video id, and comes back out as an ordinary YouTube row.
+    // The registry still holds the correspondence, so the row can
+    // declare where it came from — which is what lets the player show
+    // the origin, and what lets the NetEase side of the switcher offer
+    // the exact record rather than a search result.
+    ...neteaseOriginFor(item.id),
   };
+}
+
+/**
+ * The NetEase origin of a YouTube video, when the app knows it.
+ *
+ * Read imperatively rather than through a subscription: the caller is
+ * an action, not a component, and the value it needs is the one that
+ * was known when the row was mapped.
+ */
+function neteaseOriginFor(videoId: string): {
+  discoveredOn?: ProviderId;
+  discoveredTrackId?: string;
+} {
+  const songId = useNetEaseIdStore.getState().byVideoId[videoId];
+  if (!songId) return {};
+  return { discoveredOn: "netease", discoveredTrackId: songId };
 }
 
 function fisherYates<T>(arr: readonly T[]): T[] {
@@ -374,8 +419,40 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
    * provider it is the synthetic `provider_providerTrackId` form, and
    * a stale YouTube id would make the storage tab and the media
    * session describe the wrong file.
+   *
+   * `origin` says where the track was *found*, for the case where the
+   * source that will play it is not the one the user picked it on. It
+   * is what the player shows as "found on X, playing from Y", and the
+   * origin's own id is what the platform's lyrics are filed under.
+   *
+   * `locked` marks the choice as the user's own — the source switcher
+   * sets it, so the priority order will not undo the switch later.
    */
-  setTrackProvider: (index: number, ref: ProviderRef) => {
+  setTrackProvider: (
+    index: number,
+    ref: ProviderRef,
+    origin?: { discoveredOn?: ProviderId; discoveredTrackId?: string },
+    locked?: boolean,
+  ) => {
+    // The two ids are one recording under two names, and the app needs
+    // to remember that: it is what lets the track keep its platform's
+    // own lyrics on either side, and what lets the source switcher
+    // offer the *exact* record rather than a search result that might
+    // be a cover.
+    //
+    // Read before the update — the slot is about to change.
+    const before = get().queue[index];
+    if (before) {
+      rememberPlatformPair(
+        {
+          provider: before.provider,
+          providerTrackId: before.providerTrackId,
+          videoId: before.videoId,
+        },
+        { provider: ref.provider, providerTrackId: ref.providerTrackId },
+      );
+    }
+
     set((s) => {
       if (index < 0 || index >= s.queue.length) return s;
       const current = s.queue[index];
@@ -389,15 +466,22 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
         videoId,
         provider: ref.provider,
         providerTrackId: ref.providerTrackId,
+        // A source the user chose by hand outranks the priority order,
+        // so it is marked as locked. An automatic re-resolution leaves
+        // the flag alone.
+        ...(locked === undefined ? {} : { sourceLocked: locked }),
         // The track is moving away from the provider it was found on,
         // so that provider's id has to be remembered: it is the key
         // the platform's own lyrics are filed under.
         ...(current.provider === ref.provider
           ? {}
           : {
-              discoveredOn: current.discoveredOn ?? current.provider,
+              discoveredOn:
+                origin?.discoveredOn ?? current.discoveredOn ?? current.provider,
               discoveredTrackId:
-                current.discoveredTrackId ?? current.providerTrackId,
+                origin?.discoveredTrackId ??
+                current.discoveredTrackId ??
+                current.providerTrackId,
             }),
       };
       const isCurrent = index === s.index;

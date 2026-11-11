@@ -80,6 +80,14 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     id: "diagnostics",
     keywords: "log diagnostics debug crash report 日志 诊断",
   },
+  {
+    tab: "general",
+    titleKey: "settings.general.matchDebugLog",
+    descriptionKey: "settings.general.matchDebugLogDesc",
+    id: "matchDebugLog",
+    keywords:
+      "match diagnostics debug scoring candidates search source log 匹配 诊断 评分 候选 音源 日志",
+  },
 
   // Playback
   {
@@ -264,6 +272,29 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     descriptionKey: "settings.storage.coverArtCacheDesc",
     id: "cover-art-cache",
     keywords: "clear delete images thumbnails",
+  },
+
+  // Shortcuts
+  {
+    tab: "shortcuts",
+    titleKey: "settings.shortcuts.toggle",
+    descriptionKey: "settings.shortcuts.toggleDesc",
+    id: "shortcut-toggle",
+    keywords: "play pause hotkey keyboard shortcut global 播放 暂停 快捷键",
+  },
+  {
+    tab: "shortcuts",
+    titleKey: "settings.shortcuts.next",
+    descriptionKey: "settings.shortcuts.nextDesc",
+    id: "shortcut-next",
+    keywords: "skip track hotkey keyboard shortcut global 下一首 快捷键",
+  },
+  {
+    tab: "shortcuts",
+    titleKey: "settings.shortcuts.like",
+    descriptionKey: "settings.shortcuts.likeDesc",
+    id: "shortcut-like",
+    keywords: "heart love favourite favorite hotkey keyboard shortcut global 红心 快捷键",
   },
 
   // Integrations

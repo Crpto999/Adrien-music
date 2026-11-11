@@ -1,0 +1,221 @@
+{
+  "_comment": [
+    "The ground truth for the cross-provider matcher: 22 tracks from the",
+    "user's YouTube Music playlist, each paired with the NetEase record",
+    "that holds the same recording. A 23rd track is present but is not",
+    "catalogued on NetEase at all, so it is excluded from the denominator.",
+    "",
+    "The `neteaseId` values are the ones confirmed against the metadata:",
+    "the candidate's own title, its exact duration and its album all have",
+    "to agree with the YouTube upload. Six of them differ from what the",
+    "user first wrote down; the reasons are in",
+    "`docs/YouTube歌曲匹配算法.md` section 14.4.",
+    "",
+    "`durationSeconds` is the rounded length the playlist's accessibility",
+    "label reports, which is what the app actually has. `durationExact`",
+    "is the video's own `lengthSeconds`, which the app does not fetch.",
+    "",
+    "`variants` are the alternative spellings of the title that a search",
+    "has to try: a romanisation, a translation, a context annotation."
+  ],
+  "cases": [
+    {
+      "youtubeTitle": "Auld Lang Syne",
+      "youtubeArtists": ["Royal Scots Dragoon Guards"],
+      "youtubeAlbum": "Flower Of Scotland: Timeless Classics from the Land of the Brave",
+      "durationSeconds": 239,
+      "durationExact": 239,
+      "neteaseId": "473103115",
+      "note": "Same album and the same length as the upload; the user's first answer (414829974) is the same recording on a different compilation."
+    },
+    {
+      "youtubeTitle": "Ayo",
+      "youtubeArtists": ["Chris Brown", "Tyga"],
+      "youtubeAlbum": "Fan of A Fan The Album (Expanded Edition)",
+      "durationSeconds": 226,
+      "durationExact": 225,
+      "neteaseId": "30512923",
+      "supersededIds": ["31526544", "29809963"],
+      "note": "The user's own answer was '31526544 or 29809963, either is fine'. The matcher prefers 30512923, which is the recording on the original album — 'Fan of A Fan The Album (Deluxe Version)' — at 225.28s against the upload's own 225s. The two the user chose are a compilation (31526544, 226.52s) and the single (29809963, 226.25s), both of which sit ~1.3s further from the upload's exact length. The album name agrees with the upload's own album field, so this is the better answer and the answer is now the confirmed one."
+    },
+    {
+      "youtubeTitle": "Deep Ends",
+      "youtubeArtists": ["Ollie"],
+      "youtubeAlbum": "Deep Ends",
+      "durationSeconds": 175,
+      "durationExact": 175,
+      "neteaseId": "2051615275"
+    },
+    {
+      "youtubeTitle": "残酷な天使のテーゼ - Zankoku na Tenshi no Thesis",
+      "youtubeArtists": ["Yoko Takahashi"],
+      "youtubeAlbum": "Zankoku na Tenshi no Thesis",
+      "durationSeconds": 246,
+      "durationExact": 246,
+      "neteaseId": "3341072499",
+      "note": "The NetEase row is titled 残酷な天使のテｰゼ (halfwidth prolonged sound mark) and carries the romanisation as its alias. NFKC folds the two; the alias is what makes the title match at all."
+    },
+    {
+      "youtubeTitle": "Got It",
+      "youtubeArtists": ["VZEUS"],
+      "youtubeAlbum": "Got It",
+      "durationSeconds": 131,
+      "durationExact": 131,
+      "neteaseId": "2679634795"
+    },
+    {
+      "youtubeTitle": "prom dress",
+      "youtubeArtists": ["mxmtoon"],
+      "youtubeAlbum": "prom dress",
+      "durationSeconds": 198,
+      "durationExact": 198,
+      "neteaseId": "2099993157"
+    },
+    {
+      "youtubeTitle": "愿你余生漫长",
+      "youtubeArtists": ["王贰浪"],
+      "youtubeAlbum": "愿你余生漫长",
+      "durationSeconds": 232,
+      "durationExact": 232,
+      "neteaseId": "1425814935"
+    },
+    {
+      "youtubeTitle": "跨不过的距离",
+      "youtubeArtists": ["虎二"],
+      "youtubeAlbum": "跨不过的距离",
+      "durationSeconds": 271,
+      "durationExact": 271,
+      "neteaseId": "1458462128"
+    },
+    {
+      "youtubeTitle": "Back To My Bed",
+      "youtubeArtists": ["Elderbrook"],
+      "youtubeAlbum": "Why Do We Shake In The Cold?",
+      "durationSeconds": 203,
+      "durationExact": 202,
+      "neteaseId": "1479683839",
+      "note": "The album and the length both point here; the user's first answer (1479407252) is the single release of the same recording."
+    },
+    {
+      "youtubeTitle": "幕后生活",
+      "youtubeArtists": ["海洋Bo"],
+      "youtubeAlbum": "普通人生",
+      "durationSeconds": 221,
+      "durationExact": 221,
+      "neteaseId": "2103368325",
+      "note": "The title and the length both point here; the user's first answer (2041799838) is the album's title track."
+    },
+    {
+      "youtubeTitle": "Nana",
+      "youtubeArtists": ["Иван Купала"],
+      "youtubeAlbum": "Радио Награ",
+      "durationSeconds": 318,
+      "durationExact": 318,
+      "neteaseId": null,
+      "uncatalogued": true,
+      "note": "Not in NetEase's catalogue at all. No algorithm can match what is not there, so this case is excluded from the denominator."
+    },
+    {
+      "youtubeTitle": "We Don't Talk Anymore (feat. Selena Gomez)",
+      "youtubeArtists": ["Charlie Puth"],
+      "youtubeAlbum": "Nine Track Mind",
+      "durationSeconds": 218,
+      "durationExact": 218,
+      "neteaseId": "2166151146",
+      "note": "The title carries the credit, so the credit-bearing release is the right one — even though the platform ranks the plain release higher."
+    },
+    {
+      "youtubeTitle": "Stay With Me",
+      "youtubeArtists": ["1nonly"],
+      "youtubeAlbum": "Stay With Me",
+      "durationSeconds": 142,
+      "durationExact": 142,
+      "neteaseId": "1486904053"
+    },
+    {
+      "youtubeTitle": "Beaté",
+      "youtubeArtists": ["Jordan Critz"],
+      "youtubeAlbum": "Beaté",
+      "durationSeconds": 167,
+      "durationExact": 167,
+      "neteaseId": "3374488834"
+    },
+    {
+      "youtubeTitle": "ツナ覚醒",
+      "youtubeArtists": ["Various Artists"],
+      "youtubeAlbum": "家庭教師ヒットマンREBORN! オリジナル サウンドトラック ~標的2~",
+      "durationSeconds": 98,
+      "durationExact": 98,
+      "neteaseId": "29095230",
+      "note": "The source artist is the placeholder 'Various Artists', which says nothing about who performed it and so cannot veto a match."
+    },
+    {
+      "youtubeTitle": "Soft Spot",
+      "youtubeArtists": ["keshi"],
+      "youtubeAlbum": "Soft Spot",
+      "durationSeconds": 205,
+      "durationExact": 204,
+      "neteaseId": "2626568453",
+      "note": "The studio recording; the user's first answer (2639918917) is the Acoustic version, three seconds longer."
+    },
+    {
+      "youtubeTitle": "Jhim Jhimaune Aankha",
+      "youtubeArtists": ["Ekdev Limbu"],
+      "youtubeAlbum": "Jhim Jhimaune Aankha",
+      "durationSeconds": 207,
+      "durationExact": 207,
+      "neteaseId": "2652257620"
+    },
+    {
+      "youtubeTitle": "AM",
+      "youtubeArtists": ["T-Chenxi"],
+      "youtubeAlbum": "挽回不了的成就",
+      "durationSeconds": 230,
+      "durationExact": 230,
+      "neteaseId": "2141628303"
+    },
+    {
+      "youtubeTitle": "Stand My Ground",
+      "youtubeArtists": ["Yonatron"],
+      "youtubeAlbum": "Stand My Ground",
+      "durationSeconds": 176,
+      "durationExact": 176,
+      "neteaseId": "2615759502"
+    },
+    {
+      "youtubeTitle": "Seena",
+      "youtubeArtists": ["Lunaar"],
+      "youtubeAlbum": "Seena",
+      "durationSeconds": 175,
+      "durationExact": 175,
+      "neteaseId": "1977991026"
+    },
+    {
+      "youtubeTitle": "紳士 - Gentleman",
+      "youtubeArtists": ["Victor Lau", "Princess Ai"],
+      "youtubeAlbum": "iPartment 4",
+      "durationSeconds": 198,
+      "durationExact": 198,
+      "neteaseId": "28219175",
+      "note": "The NetEase row is titled 'Gentleman' and carries 演奏曲 on a second release of the same recording. Without 演奏曲 in the version-word list the two are indistinguishable."
+    },
+    {
+      "youtubeTitle": "无名的人 (电影《雄狮少年》主题曲/片尾曲)",
+      "youtubeArtists": ["Angela Zhang"],
+      "youtubeAlbum": null,
+      "durationSeconds": 266,
+      "durationExact": 266,
+      "neteaseId": "2653125161",
+      "note": "The parenthetical is a context annotation, not part of the name. It has to be stripped before the title is compared."
+    },
+    {
+      "youtubeTitle": "True Colors(合作音乐人:Nicki Minaj)",
+      "youtubeArtists": ["Wiz Khalifa"],
+      "youtubeAlbum": "Blacc Hollywood",
+      "durationSeconds": 256,
+      "durationExact": 256,
+      "neteaseId": "28935275",
+      "note": "The Chinese platforms file a collaboration as 'True Colors(合作音乐人:Nicki Minaj)'. Two things had to be fixed for this one: the credit marker was not recognised (so the source silently lost its credit, and the credit tier then ranked the candidate carrying '(feat. Nicki Minaj)' BELOW every same-titled cover), and the query was sent with the Chinese marker in it (so NetEase returned a page of unrelated songs and the record was not on it at all). The user confirmed the id by hand."
+    }
+  ]
+}

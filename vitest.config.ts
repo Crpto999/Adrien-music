@@ -13,6 +13,9 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    // `scripts` holds the dev-tooling helpers that are worth testing
+    // (the Tauri CLI wrapper, most of all) — they are plain Node, so
+    // the node environment is enough for them too.
+    include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
   },
 });

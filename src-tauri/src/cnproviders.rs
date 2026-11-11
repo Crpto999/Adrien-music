@@ -237,7 +237,7 @@ fn parse_migu_song(row: &serde_json::Value) -> Option<CnSong> {
         .and_then(|list| list.last())
         .and_then(|i| i.get("img"))
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+        .map(crate::cover_url::to_https);
     Some(CnSong {
         id,
         title,
@@ -504,7 +504,7 @@ fn parse_kugou_song(row: &serde_json::Value) -> Option<CnSong> {
                 .and_then(|t| t.get("union_cover"))
                 .and_then(|v| v.as_str())
         })
-        .map(|s| s.replace("{size}", "400"));
+        .map(|s| crate::cover_url::to_https(&s.replace("{size}", "400")));
     Some(CnSong {
         id,
         title,

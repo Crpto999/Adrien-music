@@ -230,6 +230,7 @@ export const zhCN: typeof en = {
     couldNotReach: "无法连接 {sources}。",
     showLyrics: "显示歌词",
     auto: "自动",
+    matchingSource: "匹配",
     turnOn: "开启歌词",
   },
 
@@ -345,7 +346,7 @@ export const zhCN: typeof en = {
     noResultsFor: "没有找到与“{query}”匹配的结果。",
     clear: "清除搜索",
     inPlaylist: "在播放列表中搜索",
-    resultsFor: '“{query}” 的搜索结果',
+    resultsFor: "“{query}” 的搜索结果",
     showAll: "查看全部",
     scopeCatalog: "曲库",
     scopeLibrary: "我的媒体库",
@@ -493,12 +494,14 @@ export const zhCN: typeof en = {
     commandCopied: "更新命令已复制",
     couldNotOpenBrowser: "无法打开浏览器",
     reportThanks: "感谢反馈！请在浏览器中完成问题提交。",
-    lastfmAuthorized: "请在打开的浏览器标签页中授权 adrify — 授权完成后将自动完成关联。",
+    lastfmAuthorized:
+      "请在打开的浏览器标签页中授权 adrify — 授权完成后将自动完成关联。",
     lastfmDisconnected: "已断开与 Last.fm 的连接",
     lastfmMissingCredentials: "请先输入你的 Last.fm API 密钥和共享密钥。",
     lastfmTimeout: "等待 Last.fm 授权超时。",
     playlistCreated: "已创建“{name}”",
     playlistCreateFailed: "创建失败：{error}",
+    playlistNoTrack: "这些歌曲都无法添加",
     playlistOneTrack: "该歌曲将作为第一条加入。",
     playlistManyTracks: "这 {count} 首歌曲将按顺序加入。",
     playlistPrivateHint:
@@ -532,7 +535,8 @@ export const zhCN: typeof en = {
     close: "关闭设置",
     searchPlaceholder: "搜索设置",
     noResults: "未找到相关设置",
-    noResultsHint: "没有与“{query}”匹配的内容。试试更短的词，例如“渐变”或“字体”。",
+    noResultsHint:
+      "没有与“{query}”匹配的内容。试试更短的词，例如“渐变”或“字体”。",
     tabs: {
       general: "通用",
       playback: "播放",
@@ -540,6 +544,7 @@ export const zhCN: typeof en = {
       home: "首页",
       sources: "音源",
       storage: "存储",
+      shortcuts: "快捷键",
       integrations: "集成",
     },
     language: {
@@ -562,12 +567,15 @@ export const zhCN: typeof en = {
         "此安装由系统包管理器管理 — 请从 Releases 页面获取新版本。",
       proxy: "代理",
       proxyDesc: "通过 HTTP/HTTPS 或 SOCKS 代理转发网络流量。留空则直连。",
-      proxyPlaceholder: "socks5://127.0.0.1:1080",
+      proxyPlaceholder: "支持socks5/http/https",
       proxyInvalid: "这不是一个有效的代理地址。",
       proxyUnsupportedScheme:
         "不支持的协议 — 请使用 http、https、socks4、socks4a、socks5 或 socks5h。",
       logPath: "日志文件",
       logPathDesc: "打包版没有控制台，日志是唯一的问题记录。点击复制路径。",
+      matchDebugLog: "匹配诊断",
+      matchDebugLogDesc:
+        "把每次跨源搜索记录进日志：查询词、候选、各自的评分，以及最终选中或被拒绝的原因。",
     },
     playback: {
       crossfade: "渐变淡出淡入",
@@ -590,7 +598,8 @@ export const zhCN: typeof en = {
       resumeWhereYouLeftOff: "继续上次播放",
       resumeWhereYouLeftOffDesc: "重启后记住歌曲与播放位置。",
       variedRadio: "更多样的电台与自动播放",
-      variedRadioDesc: "为电台和自动播放加入更多歌曲并稍作打乱，避免每次都是同样的歌。",
+      variedRadioDesc:
+        "为电台和自动播放加入更多歌曲并稍作打乱，避免每次都是同样的歌。",
       systemDefault: "系统默认",
       decrease: "减少",
       increase: "增加",
@@ -627,10 +636,22 @@ export const zhCN: typeof en = {
       interfaceFont: "界面字体",
       interfaceFontDesc: "应用于整个应用，歌曲与艺人名称同样使用该字体。",
       fontSystem: "系统默认",
+      fontPingfang: "苹方 PingFang SC",
+      fontPingfangDesc:
+        "完整的中文字体，需要时下载。约 {size}，只需下载一次，文件会保存在本地。",
+      fontPingfangDownload: "下载（{size}）",
+      fontPingfangDownloading: "下载中… {percent}%",
+      fontPingfangDownloaded: "已下载",
+      fontPingfangRemove: "删除已下载的字体",
+      fontPingfangRemoveConfirm:
+        "删除已下载的苹方 PingFang SC 字体文件？之后可以重新下载。",
+      fontPingfangFailed: "字体下载失败：{error}",
+      fontPingfangInstalled: "已安装到本设备",
     },
     home: {
       sectionOrder: "板块顺序",
-      sectionOrderDesc: "拖动以调整首页显示的板块顺序，也可以把不喜欢的板块隐藏起来。",
+      sectionOrderDesc:
+        "拖动以调整首页显示的板块顺序，也可以把不喜欢的板块隐藏起来。",
       hideSection: "隐藏该板块",
       showSection: "显示该板块",
       dropToHide: "拖到这里即可隐藏该板块",
@@ -669,12 +690,11 @@ export const zhCN: typeof en = {
       priority: "音源优先级",
       priorityDesc: "同一首歌在多个音源都能播放时，按此顺序依次尝试。",
       priorityHint:
-        "默认 YouTube 排在最前：它没有会员门槛，只要收录就能播。若你的网易云账号有会员，可将网易云提前——那里是无损音质。咪咕、酷狗、QQ 音乐均可匿名搜索与播放，会员歌曲会走第三方解析。",
+        "当多个音源都能播放这首歌时，排在前面的优先。若某个音源有歌却放不了（例如无会员时网易云的会员专属曲目），会跳过它继续试下一个。网易云每日推荐是唯一的例外：只要网易云能放，就优先用网易云音源，因为日推本身就是网易云的录音。调整顺序会立即重新指向已在队列中的歌曲。",
       neteaseDaily: "每日推荐",
       neteaseDailyCount: "{count} 首",
       neteaseDailySubtitle: "网易云音乐今天为你的账号挑选的每日推荐歌单。",
-      neteaseDailySignIn:
-        "登录网易云音乐，即可看到它每天为你挑选的日推歌单。",
+      neteaseDailySignIn: "登录网易云音乐，即可看到它每天为你挑选的日推歌单。",
       neteaseSignInAction: "打开网易云",
       noPlayableSource: "「{title}」目前在所有音源中都不可用。",
       playingFrom: "音源：{provider}",
@@ -683,6 +703,7 @@ export const zhCN: typeof en = {
       switchSource: "切换音源",
       searchingSources: "正在查找其他音源…",
       noOtherSource: "没有其他音源收录这首歌。",
+      sourceUnavailable: "不可播放",
       switchedTo: "已切换到 {source}。",
       switchFailed: "{source} 无法播放这首歌。",
     },
@@ -744,14 +765,36 @@ export const zhCN: typeof en = {
       sortOldestFirst: "最旧优先",
       sortLargestFirst: "最大优先",
     },
+    shortcuts: {
+      toggle: "播放 / 暂停",
+      toggleDesc: "在系统任意位置开始或暂停播放。",
+      next: "下一首",
+      nextDesc: "在系统任意位置切换到下一首歌曲。",
+      like: "红心",
+      likeDesc: "在系统任意位置为当前歌曲红心。",
+      record: "录制快捷键",
+      recording: "请按下按键…",
+      unbound: "未设置",
+      clear: "清除快捷键",
+      inputType: "快捷键输入方式",
+      keyboard: "键盘",
+      mouse: "鼠标",
+      resetAll: "全部重置",
+      registerFailed: "快捷键注册失败——可能已被其他程序占用。",
+      windowsHint: "这些快捷键在 adrify 最小化到托盘时依然生效。",
+      genericHint:
+        "这些快捷键在 adrify 最小化到托盘时依然生效。鼠标快捷键仅在 Windows 上可用。",
+    },
     integrations: {
       lastfm: "Last.fm",
-      lastfmDesc: "记录你播放的内容并分享正在播放的状态。使用你自己的 Last.fm API 账号。",
+      lastfmDesc:
+        "记录你播放的内容并分享正在播放的状态。使用你自己的 Last.fm API 账号。",
       enableScrobbling: "启用 scrobbling",
       scrobbleTracks: "记录播放",
       scrobbleTracksDesc: "将播放记录和正在播放状态发送到 Last.fm。",
       loveLikedTracks: "同步喜欢的歌曲",
-      loveLikedTracksDesc: "在 adrify 中喜欢的歌曲，也会同时标记为 Last.fm 上的 Love。",
+      loveLikedTracksDesc:
+        "在 adrify 中喜欢的歌曲，也会同时标记为 Last.fm 上的 Love。",
       syncLovedTracks: "同步已标记的歌曲",
       apiKey: "你的 Last.fm API 密钥",
       apiSecret: "你的 Last.fm 共享密钥",
@@ -761,8 +804,22 @@ export const zhCN: typeof en = {
         "登录网易云音乐，侧边栏即可看到「每日推荐」，并可播放你自己的无损曲库。",
       neteaseSignedInHint:
         "已登录。侧边栏的播放列表区现在多了一个「每日推荐」入口，内含网易云每天为你挑选的日推歌单；网易云也会按你的账号权限提供曲库（含无损音质）。",
+      neteaseQrTitle: "登录网易云音乐",
+      neteaseQrDesc:
+        "请使用手机上的网易云音乐 App 扫描此二维码，并在手机上确认登录。登录成功后本弹窗会自动关闭。",
+      neteaseQrAlt: "网易云音乐登录二维码",
+      neteaseQrRefresh: "换一个二维码",
+      neteaseQrFailed: "无法登录网易云音乐，请换一个二维码重试。",
+      neteaseQrExpired: "二维码在扫描前已过期，请换一个二维码重试。",
+      neteaseQrBlocked:
+        "网易云拒绝了本次登录（风控拦截），请稍等几分钟后再试。",
+      neteaseQrNoCredential:
+        "网易云已确认登录，但未返回凭证，请换一个二维码重试。",
+      neteaseQrClientFailed: "无法连接到网易云，请检查网络后重试。",
+      neteaseQrStorageFailed: "已登录网易云，但凭证保存失败，请重试。",
       discord: "Discord 状态展示",
-      discordDesc: "在 Discord 个人资料中展示你正在播放的内容，直接与本地 Discord 应用通信。",
+      discordDesc:
+        "在 Discord 个人资料中展示你正在播放的内容，直接与本地 Discord 应用通信。",
       enableDiscord: "启用 Discord 状态展示",
       clientId: "你的 Discord 应用 Client ID",
       activityType: "活动类型",

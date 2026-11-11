@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import { usePlaybackStore, type QueueTrack } from "@/lib/store/playback";
 import { toQueueTrack } from "@/lib/providers/queue";
-import { canPlayFrom } from "@/lib/providers/playback";
-import { findMatches } from "@/lib/providers/resolve";
-import { getProviderOrder } from "@/lib/providers/play";
+import { rememberPlatformPair } from "@/lib/store/netease-ids";
+import { canPlayFrom } from "@/lib/providers/probe";
+import { getAvailability } from "@/lib/providers/availability";
+import { getProviderOrder } from "@/lib/providers/order";
+import { effectiveOrder } from "@/lib/providers/source-resolution";
 import { toCandidate, type NeteaseSong } from "@/lib/providers/adapters/netease";
 import {
-  playableProviders,
-  searchOrderFor,
   type CanonicalTrack,
   type ProviderRef,
 } from "@/lib/providers/types";
@@ -28,7 +28,8 @@ import {
  *   1. **Can NetEase serve it?** One probe answers this — the same
  *      resolution the stream server runs before serving the bytes. When
  *      the answer is yes (the common case) the track plays straight
- *      from NetEase and no cross-provider search happens at all.
+ *      from NetEase and no cross-provider search is needed for the
+ *      playback decision.
  *   2. **When it cannot**, the other platforms are searched for the
  *      same recording and the first one that can serve it wins, in the
  *      user's own provider-priority order.
@@ -37,6 +38,17 @@ import {
  * that recording is the one the user is being offered — the other
  * platforms are substitutes for the ones NetEase will not serve, not
  * better versions of it.
+ *
+ * ## The other platforms are searched anyway
+ *
+ * The search happens for *every* pick, not only for the ones NetEase
+ * cannot serve, because the answer feeds the source-switcher panel:
+ * the user can see which other sources have the song and switch to one
+ * by hand.
+ *
+ * That search is concurrent — every source is asked at the same time —
+ * so the pick's own source is not held up waiting for the others. The
+ * playback decision waits only for NetEase's own answer.
  *
  * ## Why the resolution is not eager
  *
@@ -89,6 +101,13 @@ export function dailyQueueTracks(songs: NeteaseSong[]): QueueTrack[] {
     // "found on NetEase, playing from YouTube" once the slot is
     // upgraded to another provider.
     discoveredOn: "netease",
+    // And the song's own id on that platform. The two go together:
+    // `discoveredOn` names the platform, `discoveredTrackId` is the
+    // key the platform's lyrics are filed under. Without the id the
+    // origin would be a name without an address, and a pick that moved
+    // to YouTube would lose the NetEase lyrics that are exactly its
+    // own words.
+    discoveredTrackId: song.id,
   }));
 }
 
@@ -141,25 +160,31 @@ async function resolveUncached(
     providerTrackId: song.id,
   };
 
-  // The cheap question first: one request answers it, and a "yes"
-  // saves several parallel searches.
-  if (await canPlayFrom(neteaseRef)) return neteaseRef;
-
-  // NetEase cannot serve it, so look elsewhere. The origin provider is
-  // excluded from the search — we already know its answer.
+  // The other platforms are searched *concurrently* — every source is
+  // asked at the same time, so the answer does not depend on which
+  // source replied first. The result is what feeds the source panel.
+  //
+  // The search is started before the NetEase probe rather than after
+  // it, so the two run in parallel rather than one after the other.
   const priority = getProviderOrder();
-  const playable = playableProviders(priority);
-  const searchable = searchOrderFor("netease", playable);
-  if (searchable.length === 0) return null;
+  const order = effectiveOrder(priority, ["netease"]);
+  const availability = getAvailability(canonicalFor(song), { priority: order });
 
-  const matches = await findMatches(canonicalFor(song), searchable);
-  for (const provider of searchable) {
-    const match = matches.get(provider);
-    if (!match) continue;
-    const ref: ProviderRef = {
-      provider,
-      providerTrackId: match.providerTrackId,
-    };
+  // The cheap question first: one request answers it, and a "yes"
+  // saves waiting for the search.
+  if (await canPlayFrom(neteaseRef)) {
+    // The search is still worth having — it is what the source panel
+    // shows — but the playback decision does not wait for it.
+    void availability.catch(() => {});
+    return neteaseRef;
+  }
+
+  // NetEase cannot serve it, so look elsewhere. The order is the
+  // user's own, with NetEase at the front — the search skips NetEase
+  // itself, since its answer is already known.
+  const matches = await availability;
+  for (const ref of matches) {
+    if (ref.provider === "netease") continue;
     if (await canPlayFrom(ref)) return ref;
   }
 
@@ -179,6 +204,17 @@ export async function resolvedDailyTrack(
   const base = dailyQueueTracks([song])[0];
   const ref = await resolveDailySource(song);
   if (!ref || ref.provider === "netease") return base;
+
+  // The pick and the video it resolved to are one recording under two
+  // ids. Remembering that is what lets the track keep its NetEase
+  // lyrics while it plays from YouTube, and what lets the source
+  // switcher offer the pick's *exact* NetEase record rather than a
+  // search result that might be a cover of the same song.
+  rememberPlatformPair(
+    { provider: "netease", providerTrackId: song.id },
+    { provider: ref.provider, providerTrackId: ref.providerTrackId },
+  );
+
   return {
     ...base,
     ...toQueueTrack({

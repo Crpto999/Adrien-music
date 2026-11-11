@@ -11,7 +11,8 @@ import {
   getProviderOrder,
   setProviderOrder,
   subscribeProviderOrder,
-} from "@/lib/providers/play";
+} from "@/lib/providers/order";
+import { reResolveQueueForOrder } from "@/lib/providers/source-resolution";
 
 /**
  * The reorderable provider priority list.
@@ -20,6 +21,10 @@ import {
  * them has it. It is a *pre-playback* choice: the app picks a source
  * that can play the track before any audio starts, so changing the
  * order here never interrupts a track that is already playing.
+ *
+ * Changing the order also re-points the tracks that are already
+ * queued, so the setting takes effect at once rather than only for
+ * the tracks played after it.
  */
 export function ProviderPriorityList() {
   const t = useT();
@@ -43,6 +48,9 @@ export function ProviderPriorityList() {
     next.splice(target, 0, moved);
     setOrder(next);
     setProviderOrder(next);
+    // The queued tracks follow the new order, so the setting applies
+    // to what is already lined up and not just to what comes next.
+    void reResolveQueueForOrder();
   };
 
   return (

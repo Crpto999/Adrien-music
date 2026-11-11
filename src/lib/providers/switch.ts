@@ -1,5 +1,5 @@
 import { usePlaybackStore } from "@/lib/store/playback";
-import { canPlayFrom } from "@/lib/providers/playback";
+import { canPlayFrom } from "@/lib/providers/probe";
 import type { ProviderRef } from "@/lib/providers/types";
 
 /**
@@ -27,6 +27,9 @@ export async function switchTrackProvider(ref: ProviderRef): Promise<boolean> {
   const playable = await canPlayFrom(ref);
   if (!playable) return false;
 
-  usePlaybackStore.getState().setTrackProvider(index, ref);
+  // `locked`: the user chose this source by hand, so the priority
+  // order will not undo the switch the next time the track is
+  // re-resolved.
+  usePlaybackStore.getState().setTrackProvider(index, ref, undefined, true);
   return true;
 }

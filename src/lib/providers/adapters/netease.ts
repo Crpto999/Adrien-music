@@ -17,6 +17,8 @@ export type NeteaseSong = {
   title: string;
   artists: string[];
   album: string | null;
+  /** The platform's other names for the recording. */
+  aliases: string[];
   durationMs: number;
   duration: number;
   coverUrl: string | null;
@@ -24,6 +26,27 @@ export type NeteaseSong = {
   fee: number;
   playable: boolean;
 };
+
+/**
+ * The number of rows to ask NetEase for.
+ *
+ * The platform's search is a *relevance* ranking, not a lookup: for a
+ * popular song it fills the top of the page with covers, piano versions
+ * and remixes, and files the original further down. Measured against
+ * the live API, the authoritative recording of 晴天 / 周杰伦 sits at
+ * **rank 65** of a 100-row page, and 草蜢's own song 草蜢 - 嗲噢! at
+ * **rank 67**.
+ *
+ * So the page has to be deep, and the *matcher* — not a row count —
+ * decides which row is the right one. `scoreMatch` is what rejects a
+ * cover; a 20-row cut-off would throw the original away before the
+ * matcher ever saw it, which is exactly how a song the platform
+ * clearly has ends up with no source option at all.
+ *
+ * The sibling module `netease-like.ts` already asks for 100 for the
+ * same reason.
+ */
+export const NETEASE_SEARCH_LIMIT = 100;
 
 /**
  * Search NetEase.
@@ -34,7 +57,7 @@ export type NeteaseSong = {
  */
 export async function neteaseSearch(
   query: string,
-  limit = 20,
+  limit = NETEASE_SEARCH_LIMIT,
 ): Promise<NeteaseSong[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
@@ -119,6 +142,10 @@ export function toCandidate(song: NeteaseSong): ProviderCandidate {
     album: song.album ?? undefined,
     duration: song.duration,
     coverUrl: song.coverUrl ?? undefined,
+    // The aliases go with the candidate: they are the platform's other
+    // names for the recording, and the matcher uses them to connect a
+    // row filed under one name to a source filed under another.
+    aliases: song.aliases?.length ? song.aliases : undefined,
   };
 }
 

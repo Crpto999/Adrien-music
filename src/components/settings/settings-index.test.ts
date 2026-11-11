@@ -18,6 +18,28 @@ const tabSources = import.meta.glob("./*-tab.tsx", {
   eager: true,
 }) as Record<string, string>;
 
+// Rows that live in their own file, rendered by the tab that imports
+// them. The `settingId` anchor the checks below look for is in that
+// file, not in the tab, so the tab has to be checked together with the
+// rows it pulls in.
+const rowSources = import.meta.glob("./*-row.tsx", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+/** Which row files belong to which tab. */
+const EXTRA_ROWS: Record<string, string[]> = {
+  "./appearance-tab.tsx": ["./interface-font-row.tsx"],
+};
+
+/** Every source that makes up a tab: the tab itself plus its rows. */
+function sourcesForTab(tab: string): string {
+  const key = `./${tab}-tab.tsx`;
+  const parts = [tabSources[key], ...(EXTRA_ROWS[key] ?? []).map((r) => rowSources[r])];
+  return parts.filter(Boolean).join("\n");
+}
+
 const titles = (q: string) => searchSettings(q).map((m) => m.entry.titleKey);
 
 // The app ships with Simplified Chinese as its default locale, but these
@@ -105,7 +127,7 @@ describe("settings index", () => {
 
   it("only lists rows that exist in their tab", () => {
     for (const e of SETTINGS_INDEX) {
-      const src = tabSources[`./${e.tab}-tab.tsx`];
+      const src = sourcesForTab(e.tab);
       expect(src, `missing tab file for ${e.tab}`).toBeTruthy();
       // Every indexed row renders a `data-setting` anchor with its id.
       expect(

@@ -165,7 +165,7 @@ describe("YouTube Music lyrics", () => {
     expect(lines[0].text).toBe("");
   });
 
-  it("sends the mobile client, which is what unlocks timed lyrics", async () => {
+  it("reads the lyrics with the mobile client, which unlocks the timings", async () => {
     // Load-bearing: on WEB_REMIX the very same browseId returns plain text.
     // Anyone "tidying" this back to the app's default client would silently
     // lose the timings, so pin it.
@@ -173,11 +173,28 @@ describe("YouTube Music lyrics", () => {
       bothHops(nextResponse([tab({})]), timedBrowse),
     );
     await fetchYtMusicLyrics("J7p4bzqLvCw");
-    for (const c of calls) {
-      const client = (c.body.context as { client: { clientName: string } })
-        .client;
-      expect(client.clientName).toBe("ANDROID_MUSIC");
-    }
+    const browse = calls.find((c) => c.url.includes("/browse"));
+    expect(browse).toBeDefined();
+    const client = (browse!.body.context as { client: { clientName: string } })
+      .client;
+    expect(client.clientName).toBe("ANDROID_MUSIC");
+  });
+
+  it("finds the lyrics tab with the fast client, so the lookup fits the budget", async () => {
+    // The `/next` hop's answer is the same under either client, but the
+    // latency is not: measured against the live API, `/next` via
+    // ANDROID_MUSIC takes 5.7 s - 9.8 s and pushes the whole lookup past
+    // the 8 s deadline (`PROVIDER_TIMEOUT_MS`), so every lookup timed out.
+    // Via WEB_REMIX the same hop takes 0.2 s.
+    const { fetchYtMusicLyrics, calls } = await setup(
+      bothHops(nextResponse([tab({})]), timedBrowse),
+    );
+    await fetchYtMusicLyrics("J7p4bzqLvCw");
+    const next = calls.find((c) => c.url.includes("/next"));
+    expect(next).toBeDefined();
+    const client = (next!.body.context as { client: { clientName: string } })
+      .client;
+    expect(client.clientName).toBe("WEB_REMIX");
   });
 
   it("stops after one request when YTM marks the tab unselectable", async () => {

@@ -63,16 +63,17 @@ import { useNeteaseLikedIds } from "@/lib/providers/netease-liked";
 import { fetchVariedRadio } from "@/lib/innertube/radio-variety";
 import { fetchLikedSongs } from "@/lib/innertube/library";
 import {
-  addToPlaylist,
   createPlaylistWithTracks,
   fetchUserPlaylists,
   removeFromPlaylist,
   type UserPlaylist,
 } from "@/lib/innertube/mutations";
+import { addTracksToPlaylist, youtubeIdForPlaylist } from "@/lib/providers/playlist-add";
 import { toggleDisliked, toggleLiked } from "@/lib/like-actions";
 import { useSettingsStore } from "@/lib/store/settings";
 import { useT, translate } from "@/lib/i18n";
 import { usePlaybackStore } from "@/lib/store/playback";
+import type { QueueTrack } from "@/lib/store/playback";
 import { usePlaybackSettings } from "@/lib/store/playback-settings";
 import { armFadeInto } from "@/lib/fade-request";
 import type { ShelfItem } from "@/lib/innertube/types";
@@ -191,7 +192,7 @@ export function useTrackMenuController(item: ShelfItem) {
   };
   const runAddToPlaylist = async (p: UserPlaylist) => {
     try {
-      await addToPlaylist(p.id, item.id);
+      await addTracksToPlaylist(p.id, [item]);
       // The playlist page keys its data as ["playlist-pages", id] (with a
       // possibly VL-prefixed id), so ["playlist", p.id] never matched and
       // the invalidation was a no-op. Prefix-match every open playlist page.
@@ -475,7 +476,7 @@ export function TrackContextMenu({ item, children, context, removal }: Props) {
         open={controller.newPlaylistOpen}
         onOpenChange={controller.setNewPlaylistOpen}
         defaultTitle={item.title}
-        videoIds={[item.id]}
+        tracks={[item]}
       />
     </>
   );
@@ -535,7 +536,7 @@ export function TrackMoreMenu({
         open={controller.newPlaylistOpen}
         onOpenChange={controller.setNewPlaylistOpen}
         defaultTitle={item.title}
-        videoIds={[item.id]}
+        tracks={[item]}
       />
     </>
   );
@@ -545,12 +546,20 @@ export function NewPlaylistDialog({
   open,
   onOpenChange,
   defaultTitle,
-  videoIds,
+  tracks,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   defaultTitle: string;
-  videoIds: string[];
+  /**
+   * The rows to seed the playlist with.
+   *
+   * Rows rather than ids, because a row from another platform (a NetEase
+   * daily pick) does not have a YouTube video id to begin with — it has
+   * to be translated into one first, and only the row carries enough
+   * information (title, artist, length) to find a convincing match.
+   */
+  tracks: (ShelfItem | QueueTrack)[];
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -566,7 +575,15 @@ export function NewPlaylistDialog({
     if (!name || busy) return;
     setBusy(true);
     try {
-      await createPlaylistWithTracks(name, videoIds);
+      // The playlist is created with the tracks the dialog was given —
+      // translated into YouTube video ids where they have to be.
+      const ids: string[] = [];
+      for (const track of tracks) {
+        const videoId = await youtubeIdForPlaylist(track);
+        if (videoId) ids.push(videoId);
+      }
+      if (ids.length === 0) throw new Error(t("toast.playlistNoTrack"));
+      await createPlaylistWithTracks(name, ids);
       await qc.invalidateQueries({ queryKey: ["user-playlists"] });
       await qc.invalidateQueries({ queryKey: ["library"] });
       toast.success(t("toast.playlistCreated", { name }));
@@ -584,9 +601,9 @@ export function NewPlaylistDialog({
         <DialogHeader>
           <DialogTitle>{t("action.newPlaylist")}</DialogTitle>
           <DialogDescription>
-            {videoIds.length === 1
+            {tracks.length === 1
               ? t("toast.playlistOneTrack")
-              : t("toast.playlistManyTracks", { count: videoIds.length })}{" "}
+              : t("toast.playlistManyTracks", { count: tracks.length })}{" "}
             {t("toast.playlistPrivateHint")}
           </DialogDescription>
         </DialogHeader>

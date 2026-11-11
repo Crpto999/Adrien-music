@@ -1,27 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { scoreMatch, artistsAgree } from "@/lib/providers/match";
+import {
+  scoreCandidate,
+  decideConfidence,
+  artistsAgree,
+} from "@/lib/providers/match";
 
 /**
  * The NetEase like sync's threshold.
  *
- * The score a candidate has to reach before the heart is written to the
+ * The bar a candidate has to clear before the heart is written to the
  * user's NetEase library. Lighting the heart on the wrong song in the
  * user's own collection is worse than not mirroring at all, so the bar
- * is deliberately high.
+ * is the doc's `high` or `medium` stage — the two the doc says to
+ * "采用并缓存" (adopt and cache).
+ *
+ * The `low` stage is deliberately not enough. The doc marks it "采用
+ * 但标记需确认" (adopt, but flag for confirmation), and a heart in the
+ * user's own library has no way to ask for confirmation.
  */
-const LIKE_SYNC_THRESHOLD = 5;
-
-/** The gate the sync applies on top of the score. */
 const qualifies = (
   candidate: { title: string; artists: string[]; duration: number },
   hint: { title: string; artists: string[]; duration: number },
 ): boolean => {
-  const score = scoreMatch(candidate, hint);
-  return (
-    score !== null &&
-    score >= LIKE_SYNC_THRESHOLD &&
-    artistsAgree(candidate, hint)
-  );
+  const scored = scoreCandidate(candidate, hint);
+  const confidence = decideConfidence(scored, null);
+  if (confidence !== "high" && confidence !== "medium") return false;
+  // The artist has to agree as well: the scorer is lenient about the
+  // artist when the lengths match — a cover is a fine substitute for
+  // *playback* — but it is not fine for a *library*.
+  return artistsAgree(candidate, hint);
 };
 
 describe("the NetEase like-sync threshold", () => {

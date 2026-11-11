@@ -3,12 +3,10 @@ import { usePlaybackStore, type QueueTrack } from "@/lib/store/playback";
 import { canonicalFromCandidate, toQueueTrack } from "@/lib/providers/queue";
 import { resolvePlaybackSource, type PlaybackSource } from "@/lib/providers/playback";
 import {
-  playableProviders,
-  PROVIDER_PRIORITY,
   type CanonicalTrack,
   type ProviderCandidate,
-  type ProviderId,
 } from "@/lib/providers/types";
+import { getProviderOrder } from "@/lib/providers/order";
 import { translate } from "@/lib/i18n";
 
 /**
@@ -26,83 +24,12 @@ import { translate } from "@/lib/i18n";
  *      winning provider's id rides along in `provider` /
  *      `providerTrackId` while `videoId` stays a stable identity for
  *      everything else in the app.
- */
-
-/**
- * The provider priority chain.
  *
- * YouTube is first by default because it has no membership gate — a
- * track it has is playable by anyone. A signed-in NetEase account
- * with a membership can move NetEase to the front, because there the
- * stream is lossless rather than 128 kbps.
- *
- * The order is persisted: it is the user's standing preference about
- * where audio comes from, and losing it on every restart would make
- * the setting a chore.
+ * The priority chain itself lives in `./order` — it is read by the
+ * availability search and by the audio engine too, and none of those
+ * should have to come through this module to get at it.
  */
-let providerOrder: ProviderId[] = loadProviderOrder();
-const providerOrderListeners = new Set<() => void>();
-
-/** Where the persisted order lives. */
-const ORDER_STORAGE_KEY = "adrify-provider-order";
-
-/**
- * Read the persisted order.
- *
- * A stored order that names a provider the app no longer has is
- * dropped rather than honoured, and the rest is kept in the stored
- * order — a provider the user put first stays first.
- */
-function loadProviderOrder(): ProviderId[] {
-  try {
-    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    const playable = playableProviders();
-    const kept = parsed.filter(
-      (p): p is ProviderId =>
-        typeof p === "string" && playable.includes(p as ProviderId),
-    );
-    // Any provider the app gained since the order was written is
-    // appended at the end rather than dropped: it is playable, and
-    // putting it last means it only ever serves a track nothing else
-    // can.
-    const missing = playable.filter((p) => !kept.includes(p));
-    return [...kept, ...missing];
-  } catch {
-    return [];
-  }
-}
-
-/** Persist the order. */
-function persistProviderOrder(order: ProviderId[]): void {
-  try {
-    localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
-  } catch {
-    /* private mode etc — the in-memory order still works */
-  }
-}
-
-/** Set the provider priority. */
-export function setProviderOrder(order: ProviderId[]): void {
-  providerOrder = order.filter((p) => playableProviders().includes(p));
-  persistProviderOrder(providerOrder);
-  providerOrderListeners.forEach((l) => l());
-}
-
-/** The current provider priority. */
-export function getProviderOrder(): ProviderId[] {
-  return providerOrder.length > 0 ? providerOrder : PROVIDER_PRIORITY;
-}
-
-/** Subscribe to provider-priority changes. */
-export function subscribeProviderOrder(fn: () => void): () => void {
-  providerOrderListeners.add(fn);
-  return () => {
-    providerOrderListeners.delete(fn);
-  };
-}
+export { getProviderOrder } from "@/lib/providers/order";
 
 /**
  * Play a provider candidate.

@@ -7,6 +7,7 @@ export type SettingsTab =
   | "home"
   | "sources"
   | "storage"
+  | "shortcuts"
   | "integrations";
 
 /** The drill-in pages of the Integrations tab. */

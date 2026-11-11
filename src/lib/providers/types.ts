@@ -60,6 +60,25 @@ export type CanonicalTrack = {
   origin?: ProviderId;
   /** That provider's id for it. */
   originId?: string;
+  /**
+   * Ids the track is *known* by, per provider.
+   *
+   * An id listed here is authoritative: it is the exact record, not a
+   * cross-platform match that might be a different recording (a cover,
+   * a live cut). The origin's own id is authoritative by definition
+   * and lives in `originId`; this map carries the *other* platforms'
+   * ids, which the app established when it moved the track between
+   * them.
+   *
+   * The case that matters is the NetEase daily pick the user hearts:
+   * the pick is a NetEase recording, the heart puts it in the YouTube
+   * liked list as a YouTube video id, and from then on the app knows
+   * both ids of one recording. The YouTube id has to keep winning on
+   * YouTube (the user hearted *that* video) and the NetEase id has to
+   * be offered as the authoritative NetEase record — not a fuzzy
+   * search result, which for a popular song can easily be a cover.
+   */
+  knownIds?: Partial<Record<ProviderId, string>>;
 };
 
 /** What a provider can do. */
@@ -174,6 +193,26 @@ export type ProviderCandidate = {
   album?: string;
   duration?: number;
   coverUrl?: string;
+  /**
+   * The platform's other names for the recording.
+   *
+   * NetEase files a song under an alias as well as its title, and the
+   * alias is often the name the recording is known by *elsewhere* —
+   * "晴天" is also "Sunny Day", and a Japanese release carries the
+   * romanised title. Matching against the aliases is what connects a
+   * YouTube upload filed under one name to the NetEase record filed
+   * under another.
+   */
+  aliases?: string[];
+  /**
+   * Where the platform ranked this candidate, zero-based.
+   *
+   * The platform's own ordering is a strong prior — the authoritative
+   * recording of a song sits at rank 0 in most searches — so the
+   * matcher uses it as its last tie-breaker. `undefined` means the
+   * candidate was not ranked.
+   */
+  rank?: number;
 };
 
 /**
@@ -181,9 +220,45 @@ export type ProviderCandidate = {
  */
 export type ScoredCandidate = {
   candidate: ProviderCandidate;
-  /** Higher is better. `null` means the candidate was rejected. */
-  score: number | null;
+  /**
+   * The comparison key, or `null` when the candidate was rejected.
+   *
+   * The key is the cascade's tuple — the components in cascade order —
+   * so it is compared lexicographically rather than summed. See
+   * `docs/YouTube歌曲匹配算法.md` §7.
+   */
+  score: MatchKey | null;
+  /**
+   * How confident the matcher is that this is the same recording.
+   *
+   * The distinction matters for the *library* flows: a `high` or
+   * `medium` match is good enough to write into the user's own
+   * collection, a `low` one is only good enough to play. A `low` match
+   * that came from the cover fallback is a different performer playing
+   * the same song — serviceable as audio, wrong as a library entry.
+   */
+  confidence?: MatchConfidence;
 };
+
+/** How confident the matcher is in a match. */
+export type MatchConfidence = "high" | "medium" | "low" | "failed";
+
+/**
+ * The comparison key the matcher produces.
+ *
+ * The components in cascade order — title, credit, artist, version,
+ * duration, album, rank — compared as a tuple rather than summed.
+ * See `docs/YouTube歌曲匹配算法.md` §7.
+ */
+export type MatchKey = readonly [
+  number, // title
+  number, // credit
+  number, // artist
+  number, // version
+  number, // duration
+  number, // album
+  number, // rank
+];
 
 /**
  * Build a canonical track from a candidate.

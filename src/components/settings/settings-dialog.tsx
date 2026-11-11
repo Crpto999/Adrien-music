@@ -11,6 +11,7 @@ import {
   IconContrastFilled,
   IconDatabaseFilled,
   IconHomeFilled,
+  IconKeyboardFilled,
   IconPlayerPlayFilled,
   IconPuzzleFilled,
   IconRouter,
@@ -40,6 +41,7 @@ import { AppearanceTab } from "@/components/settings/appearance-tab";
 import { HomeTab } from "@/components/settings/home-tab";
 import { StorageTab } from "@/components/settings/storage-tab";
 import { SourcesTab } from "@/components/settings/sources-tab";
+import { ShortcutsTab } from "@/components/settings/shortcuts-tab";
 import { IntegrationsTab } from "@/components/settings/integrations-tab";
 import {
   useSettingsDialog,
@@ -75,7 +77,16 @@ const TABS: {
     labelKey: "settings.tabs.sources",
     icon: IconRouter,
   },
-  { id: "storage", labelKey: "settings.tabs.storage", icon: IconDatabaseFilled },
+  {
+    id: "storage",
+    labelKey: "settings.tabs.storage",
+    icon: IconDatabaseFilled,
+  },
+  {
+    id: "shortcuts",
+    labelKey: "settings.tabs.shortcuts",
+    icon: IconKeyboardFilled,
+  },
   {
     id: "integrations",
     labelKey: "settings.tabs.integrations",
@@ -107,10 +118,7 @@ export function SettingsDialog() {
   const [target, setTarget] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const searching = query.trim().length >= MIN_QUERY_LENGTH;
-  const matches = useMemo(
-    () => searchSettings(query, tabLabel),
-    [query],
-  );
+  const matches = useMemo(() => searchSettings(query, tabLabel), [query]);
   const pick = (entry: SettingEntry) => {
     useSettingsDialog.getState().setIntegrationPage(entry.page ?? null);
     setTab(entry.tab);
@@ -207,10 +215,11 @@ export function SettingsDialog() {
             ))}
           </nav>
           <div className="mt-auto flex flex-col gap-[3px] px-2">
-            <span className="text-[11.5px] text-t9">
-              {version ? `adrify v${version}` : "adrify"}
+            <span className="text-[14px] text-t9">
+              {version ? `Adrify v${version} ` : "Adrify"}
             </span>
-            <span className="text-[11.5px] text-t10">
+            <span className="text-[14px] text-t9">By Adrien🧔🏻‍♂️</span>
+            <span className="text-[12px] text-t10">
               {phase === "ready"
                 ? t("update.restartToUpdate")
                 : phase === "available"
@@ -281,6 +290,7 @@ export function SettingsDialog() {
             {!searching && tab === "home" && <HomeTab />}
             {!searching && tab === "sources" && <SourcesTab />}
             {!searching && tab === "storage" && <StorageTab />}
+            {!searching && tab === "shortcuts" && <ShortcutsTab />}
             {!searching && tab === "integrations" && <IntegrationsTab />}
           </div>
         </div>

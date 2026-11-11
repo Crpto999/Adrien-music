@@ -29,10 +29,10 @@ import {
 } from "@/components/ui/tooltip";
 import { NewPlaylistDialog } from "@/components/shared/track-context-menu";
 import {
-  addManyToPlaylist,
   fetchUserPlaylists,
   type UserPlaylist,
 } from "@/lib/innertube/mutations";
+import { addTracksToPlaylist } from "@/lib/providers/playlist-add";
 import { useLayoutStore } from "@/lib/store/layout";
 import { usePlaybackStore } from "@/lib/store/playback";
 import type { ShelfItem } from "@/lib/innertube/types";
@@ -110,10 +110,7 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
     if (busy) return;
     setBusy(true);
     try {
-      await addManyToPlaylist(
-        p.id,
-        tracks.map((t) => t.id),
-      );
+      await addTracksToPlaylist(p.id, tracks);
       await qc.invalidateQueries({ queryKey: ["playlist-pages"] });
       toast.success(translate("toast.addedToPlaylist", { label, title: p.title }));
       onClear();
@@ -267,7 +264,7 @@ export function SelectionToolbar({ tracks, onClear }: Props) {
         open={newPlaylistOpen}
         onOpenChange={setNewPlaylistOpen}
         defaultTitle={tracks[0]?.title ?? t("action.newPlaylist")}
-        videoIds={tracks.map((t) => t.id)}
+        tracks={tracks}
       />
     </>,
     document.body,
