@@ -244,10 +244,15 @@ def main() -> int:
     for asset in assets:
         if asset["name"].endswith(".sig"):
             continue
-        new_name = friendly_name(asset["name"], version)
-        installers.append({**asset, "original": asset["name"], "final": new_name})
-        if new_name != asset["name"]:
-            renames[asset["original"]] = new_name
+        original = asset["name"]
+        new_name = friendly_name(original, version)
+        installers.append({**asset, "original": original, "final": new_name})
+        if new_name != original:
+            # The key is the asset's name on the release, not a key of
+            # `asset` -- the API's asset objects only carry `name`,
+            # `id`, `url` and friends, so reading "original" off one
+            # raises a KeyError and takes the whole release down.
+            renames[original] = new_name
             if not args.dry_run:
                 patch_asset(args.repo, asset["id"], new_name, token)
 
