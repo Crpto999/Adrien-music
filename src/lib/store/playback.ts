@@ -76,6 +76,29 @@ export type PlaybackState = {
   shuffle: boolean;
   repeat: RepeatMode;
 
+  /**
+   * Playback history — the tracks that have actually played, oldest
+   * first.
+   *
+   * This is a log of its own, NOT the part of the queue that sits
+   * behind the current track. The queue is a *plan* (what is going to
+   * play) and is routinely replaced wholesale — playing an album, or
+   * a single track from search, throws the old plan away — so it
+   * cannot double as the record of what was heard. Deriving the
+   * history from the queue's prefix therefore showed an empty history
+   * almost every time.
+   *
+   * The log is append-only and strictly ordered: every track that
+   * starts playing is appended, in the order it started. Going back
+   * with Previous does not rewrite it — the track is simply played
+   * again and appears again, which is what "strictly record the order"
+   * means for a log.
+   *
+   * Session-scoped: it is not persisted, so a fresh launch starts with
+   * an empty history.
+   */
+  history: QueueTrack[];
+
   // Current track status
   status: LoadStatus;
   error?: string;
@@ -140,6 +163,16 @@ export type PlaybackState = {
   clearQueue: () => void;
   /** Empty the queue and stop audio outright (account switch). */
   stopPlayback: () => void;
+  /** Forget the playback history (the History tab's own clear action). */
+  clearHistory: () => void;
+  /**
+   * Play a track from the playback history.
+   *
+   * A history entry is not a queue slot — the queue has moved on since
+   * it was played — so it is played the way any other track is picked:
+   * it cuts in line at the front of the queue.
+   */
+  playFromHistory: (historyIndex: number) => void;
   setAutoRadio: (on: boolean) => void;
   setQueueContinuation: (token?: string) => void;
 
@@ -256,6 +289,36 @@ function persistedQueueIndex(queue: QueueTrack[], index: number): number {
 }
 
 /**
+ * Soft cap on the playback history log.
+ *
+ * The log is a session's worth of played tracks. At three minutes each,
+ * 200 entries is roughly ten hours of listening — well past what a
+ * session holds, and small enough that the History tab renders without
+ * a virtualiser.
+ */
+const MAX_HISTORY_TRACKS = 200;
+
+/**
+ * Append a track to the playback history.
+ *
+ * The log is append-only and strictly ordered: every track that starts
+ * playing is appended, in the order it started. Replaying a track —
+ * stepping back with Previous, or picking it again from search —
+ * appends it again, because the log records what happened rather than
+ * what is distinct.
+ */
+function appendHistory(
+  history: QueueTrack[],
+  track: QueueTrack | undefined,
+): QueueTrack[] {
+  if (!track) return history;
+  const next = [...history, track];
+  return next.length > MAX_HISTORY_TRACKS
+    ? next.slice(next.length - MAX_HISTORY_TRACKS)
+    : next;
+}
+
+/**
  * Debounced JSON storage for the persisted playback blob.
  *
  * `position` is part of that blob, so persist fires on every `timeupdate`
@@ -309,6 +372,9 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
   radioEpoch: 0,
   queueContinuation: undefined,
 
+  // Session-scoped: not persisted, so a fresh launch starts empty.
+  history: [],
+
   status: "idle",
   error: undefined,
   streamUrl: undefined,
@@ -323,15 +389,46 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
   playNow: (track, extras) => {
     const mapped = shelfItemToTrack(track);
     if (!mapped) return;
-    let queue = extras?.length
-      ? [mapped, ...extras.filter((t) => t.videoId !== mapped.videoId)]
-      : [mapped];
-    // Honour an active shuffle for the trailing tracks (current stays first).
-    if (get().shuffle && queue.length > 1) {
-      queue = [queue[0], ...fisherYates(queue.slice(1))];
+
+    // "Cut in line": the track the user picked plays right now, and the
+    // tracks that were already queued move behind it.
+    //
+    // The queue is the user's plan, and it is built up track by track
+    // ("add to queue", "play next", an album's track list). Replacing
+    // it wholesale on every single-track play threw that plan away
+    // the moment the user clicked anything that was not part of it,
+    // which is why the queue felt like it had no consistent insertion
+    // rule. Moving the queue behind the new track keeps the plan
+    // intact: nothing is lost, and the new track simply goes first.
+    const state = get();
+    const previousQueue = state.queue;
+
+    const queue = [mapped];
+    // `extras` come straight after the track the user picked — they are
+    // the tail of the same action (a radio seeded from this track, a
+    // shared link's playlist).
+    for (const t of extras ?? []) {
+      const extra = shelfItemToTrack(t);
+      if (!extra) continue;
+      if (extra.videoId === mapped.videoId) continue;
+      if (queue.some((q) => q.videoId === extra.videoId)) continue;
+      queue.push(extra);
     }
+    // The whole queue moves behind the new track, minus any duplicate
+    // of it.
+    for (const t of previousQueue) {
+      if (t.videoId === mapped.videoId) continue;
+      if (queue.some((q) => q.videoId === t.videoId)) continue;
+      queue.push(t);
+    }
+
+    // Honour an active shuffle for the trailing tracks (current stays first).
+    const finalQueue =
+      get().shuffle && queue.length > 1
+        ? [queue[0], ...fisherYates(queue.slice(1))]
+        : queue;
     set({
-      queue,
+      queue: finalQueue,
       index: 0,
       status: "loading",
       streamUrl: undefined,
@@ -340,6 +437,7 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
       playing: true,
       error: undefined,
       queueContinuation: undefined,
+      history: appendHistory(get().history, mapped),
     });
   },
 
@@ -362,6 +460,7 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
       playing: true,
       error: undefined,
       queueContinuation: undefined,
+      history: appendHistory(get().history, queue[i]),
     });
   },
 
@@ -527,6 +626,10 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
           streamUrl: undefined,
           position: 0,
           duration: next[newIndex].duration ?? 0,
+          // Removing the current track moves the playhead onto a
+          // different one, which starts playing — so it is a new
+          // entry in the log.
+          history: appendHistory(s.history, next[newIndex]),
         };
       }
       return { queue: next, index: newIndex };
@@ -578,7 +681,27 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
       position: 0,
       duration: 0,
       queueContinuation: undefined,
+      // The history belongs to the account that was signed in. An
+      // account switch starts a fresh session, so the old account's
+      // plays do not follow the user across.
+      history: [],
     });
+  },
+
+  clearHistory: () => set({ history: [] }),
+
+  /**
+   * Play a track from the history log.
+   *
+   * A history entry is not a queue slot — the queue has moved on since
+   * it was played — so it is played the way any other track is picked:
+   * it cuts in line at the front of the queue, and the queued tracks
+   * stay behind it.
+   */
+  playFromHistory: (historyIndex: number) => {
+    const track = get().history[historyIndex];
+    if (!track) return;
+    get().playNow(track);
   },
 
   setAutoRadio: (on) => set({ autoRadio: on }),
@@ -628,6 +751,10 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
       duration: track.duration ?? 0,
       playing: true,
       error: undefined,
+      // A step forward is a new track starting: it goes into the
+      // history log. The repeat-one case above never reaches here —
+      // it replays the same slot and is not a new entry.
+      history: appendHistory(get().history, track),
     });
   },
 
@@ -657,6 +784,11 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
       duration: track.duration ?? 0,
       playing: true,
       error: undefined,
+      // Stepping back replays a track that is already in the log. The
+      // log is append-only and strictly ordered, so the track is
+      // appended again — the order records what happened, including
+      // the jump back.
+      history: appendHistory(get().history, track),
     });
   },
 
@@ -672,6 +804,7 @@ const playbackStateCreator: StateCreator<PlaybackState> = (set, get) => ({
       duration: track.duration ?? 0,
       playing: true,
       error: undefined,
+      history: appendHistory(get().history, track),
     });
   },
 
@@ -812,6 +945,9 @@ export function initFloatingPlaybackBridge(): void {
     removeAt: (index) => sendAction({ type: "removeAt", index }),
     moveTrack: (from, to) => sendAction({ type: "moveTrack", from, to }),
     clearQueue: () => sendAction({ type: "clearQueue" }),
+    clearHistory: () => sendAction({ type: "clearHistory" }),
+    playFromHistory: (historyIndex) =>
+      sendAction({ type: "playFromHistory", historyIndex }),
     appendToQueue: (tracks) =>
       sendAction({ type: "appendToQueue", tracks: tracks as unknown[] }),
     setAutoRadio: (on) => sendAction({ type: "setAutoRadio", on }),

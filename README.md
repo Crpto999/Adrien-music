@@ -91,6 +91,43 @@ Download the latest installer from the [Releases](../../releases) page and run i
 - Signing in is optional: browse and playback work anonymously; sign in to get
   your library, likes, and playlists.
 
+## Portable data folder
+
+Everything adrify writes on disk lives under a **single data root**:
+
+```text
+<app folder>/data/
+├── accounts/            encrypted account + cookie jars
+├── accounts.json        the account index
+├── netease.enc          the NetEase credential
+├── bin/                 the managed yt-dlp binary
+├── settings.json        the plugin stores (cache-dir preference, window state)
+├── EBWebView/           the WebView2 profile (localStorage, IndexedDB, cookies)
+├── caches/stream/       the downloaded audio
+├── caches/covers/       the cover images
+└── logs/                adrify.log
+```
+
+By default that root is the `data/` folder **next to the executable**, so a
+copy of the app is self-contained: move the folder and the cache, the login
+state and the settings move with it. Nothing is written to `%APPDATA%` or
+`%LOCALAPPDATA%` anymore.
+
+- **Existing installs** are migrated automatically on the first launch after
+  the update — accounts, cookies, yt-dlp, the caches and the WebView2 profile
+  are copied into the new folder, and the old location is left untouched.
+- **Read-only installs** (a per-machine install under `Program Files`, a
+  folder on a read-only share) have nowhere to write. The app does *not*
+  silently fall back to the OS folders — it asks you to pick a writable
+  folder instead, and remembers your choice.
+- **Changing the folder** is done in Settings → Storage → *Data folder*.
+  The data is moved to the new location on the next launch (the WebView2
+  profile cannot be copied while the app holds it open), so restart the app
+  when prompted. *Reset* puts it back to `data/` next to the executable.
+
+The only file that stays in the OS config folder is a one-line pointer
+recording the folder you picked, so the app can find its data again.
+
 ### FAQ
 
 **Windows says "Windows protected your PC" (SmartScreen).**
@@ -158,6 +195,7 @@ retried once the connection is back.
 ```bash
 pnpm install
 pnpm tauri dev
+pnpm exec tauri dev
 ```
 
 Frontend-only dev (no Tauri window): `pnpm dev`.
@@ -181,6 +219,10 @@ command line always wins.
 One consequence: the dev instance is a separate install as far as the
 system is concerned, so it needs its own sign-in the first time.
 
+Its data folder lives next to the dev executable
+(`src-tauri/target/debug/data/`), not in the OS dirs — the same rule as a
+release build.
+
 ## Quality checks
 
 ```bash
@@ -202,7 +244,7 @@ The release workflow (`.github/workflows/release.yml`) builds Windows
 ```bash
 # Bump the version first — it lives in three places and they must agree:
 #   package.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json
-git tag v0.13.0 && git push origin v0.13.0
+git tag v0.14.0 && git push origin v0.14.0
 ```
 
 Two repository secrets have to be set for the in-app updater to work:
@@ -215,7 +257,7 @@ Two repository secrets have to be set for the in-app updater to work:
   for a password, so this secret has to exist.
 
 The password is passed to the workflow as a secret rather than hardcoded
-because the key is encrypted with it. It still has to be *present* in
+because the key is encrypted with it. It still has to be _present_ in
 the environment even if you chose an empty passphrase: the bundler
 decides whether to prompt for a password by whether the variable exists,
 and a missing variable makes it wait on stdin forever.
@@ -235,7 +277,7 @@ users. The same check runs locally:
 ```bash
 pip install cryptography
 python scripts/verify-updater-signature.py <installer> <installer>.sig
-python scripts/verify-published-updater.py --tag v0.13.0 --repo owner/name
+python scripts/verify-published-updater.py --tag v0.14.0 --repo owner/name
 ```
 
 ## Project layout

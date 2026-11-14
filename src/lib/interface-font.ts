@@ -4,18 +4,25 @@ import {
   activatePingfang,
   initPingfang,
 } from "@/lib/pingfang-font";
+import {
+  NOTO_SANS_SC_FAMILY,
+  activateNotoSansSc,
+  initNotoSansSc,
+} from "@/lib/noto-sans-sc-font";
 
 /**
  * The Interface font setting.
  *
- * Two choices: the system stack, which is what the app has always used,
- * and PingFang SC. The chosen stack is written to `--app-font` on the
- * document root, which `index.css` reads for the whole tree.
+ * Three choices: the system stack, which is what the app has always
+ * used, and two downloaded typefaces — PingFang SC and Noto Sans SC.
+ * The chosen stack is written to `--app-font` on the document root,
+ * which `index.css` reads for the whole tree.
  *
- * PingFang SC is not bundled — it is downloaded the first time the user
- * picks it (see `lib/pingfang-font.ts`), which is why the setting row
- * asks before it fetches 37 MB. Once the family is registered with
- * the document the stack below resolves to it.
+ * Neither downloaded family is bundled — each is fetched the first time
+ * the user picks it (see `lib/pingfang-font.ts` and
+ * `lib/noto-sans-sc-font.ts`), which is why the setting row asks
+ * before it fetches them. Once a family is registered with the
+ * document the stack below resolves to it.
  *
  * Imported once from main.tsx, so the main and floating windows both
  * apply it, and the floating window follows changes through the
@@ -55,6 +62,14 @@ function withCjk(stack: string): string {
   return `${stack}, ${CJK_FALLBACKS}`;
 }
 
+/**
+ * The system stack, with the CJK fallbacks appended.
+ *
+ * The same stack the "System default" entry uses, so the fallback for
+ * an unknown id is not a subtly different one.
+ */
+export const SYSTEM_FONT_STACK_WITH_CJK = withCjk(SYSTEM_FONT_STACK);
+
 export const INTERFACE_FONTS: {
   id: InterfaceFont;
   label: string;
@@ -65,11 +80,19 @@ export const INTERFACE_FONTS: {
     label: "PingFang SC",
     stack: withCjk(`"${PINGFANG_FAMILY}"`),
   },
-  { id: "system", label: "System default", stack: withCjk(SYSTEM_FONT_STACK) },
+  {
+    id: "noto-sans-sc",
+    label: "Noto Sans SC",
+    stack: withCjk(`"${NOTO_SANS_SC_FAMILY}"`),
+  },
+  { id: "system", label: "System default", stack: SYSTEM_FONT_STACK_WITH_CJK },
 ];
 
 export function interfaceFontStack(id: InterfaceFont): string {
-  return INTERFACE_FONTS.find((f) => f.id === id)?.stack ?? SYSTEM_FONT_STACK;
+  return (
+    INTERFACE_FONTS.find((f) => f.id === id)?.stack ??
+    SYSTEM_FONT_STACK_WITH_CJK
+  );
 }
 
 function apply(id: InterfaceFont): void {
@@ -88,8 +111,9 @@ function apply(id: InterfaceFont): void {
  * the browser.
  */
 async function ensureFamily(id: InterfaceFont): Promise<void> {
-  if (id !== "pingfang") return;
-  await activatePingfang();
+  if (id === "pingfang") await activatePingfang();
+  else if (id === "noto-sans-sc") await activateNotoSansSc();
+  else return;
   // The browser re-matches the text against the newly added faces only
   // when the stack is re-applied, so do that here rather than leaving
   // the old metrics in place.
@@ -107,7 +131,8 @@ if (typeof document !== "undefined") {
     void ensureFamily(s.interfaceFont);
   });
 
-  // Register the downloaded family with the document, if it is already
-  // installed — so picking PingFang SC later is instant.
+  // Register the downloaded families with the document, if they are
+  // already installed — so picking one later is instant.
   void initPingfang();
+  void initNotoSansSc();
 }

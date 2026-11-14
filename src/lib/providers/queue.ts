@@ -177,6 +177,9 @@ export function canonicalFromQueueTrack(track: QueueTrack): CanonicalTrack {
     artists: (track.artists ?? []).map((a) => a.name),
     album: track.album,
     duration: track.duration,
+    // The artwork the queue entry already carries, so a track that is
+    // re-resolved to another provider keeps its picture.
+    coverUrl: track.thumbnails?.[0]?.url,
     origin: provider,
     originId: track.providerTrackId ?? track.videoId,
     knownIds: knownIdsFor(track),
@@ -239,6 +242,7 @@ export function canonicalFromCandidate(
     artists: candidate.artists,
     album: candidate.album,
     duration: candidate.duration,
+    coverUrl: candidate.coverUrl,
     origin: candidate.provider,
     originId: candidate.providerTrackId,
   };

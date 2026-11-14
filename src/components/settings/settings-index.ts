@@ -247,6 +247,14 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   // Storage
   {
     tab: "storage",
+    titleKey: "settings.storage.dataFolder",
+    descriptionKey: "settings.storage.dataFolderDesc",
+    id: "data-folder",
+    keywords:
+      "path directory location portable move install 数据目录 位置 移动 便携",
+  },
+  {
+    tab: "storage",
     titleKey: "settings.storage.cacheFolder",
     descriptionKey: "settings.storage.cacheFolderDesc",
     id: "cache-folder",

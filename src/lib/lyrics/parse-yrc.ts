@@ -60,6 +60,14 @@ export function parseYRC(yrc: string): TimedLine[] {
     out.push({
       start: parsed.start,
       end: parsed.end,
+      // The line's own duration is how long the line rings out; the
+      // singing stopped when the last word did. Stating that
+      // separately is what lets the panel tell an instrumental break
+      // from a line that simply runs long.
+      sungUntil:
+        parsed.words.length > 0
+          ? parsed.words[parsed.words.length - 1].end
+          : undefined,
       text: parsed.text,
       words: parsed.words,
     });

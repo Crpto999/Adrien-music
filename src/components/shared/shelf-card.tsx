@@ -395,7 +395,7 @@ function HoverPlayButton({
       aria-label={label}
       onClick={(e) => void handle(e)}
       className={cn(
-        "absolute bottom-2 right-2 grid size-9 cursor-pointer place-items-center rounded-full bg-acc1 text-white shadow-[0_6px_16px_-4px_rgba(0,0,0,0.6)] outline-none transition-[opacity,transform,filter] duration-150 hover:brightness-110 focus-visible:opacity-100 focus-visible:ring-[3px] focus-visible:ring-[rgba(var(--acc1rgb),0.35)]",
+        "absolute bottom-2 right-2 grid size-9 cursor-pointer place-items-center rounded-full bg-acc1 text-brand-foreground shadow-[0_6px_16px_-4px_rgba(0,0,0,0.6)] outline-none transition-[opacity,transform,filter] duration-150 hover:brightness-110 focus-visible:opacity-100 focus-visible:ring-[3px] focus-visible:ring-[rgba(var(--acc1rgb),0.35)]",
         busy
           ? "opacity-100"
           : "translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100",

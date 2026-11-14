@@ -15,7 +15,6 @@ import {
   IconBrandSafari,
   IconBookmarks,
   IconBookmarksFilled,
-  IconSettings,
   IconPlaylist,
   IconPinFilled,
   IconCreditCardFilled,
@@ -69,7 +68,6 @@ import {
   usePinnedPlaylistsStore,
 } from "@/lib/store/pinned-playlists";
 import { openChannelPicker } from "@/lib/store/channel-picker";
-import { openSettings } from "@/lib/store/settings-dialog";
 import { UpdateBanner } from "@/components/layout/update-banner";
 import { AppLogo } from "@/components/shared/app-logo";
 import { AppLogoMenu } from "@/components/layout/app-logo-menu";
@@ -218,17 +216,7 @@ export function AppSidebar() {
         )}
       >
         <UpdateBanner />
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip={t("nav.settings")}
-              onClick={() => openSettings()}
-            >
-              <IconSettings />
-              <span>{t("nav.settings")}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+
         <UserProfile />
       </SidebarFooter>
     </Sidebar>
@@ -446,12 +434,12 @@ function SidebarPlaylists({
                 className={ART_BTN_CLS}
               >
                 <Link to="/netease/daily">
-                  {/* The platform's own red, so the row reads as a
-                      NetEase destination rather than another
-                      YouTube playlist. */}
+                  {/* The theme's accent, so the row reads as a NetEase
+                      destination and belongs to the theme it is seen
+                      in — the same wash the daily page's cover wears. */}
                   <span
                     data-slot="playlist-art"
-                    className="grid size-6 shrink-0 place-items-center rounded-[6px] bg-[linear-gradient(145deg,#e8544a_0%,#c9302c_55%,#8f1d21_100%)]"
+                    className="grid size-6 shrink-0 place-items-center rounded-[6px] bg-[linear-gradient(145deg,var(--netease-cover-from)_0%,var(--netease-cover-mid)_55%,var(--netease-cover-to)_100%)]"
                   >
                     <IconMusicFilled className="size-3.5 text-white/95" />
                   </span>
@@ -717,11 +705,13 @@ function UserProfile() {
                   data-sidebar-label
                   variant="outline"
                   className={cn(
-                    "ms-auto h-4 px-1.5 text-[10px] font-semibold uppercase tracking-wide",
+                    "ms-auto h-4 px-1.5 text-[11px] font-medium uppercase tracking-wide",
                     "group-data-[collapsible=icon]:hidden",
-                    isPremium
-                      ? "border-tier-accent/30 bg-tier-accent/10 text-tier-accent"
-                      : "text-muted-foreground",
+                    // Both tiers wear the accent colour: the badge states
+                    // the account's plan, so "Premium" and "Free" are
+                    // drawn in the theme's secondary colour rather than
+                    // one of them being muted out.
+                    "border-tier-accent/30 bg-tier-accent/10 text-tier-accent",
                   )}
                 >
                   {tierLabel}

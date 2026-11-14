@@ -63,6 +63,7 @@ export function StorageTab() {
           bottom padding is the only separation, no divider. */}
       <StorageStats />
       <TabPane>
+        <DataFolderGroup />
         <CacheFolderGroup />
         <StorageLimitGroup />
         <Group>
@@ -191,6 +192,96 @@ function CacheFolderGroup() {
         icon={IconFolderFilled}
         settingId="cache-folder"
         title={t("settings.storage.cacheFolder")}
+        description={
+          info.data ? (
+            <span className="break-all">
+              {info.data.path}
+              {info.data.needsRestart ? (
+                <span className="text-amber-600 dark:text-amber-400">
+                  {" "}
+                  · {t("settings.storage.restartRequired")}
+                </span>
+              ) : null}
+            </span>
+          ) : (
+            "…"
+          )
+        }
+        control={
+          <div className="flex shrink-0 items-center gap-2">
+            {info.data?.isCustom ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void apply(null)}
+              >
+                {t("common.reset")}
+              </Button>
+            ) : null}
+            <Button variant="outline" size="sm" onClick={() => void change()}>
+              <IconFolderOpen />
+              {t("common.change")}
+            </Button>
+          </div>
+        }
+      />
+    </Group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Data folder                                                        */
+/* ------------------------------------------------------------------ */
+
+type DataRootInfo = {
+  path: string;
+  defaultPath: string;
+  isCustom: boolean;
+  needsRestart: boolean;
+};
+
+/**
+ * Where all of adrify's data lives.
+ *
+ * One folder holds the track cache, the cover cache, the login state,
+ * the WebView2 profile, the logs and the plugin stores — so the app is
+ * a single self-contained directory that can be moved or wiped in one
+ * go. By default it sits next to the executable.
+ */
+function DataFolderGroup() {
+  const t = useT();
+  const qc = useQueryClient();
+  const info = useQuery({
+    queryKey: ["data-root"],
+    queryFn: () => invoke<DataRootInfo>("get_data_root"),
+    staleTime: 30_000,
+  });
+
+  const apply = async (path: string | null) => {
+    try {
+      await invoke("set_data_root", { path });
+      await qc.invalidateQueries({ queryKey: ["data-root"] });
+      toast.success(t("toast.dataFolderUpdated"), {
+        description: t("settings.storage.dataFolderRestartHint"),
+        action: { label: t("settings.storage.restartNow"), onClick: () => void relaunch() },
+      });
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
+
+  const change = async () => {
+    const dir = await invoke<string | null>("pick_data_root").catch(() => null);
+    if (!dir) return;
+    await apply(dir);
+  };
+
+  return (
+    <Group>
+      <SettingRow
+        icon={IconFolderFilled}
+        settingId="data-folder"
+        title={t("settings.storage.dataFolder")}
         description={
           info.data ? (
             <span className="break-all">

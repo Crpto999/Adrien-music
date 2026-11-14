@@ -529,16 +529,19 @@ export async function syncNeteaseLike(
  * lets the source switcher offer the *exact* NetEase record rather
  * than a search result that might be a cover.
  *
- * Returns whether the heart was mirrored.
+ * Returns the YouTube video id the heart was submitted under, or `null`
+ * when it was not mirrored. The id is what the caller patches the
+ * rating cache under — and it is the *only* id the rating lives under,
+ * so returning it is what keeps the cache honest.
  */
 export async function syncYouTubeLike(
   liked: boolean,
   track: LikeSyncTrack | QueueTrack | LastfmTrackMeta | undefined,
-): Promise<boolean> {
-  if (!track) return false;
+): Promise<string | null> {
+  if (!track) return null;
 
   const subject = subjectOf(track);
-  if (!subject.title.trim() || subject.artists.length === 0) return false;
+  if (!subject.title.trim() || subject.artists.length === 0) return null;
 
   // A YouTube track already knows its YouTube id — no lookup needed.
   const videoId =
@@ -548,7 +551,7 @@ export async function syncYouTubeLike(
     toast.info(
       translate("toast.youtubeLikeNoMatch", { title: subject.title }),
     );
-    return false;
+    return null;
   }
 
   // The NetEase side of the same recording, when the track knows it.
@@ -571,11 +574,11 @@ export async function syncYouTubeLike(
     toast.success(
       translate(liked ? "toast.youtubeLiked" : "toast.youtubeUnliked"),
     );
-    return true;
+    return videoId;
   } catch (e) {
     toast.error(
       translate("toast.youtubeLikeFailed", { detail: String(e) }),
     );
-    return false;
+    return null;
   }
 }

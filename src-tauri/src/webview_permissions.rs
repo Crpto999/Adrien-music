@@ -47,7 +47,7 @@ pub fn install(win: &WebviewWindow) {
                 return Ok(());
             }
             let mut uri = PWSTR::null();
-            args.Uri(&mut uri)?;
+            args.Uri(std::ptr::from_mut(&mut uri))?;
             let own = if uri.is_null() {
                 false
             } else {

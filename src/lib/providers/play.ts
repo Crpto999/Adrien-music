@@ -77,6 +77,12 @@ export async function playCanonical(
       artists: canonical.artists,
       album: canonical.album,
       duration: canonical.duration,
+      // The artwork the canonical track carries. The source that won
+      // is another platform's record, and its cover is not in hand
+      // here — so the cover the user saw is kept. Without it the entry
+      // has no artwork at all, and the player shows an empty square
+      // and an empty backdrop for a track that plainly has a cover.
+      coverUrl: canonical.coverUrl,
     }),
     // Remember where it was discovered, so the player can say "found
     // on NetEase, playing from YouTube".

@@ -91,6 +91,21 @@ describe("the NetEase daily recommendation carries its own song id", () => {
     const canonical = canonicalFromQueueTrack(entry);
     expect(canonical.knownIds?.netease).toBe("186016");
   });
+
+  it("keeps the pick's artwork when it is redirected", () => {
+    // The source that wins the redirect is another platform's record,
+    // and its cover is not in hand — so the pick's own picture has to
+    // survive. Without it the queue entry has no artwork at all, and
+    // the player shows an empty square and an empty backdrop.
+    const song = { ...neteaseSong("186016"), coverUrl: "https://p1.music.126.net/x.jpg" };
+    const entry = dailyQueueTracks([song])[0];
+    expect(entry.thumbnails[0]?.url).toBe(song.coverUrl);
+
+    // The same picture survives the redirect, because the redirected
+    // entry is rebuilt from the same canonical shape.
+    const canonical = canonicalFromQueueTrack(entry);
+    expect(canonical.coverUrl).toBe(song.coverUrl);
+  });
 });
 
 describe("the registry of YouTube video → NetEase song", () => {

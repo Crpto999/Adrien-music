@@ -237,8 +237,8 @@ export async function fetchPlaylistContinuation(
 /**
  * Full-load variant: walks every continuation and returns the entire
  * playlist in one shot. Kept for callers that genuinely need the whole
- * list (e.g. the liked-songs membership cache used to decide whether a
- * track shows a filled thumb-up), not for UI rendering of long lists.
+ * list (e.g. the "search my library" scope, which filters the liked
+ * songs client-side), not for UI rendering of long lists.
  */
 export async function fetchPlaylist(id: string): Promise<PlaylistPage> {
   const first = await fetchPlaylistFirstPage(id);

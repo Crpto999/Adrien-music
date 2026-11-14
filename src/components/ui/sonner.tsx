@@ -49,7 +49,7 @@ const ICON =
   "group-data-[type=success]:bg-status-success/15 group-data-[type=success]:text-status-success " +
   "group-data-[type=warning]:bg-status-warning/15 group-data-[type=warning]:text-status-warning " +
   "group-data-[type=info]:bg-status-info/15 group-data-[type=info]:text-status-info " +
-  "group-data-[type=error]:bg-status-error group-data-[type=error]:text-white";
+  "group-data-[type=error]:bg-status-error group-data-[type=error]:text-status-error-foreground";
 
 const BUTTON =
   "shrink-0 cursor-pointer rounded-md bg-w060 px-[9px] py-1 text-[11.5px] " +

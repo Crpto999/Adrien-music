@@ -4,8 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import { queryClient } from "@/lib/query-client";
 import { toggleLiked } from "@/lib/like-actions";
-import { getLikedIdsSet } from "@/components/shared/like-buttons";
-import type { ShelfItem } from "@/lib/innertube/types";
+import { likeStatusKey } from "@/lib/providers/use-like-status";
 import { usePlaybackStore } from "@/lib/store/playback";
 import {
   useHotkeysStore,
@@ -147,12 +146,15 @@ export function runAction(action: HotkeyAction): void {
       const track = store.index >= 0 ? store.queue[store.index] : undefined;
       if (!track) break;
       // Read the liked state at click time rather than closing over it,
-      // so this stays correct for whichever track is playing.
-      const cached = queryClient.getQueryData<ShelfItem[]>(["liked-songs"]);
+      // so this stays correct for whichever track is playing. The rating
+      // is cached per track, so this is a cache read — not a request.
+      const wasLiked =
+        queryClient.getQueryData<string>(likeStatusKey(track.videoId)) ===
+        "LIKE";
       void toggleLiked({
         queryClient,
         videoId: track.videoId,
-        wasLiked: getLikedIdsSet(cached).has(track.videoId),
+        wasLiked,
         track,
       }).catch((err) => toast.error(String(err)));
       break;

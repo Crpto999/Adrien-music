@@ -327,7 +327,7 @@ export function AboutDialog({
             ) : (
               <>
                 <IconCheck
-                  className="size-3.5 shrink-0 text-[#7FCE9B]"
+                  className="size-3.5 shrink-0 text-status-success"
                   stroke={2.4}
                 />
                 <span className="text-[12.5px] text-t5">

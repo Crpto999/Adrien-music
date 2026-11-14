@@ -44,9 +44,11 @@ type TransportSnapshot = Pick<
 // "Queue" — only changes on user actions (play, skip, shuffle, etc.).
 // The full queue array can be tens of KB on long playlists, so emitting
 // it 4×/sec was burning serious IPC bandwidth before this split.
+// The playback history rides along with it: it changes on the same
+// actions and is small.
 type QueueSnapshot = Pick<
   PlaybackState,
-  "queue" | "index" | "shuffle" | "repeat" | "autoRadio"
+  "queue" | "index" | "shuffle" | "repeat" | "autoRadio" | "history"
 >;
 
 function buildTransportSnapshot(s: PlaybackState): TransportSnapshot {
@@ -69,6 +71,7 @@ function buildQueueSnapshot(s: PlaybackState): QueueSnapshot {
     shuffle: s.shuffle,
     repeat: s.repeat,
     autoRadio: s.autoRadio,
+    history: s.history,
   };
 }
 
@@ -78,7 +81,8 @@ function queueChanged(prev: PlaybackState, curr: PlaybackState): boolean {
     prev.index !== curr.index ||
     prev.shuffle !== curr.shuffle ||
     prev.repeat !== curr.repeat ||
-    prev.autoRadio !== curr.autoRadio
+    prev.autoRadio !== curr.autoRadio ||
+    prev.history !== curr.history
   );
 }
 
@@ -108,6 +112,8 @@ type PlaybackAction =
   | { type: "removeAt"; index: number }
   | { type: "moveTrack"; from: number; to: number }
   | { type: "clearQueue" }
+  | { type: "clearHistory" }
+  | { type: "playFromHistory"; historyIndex: number }
   | { type: "appendToQueue"; tracks: unknown[] }
   | { type: "setAutoRadio"; on: boolean }
   | { type: "playNow"; track: unknown; extras?: unknown }
@@ -209,6 +215,12 @@ export function FloatingPlayerSync() {
             break;
           case "clearQueue":
             store.clearQueue();
+            break;
+          case "clearHistory":
+            store.clearHistory();
+            break;
+          case "playFromHistory":
+            store.playFromHistory(a.historyIndex);
             break;
           case "appendToQueue":
             // Tracks arrive as serialized QueueTrack-shaped objects;

@@ -15,6 +15,39 @@ export type TimedLine = {
    * have it; a plain LRC line has no word timings.
    */
   words?: WordSpan[];
+  /**
+   * When the singing of this line actually stopped, where the source
+   * says so.
+   *
+   * `end` is not the same thing: for a line-timed source it is only
+   * the *next* line's start, which says when the next line began and
+   * not when this one fell silent. This says the latter, and only
+   * exists for the sources that state it — a word-timed line (where
+   * the last word's end is the answer) and a line-timed source that
+   * publishes an explicit end.
+   *
+   * It is what tells the panel that a stretch of silence between two
+   * lines is really a break rather than a line that simply runs long.
+   */
+  sungUntil?: number;
+  /**
+   * The answering vocal of this line, drawn in its own row beneath it.
+   *
+   * A line like "Lead line (Backing vocal)" carries two voices, and
+   * drawing them as one makes the highlight sweep across both at once
+   * — which looks like a word lighting up at the wrong time. Lifting
+   * the answering voice out gives each voice its own timing.
+   */
+  background?: TimedLine;
+  /**
+   * Whether this line stands for an instrumental stretch rather than
+   * for words.
+   *
+   * A blank line in a lyric set is usually a break — the singing stops
+   * and nothing is said for a while. The panel draws it as a break
+   * marker rather than as an empty lyric.
+   */
+  gap?: boolean;
 };
 
 /**

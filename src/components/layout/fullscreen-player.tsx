@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchLikedSongs } from "@/lib/innertube/library";
 import { toggleDisliked, toggleLiked } from "@/lib/like-actions";
 import { useDislikesStore } from "@/lib/store/dislikes";
 import { AnimatePresence, m } from "motion/react";
@@ -32,8 +31,8 @@ import {
 import { ArtworkOutline } from "@/components/shared/artwork-outline";
 import { ArtistLinks } from "@/components/shared/artist-links";
 import { EntityLink } from "@/components/shared/entity-link";
-import { getLikedIdsSet } from "@/components/shared/like-buttons";
 import { useNeteaseLikedIds } from "@/lib/providers/netease-liked";
+import { useTrackLikeStatus } from "@/lib/providers/use-like-status";
 import { Thumbnail } from "@/components/shared/thumbnail";
 import { LyricsBody, useLyricsView } from "@/components/layout/lyrics-view";
 import {
@@ -48,6 +47,7 @@ import { PlayerMoreMenu } from "@/components/layout/player-more-menu";
 import { SourceIndicator } from "@/components/layout/source-indicator";
 import { QueuePopover } from "@/components/layout/queue-panel";
 import { LyricsSourceButton } from "@/components/layout/lyrics-view";
+import { ImmersivePanel } from "@/components/layout/immersive-panel";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useFullscreenStore } from "@/lib/store/fullscreen";
@@ -173,10 +173,8 @@ function FullscreenView({ track }: { track: QueueTrack }) {
   // The distance is a full viewport edge — this is a pull-out, not a
   // nudge. A small offset reads as a fade, which is what the expand
   // used to look like.
-  const slideFrom =
-    origin === "bottom" ? { y: "100%" } : { x: "100%" };
-  const slideTo =
-    origin === "bottom" ? { y: "100%" } : { x: "100%" };
+  const slideFrom = origin === "bottom" ? { y: "100%" } : { x: "100%" };
+  const slideTo = origin === "bottom" ? { y: "100%" } : { x: "100%" };
 
   // The cover layouts wash the art out under a heavy blur. Immersive
   // keeps it sharp in the middle and blurs only the top and bottom bands
@@ -219,6 +217,12 @@ function FullscreenView({ track }: { track: QueueTrack }) {
         // Clicking the sheet's blank surface collapses the view. The
         // click target is checked so a click on a button, the
         // progress slider or a lyric line never collapses it.
+        //
+        // The lyrics column opts OUT of that check in this view: only
+        // the lyric TEXT is a control, so a click on the background
+        // beside the lines lands on empty surface and closes the sheet,
+        // while a click on the words themselves seeks. See
+        // `LyricsBody`'s `backgroundIsBlank`.
         onClick={(e) => {
           if (!isBlankClick(e.target)) return;
           setOpen(false);
@@ -350,22 +354,43 @@ function FullscreenView({ track }: { track: QueueTrack }) {
               {/* Shorter than the cover column on purpose: a few lines
                   either side of the active one, centred on the cover. */}
               <div className="relative h-[min(400px,100%)] min-w-0 flex-1 overflow-hidden">
-                <LyricsBody state={lyricsState} large />
+                <LyricsBody state={lyricsState} large backgroundIsBlank />
               </div>
             </div>
           ) : null}
 
           {immersive ? (
-            <div className="flex min-h-0 flex-1 flex-col justify-end gap-2.5 pb-5 pt-3.5">
-              <span
-                className={cn(
-                  "font-bold leading-[1.02] tracking-[-0.035em] text-(--fs-title) transition-[font-size] duration-300 [text-wrap:pretty]",
-                  "text-[56px]",
-                )}
-              >
-                {track.title}
-              </span>
-              <Subtitle track={track} className="text-[17px]" />
+            /* The same two-column shape as the lyrics layout: the cover
+               and the title on the left, the reading column on the
+               right. Only the *content* of the right column differs —
+               here it is the comments and the encyclopedia rather than
+               the words of the song.
+
+               The two layouts are siblings, not variants: they share a
+               shape on purpose, so the view does not jump when the
+               user switches between them. */
+            <div className="mx-auto flex min-h-0 w-full max-w-[1020px] flex-1 items-stretch gap-14 py-3.5">
+              <div className="flex w-[340px] shrink-0 flex-col justify-center gap-5">
+                <Cover
+                  track={track}
+                  override={iTunesCover}
+                  className="w-full rounded-xl shadow-[0_30px_60px_-26px_var(--k900),inset_0_0_0_1px_var(--w140)]"
+                />
+                <div className="flex min-w-0 flex-col gap-[7px]">
+                  <span className="truncate text-[27px] font-bold leading-tight tracking-[-0.025em] text-(--fs-title)">
+                    {track.title}
+                  </span>
+                  <Subtitle track={track} className="truncate text-sm" />
+                </div>
+              </div>
+              {/* The reading column: a panel with the three tabs. It
+                  takes the *whole* height of the row rather than a
+                  fixed slice of it — the comments are read by
+                  scrolling, and a short column with a wall of empty
+                  space above it wastes the space the reading needs. */}
+              <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-w080 bg-background/55 backdrop-blur-2xl">
+                <ImmersivePanel track={track} />
+              </div>
             </div>
           ) : null}
 
@@ -388,16 +413,16 @@ function FullscreenView({ track }: { track: QueueTrack }) {
             </div>
             <div className="relative flex items-center justify-center gap-3">
               <div className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
-                <LikePill track={track} />
-                <VolumeControl className={chip} />
-              </div>
-              <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
                 {/* Which provider is serving the audio, and a way to
                     switch to another one that carries the same
                     recording. */}
                 <SourceIndicator track={track} variant="chip" />
+              </div>
+              <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
+                <LikePill track={track} />
                 <LyricsSourceButton state={lyricsState} className={chip} />
                 <QueuePopover className={chip} />
+                <VolumeControl className={chip} />
                 <PlayerMoreMenu track={track} className={chip} />
               </div>
 
@@ -494,12 +519,6 @@ function LikePill({ track }: { track: QueueTrack }) {
   const qc = useQueryClient();
   const both = useSettingsStore((s) => s.ratingButtons === "both");
   const isDisliked = useDislikesStore((s) => !!s.ids[track.videoId]);
-  const liked = useQuery({
-    queryKey: ["liked-songs"],
-    queryFn: () => fetchLikedSongs(),
-    staleTime: 60 * 60 * 1000,
-    retry: false,
-  });
 
   // A NetEase track's heart belongs to the NetEase account, so its
   // filled state comes from the account's own collection rather than
@@ -507,9 +526,17 @@ function LikePill({ track }: { track: QueueTrack }) {
   // song id.
   const isNetease = track.provider === "netease";
   const neteaseLiked = useNeteaseLikedIds(isNetease);
+
+  // The rating for the track that is playing, fetched on demand — and
+  // for a track from another platform, under the YouTube recording that
+  // holds it, so the heart reflects the user's YouTube rating either
+  // way.
+  const { status } = useTrackLikeStatus(track);
+
   const isLiked = isNetease
-    ? (neteaseLiked.data?.includes(track.providerTrackId ?? "") ?? false)
-    : getLikedIdsSet(liked.data).has(track.videoId);
+    ? (neteaseLiked.data?.includes(track.providerTrackId ?? "") ?? false) ||
+      status === "LIKE"
+    : status === "LIKE";
   const [busy, setBusy] = useState(false);
 
   const run = async (action: () => Promise<void>) => {
@@ -556,7 +583,6 @@ function LikePill({ track }: { track: QueueTrack }) {
         )}
       >
         <LikeIcon className="size-4" stroke={1.9} />
-        {isLiked ? t("like.liked") : t("like.like")}
       </button>
       {both ? (
         <button

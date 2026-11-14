@@ -88,7 +88,13 @@ export function QueueBody({ onClose }: { onClose?: () => void }) {
   const setAutoRadio = usePlaybackStore((s) => s.setAutoRadio);
 
   const upcoming = index >= 0 ? queue.slice(index + 1) : queue;
-  const history = index > 0 ? queue.slice(0, index) : [];
+  // The history is its own log in the store, not the part of the queue
+  // that sits behind the playhead: the queue is a plan and is replaced
+  // wholesale all the time, so it cannot double as the record of what
+  // was heard.
+  const history = usePlaybackStore((s) => s.history);
+  const playFromHistory = usePlaybackStore((s) => s.playFromHistory);
+  const clearHistory = usePlaybackStore((s) => s.clearHistory);
 
   const [tab, setTab] = useState<Tab>("queue");
 
@@ -149,16 +155,18 @@ export function QueueBody({ onClose }: { onClose?: () => void }) {
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label={t("queue.clearQueue")}
-                disabled={upcoming.length === 0}
-                onClick={clearQueue}
+                aria-label={
+                  tab === "queue" ? t("queue.clearQueue") : t("queue.clearHistory")
+                }
+                disabled={tab === "queue" ? upcoming.length === 0 : false}
+                onClick={tab === "queue" ? clearQueue : clearHistory}
                 className={playerIconButton}
               >
                 <IconTrashFilled />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              {t("queue.clearQueue")}
+              {tab === "queue" ? t("queue.clearQueue") : t("queue.clearHistory")}
             </TooltipContent>
           </Tooltip>
           {onClose && (
@@ -207,8 +215,7 @@ export function QueueBody({ onClose }: { onClose?: () => void }) {
           ) : (
             <HistoryTabBody
               history={history}
-              onGoTo={goTo}
-              onRemoveAt={removeAt}
+              onPlay={playFromHistory}
             />
           )}
         </div>
@@ -314,14 +321,21 @@ function QueueTabBody({
   );
 }
 
+/**
+ * The History tab.
+ *
+ * The log is stored oldest-first, but the newest entry is what the
+ * user cares about, so it is displayed reversed — the same way a
+ * browser's history and every music player's "recently played" list
+ * read. The index handed to `onPlay` is the *log's* index, not the
+ * display index, because the list is shown reversed.
+ */
 function HistoryTabBody({
   history,
-  onGoTo,
-  onRemoveAt,
+  onPlay,
 }: {
   history: NonNullable<ReturnType<typeof currentTrack>>[];
-  onGoTo: (i: number) => void;
-  onRemoveAt: (i: number) => void;
+  onPlay: (historyIndex: number) => void;
 }) {
   const t = useT();
   if (history.length === 0) {
@@ -329,16 +343,19 @@ function HistoryTabBody({
       <p className="mt-3 px-2 text-[13.5px] text-t5">{t("queue.noHistory")}</p>
     );
   }
+  const recent = [...history].reverse();
   return (
     <QueueSection label={t("queue.previouslyPlayed")} muted>
-      {history.map((t, i) => (
-        <QueueRow
-          key={`h-${t.videoId}-${i}`}
-          track={t}
-          onActivate={() => onGoTo(i)}
-          onRemove={() => onRemoveAt(i)}
-        />
-      ))}
+      {recent.map((track, displayIndex) => {
+        const historyIndex = history.length - 1 - displayIndex;
+        return (
+          <QueueRow
+            key={`h-${track.videoId}-${historyIndex}`}
+            track={track}
+            onActivate={() => onPlay(historyIndex)}
+          />
+        );
+      })}
     </QueueSection>
   );
 }

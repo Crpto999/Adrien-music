@@ -1,6 +1,6 @@
 [package]
 name = "adrify"
-version = "0.13.0"
+version = "0.14.0"
 description = "adrify — fast, responsive YouTube Music desktop client"
 authors = ["George Shyshov"]
 license = "GPL-3.0-only"
@@ -47,6 +47,14 @@ tauri-plugin-http = { version = "2", default-features = false, features = [
 ] }
 tauri-plugin-store = "2"
 tauri-plugin-shell = "2"
+# Native folder/message dialogs, used before the app's event loop exists
+# (the data-root picker in `run()`). Same crate the dialog plugin is
+# built on, so it adds no new dependency to the tree.
+rfd = { version = "0.16", default-features = false, features = ["common-controls-v6"] }
+# The OS-level directories (config / data / cache). Used directly — not
+# through Tauri's path API — because that API is exactly what the
+# data-root override redirects. See src/data_root.rs.
+dirs = "7"
 # rustls rather than native-tls: tauri-plugin-http already compiles reqwest
 # 0.12 with rustls, so native-tls only added a second TLS stack (OpenSSL on
 # Linux, plus hyper-tls/tokio-native-tls everywhere).
@@ -130,13 +138,16 @@ windows-sys = { version = "0.59", features = [
     # GetCurrentThreadId — identifying the thread that owns the low-level
     # mouse hook, so it can be asked to stop. See src/hotkeys.rs.
     "Win32_System_Threading",
+    # GetModuleHandleW — the handle of our own executable, needed to
+    # install the low-level mouse hook. See src/hotkeys.rs.
+    "Win32_System_LibraryLoader",
 ] }
 # The taskbar thumbnail toolbar (shuffle / prev / play-pause / next / repeat /
 # like under the taskbar preview) is COM: ITaskbarList3 plus a window subclass
 # for the button clicks. windows-sys has no safe COM wrappers, and the
 # `windows` crate is already in the tree via tauri/wry, so we only add features
 # to a crate that is compiled anyway. See src/thumbbar.rs.
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_System_Com",
     "Win32_System_Registry",
@@ -153,7 +164,7 @@ windows = { version = "0.61", features = [
 resvg = { version = "0.48.1", default-features = false }
 # PermissionRequested handler on the main webview (src/webview_permissions.rs).
 # Same version tauri/wry already compile.
-webview2-com = "0.38"
+webview2-com = "0.39"
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 # Cookie jars remain files in app data, but their random AES key lives in the

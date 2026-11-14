@@ -56,6 +56,17 @@ export type CanonicalTrack = {
   artists: string[];
   album?: string;
   duration?: number;
+  /**
+   * The artwork for the recording.
+   *
+   * Not part of the *matching* — the matcher compares the title and the
+   * artist, and never the picture. It is here because the canonical
+   * form is also what the queue entry is built from: a track that
+   * resolves to another provider's record would otherwise be left with
+   * no artwork at all, and the player shows an empty square and an
+   * empty backdrop for a track that plainly has a cover.
+   */
+  coverUrl?: string;
   /** The provider this track was discovered on. */
   origin?: ProviderId;
   /** That provider's id for it. */

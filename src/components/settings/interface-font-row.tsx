@@ -33,6 +33,12 @@ import {
   uninstallPingfang,
   usePingfangStore,
 } from "@/lib/pingfang-font";
+import {
+  NOTO_SANS_SC_TOTAL_BYTES,
+  installNotoSansSc,
+  uninstallNotoSansSc,
+  useNotoSansScStore,
+} from "@/lib/noto-sans-sc-font";
 import { useT } from "@/lib/i18n";
 import { useSettingsStore } from "@/lib/store/settings";
 
@@ -44,34 +50,50 @@ function formatSize(bytes: number): string {
 /**
  * The Interface font row.
  *
- * Two typefaces: the system stack and PingFang SC. The second one is
- * not bundled — it is 37 MB of font files, most of which most installs
- * never look at. So picking it does not switch the typeface straight
- * away: the user is told how big the download is and asked to confirm
- * it first. The download then happens in the background, with the
- * progress shown in the same dialog.
+ * Three typefaces: the system stack, PingFang SC and Noto Sans SC.
+ * The latter two are not bundled — they are tens of megabytes of font
+ * files, most of which most installs never look at. So picking one
+ * does not switch the typeface straight away: the user is told how big
+ * the download is and asked to confirm it first. The download then
+ * happens in the background, with the progress shown in the same
+ * dialog.
  */
 export function InterfaceFontRow() {
   const t = useT();
   const font = useSettingsStore((s) => s.interfaceFont);
   const setFont = useSettingsStore((s) => s.setInterfaceFont);
 
-  const status = usePingfangStore((s) => s.status);
-  const loaded = usePingfangStore((s) => s.loaded);
-  const total = usePingfangStore((s) => s.total);
-  const error = usePingfangStore((s) => s.error);
+  const pingfang = usePingfangStore();
+  const noto = useNotoSansScStore();
 
-  // The confirmation dialog, open only when the family is missing.
-  const [asking, setAsking] = useState(false);
+  // The confirmation dialog, open only when the family is missing. It
+  // names the family, so the pending pick is kept rather than a bare
+  // boolean.
+  const [asking, setAsking] = useState<"pingfang" | "noto-sans-sc" | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
 
   const current = INTERFACE_FONTS.find((f) => f.id === font);
-  const installed = status === "ready";
-  const downloading = status === "downloading";
 
-  const choose = (id: "system" | "pingfang") => {
-    if (id === "pingfang" && !installed) {
-      setAsking(true);
+  /**
+   * The state of the family the dialog is about, and the operations on
+   * it. The two downloadable families are handled by the same code, so
+   * the row does not carry a branch per family.
+   */
+  const pending = asking === "pingfang" ? "pingfang" : "noto-sans-sc";
+  const state = asking === "pingfang" ? pingfang : noto;
+  const downloading = state.status === "downloading";
+  const totalBytes =
+    asking === "pingfang" ? PINGFANG_TOTAL_BYTES : NOTO_SANS_SC_TOTAL_BYTES;
+
+  const choose = (id: "system" | "pingfang" | "noto-sans-sc") => {
+    if (id === "pingfang" && pingfang.status !== "ready") {
+      setAsking("pingfang");
+      return;
+    }
+    if (id === "noto-sans-sc" && noto.status !== "ready") {
+      setAsking("noto-sans-sc");
       return;
     }
     setFont(id);
@@ -80,37 +102,42 @@ export function InterfaceFontRow() {
   const download = async () => {
     setBusy(true);
     try {
-      const ok = await installPingfang();
+      const ok =
+        pending === "pingfang"
+          ? await installPingfang()
+          : await installNotoSansSc();
       if (!ok) {
         toast.error(
-          t("settings.appearance.fontPingfangFailed", {
+          t("settings.appearance.fontDownloadFailed", {
             error: t("common.unknown"),
           }),
         );
         return;
       }
-      setFont("pingfang");
-      setAsking(false);
-      toast.success(t("settings.appearance.fontPingfangDownloaded"));
+      setFont(pending);
+      setAsking(null);
+      toast.success(t("settings.appearance.fontDownloaded"));
     } catch (e) {
       toast.error(
-        t("settings.appearance.fontPingfangFailed", { error: String(e) }),
+        t("settings.appearance.fontDownloadFailed", { error: String(e) }),
       );
     } finally {
       setBusy(false);
     }
   };
 
-  const remove = async () => {
-    await uninstallPingfang();
+  const remove = async (id: "pingfang" | "noto-sans-sc") => {
+    if (id === "pingfang") await uninstallPingfang();
+    else await uninstallNotoSansSc();
     // The typeface is gone, so the selection has to fall back to the
     // system stack rather than leave the app pointing at a font that
     // is no longer there.
-    if (font === "pingfang") setFont("system");
-    toast.success(t("settings.appearance.fontPingfangRemove"));
+    if (font === id) setFont("system");
+    toast.success(t("settings.appearance.fontRemove"));
   };
 
-  const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+  const percent =
+    state.total > 0 ? Math.round((state.loaded / state.total) * 100) : 0;
 
   return (
     <>
@@ -141,7 +168,10 @@ export function InterfaceFontRow() {
                   style={{ fontFamily: f.stack }}
                 >
                   <span className="flex-1 truncate">{f.label}</span>
-                  {f.id === "pingfang" && !installed ? (
+                  {f.id !== "system" &&
+                  (f.id === "pingfang"
+                    ? pingfang.status !== "ready"
+                    : noto.status !== "ready") ? (
                     <IconDownload className="size-3.5 shrink-0 text-t8" />
                   ) : null}
                   {font === f.id ? (
@@ -150,18 +180,31 @@ export function InterfaceFontRow() {
                 </DropdownMenuItem>
               ))}
 
-              {installed ? (
+              {pingfang.status === "ready" || noto.status === "ready" ? (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => void remove()}
-                  >
-                    <IconTrash className="size-3.5 shrink-0" />
-                    <span className="truncate">
-                      {t("settings.appearance.fontPingfangRemove")}
-                    </span>
-                  </DropdownMenuItem>
+                  {pingfang.status === "ready" ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => void remove("pingfang")}
+                    >
+                      <IconTrash className="size-3.5 shrink-0" />
+                      <span className="truncate">
+                        {t("settings.appearance.fontRemove")}
+                      </span>
+                    </DropdownMenuItem>
+                  ) : null}
+                  {noto.status === "ready" ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => void remove("noto-sans-sc")}
+                    >
+                      <IconTrash className="size-3.5 shrink-0" />
+                      <span className="truncate">
+                        {t("settings.appearance.fontRemove")}
+                      </span>
+                    </DropdownMenuItem>
+                  ) : null}
                 </>
               ) : null}
             </DropdownMenuContent>
@@ -169,17 +212,22 @@ export function InterfaceFontRow() {
         }
       />
 
-      {/* The download confirmation. Shown when the user picks PingFang
-          SC and the family is not on disk yet. */}
-      <Dialog open={asking} onOpenChange={(v) => !busy && setAsking(v)}>
+      {/* The download confirmation. Shown when the user picks a
+          downloadable family and it is not on disk yet. */}
+      <Dialog
+        open={asking !== null}
+        onOpenChange={(v) => !busy && setAsking(v ? asking : null)}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {t("settings.appearance.fontPingfang")}
+              {pending === "pingfang"
+                ? t("settings.appearance.fontPingfang")
+                : t("settings.appearance.fontNotoSansSc")}
             </DialogTitle>
             <DialogDescription>
-              {t("settings.appearance.fontPingfangDesc", {
-                size: formatSize(PINGFANG_TOTAL_BYTES),
+              {t("settings.appearance.fontDownloadDesc", {
+                size: formatSize(totalBytes),
               })}
             </DialogDescription>
           </DialogHeader>
@@ -193,23 +241,25 @@ export function InterfaceFontRow() {
                 />
               </div>
               <span className="text-xs text-t7">
-                {t("settings.appearance.fontPingfangDownloading", {
+                {t("settings.appearance.fontDownloading", {
                   percent: String(percent),
                 })}
               </span>
             </div>
           ) : null}
 
-          {error ? (
+          {state.error ? (
             <p className="text-xs text-status-error">
-              {t("settings.appearance.fontPingfangFailed", { error })}
+              {t("settings.appearance.fontDownloadFailed", {
+                error: state.error,
+              })}
             </p>
           ) : null}
 
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setAsking(false)}
+              onClick={() => setAsking(null)}
               disabled={busy}
             >
               {t("common.cancel")}
@@ -220,8 +270,8 @@ export function InterfaceFontRow() {
               ) : (
                 <IconDownload />
               )}
-              {t("settings.appearance.fontPingfangDownload", {
-                size: formatSize(PINGFANG_TOTAL_BYTES),
+              {t("settings.appearance.fontDownload", {
+                size: formatSize(totalBytes),
               })}
             </Button>
           </DialogFooter>

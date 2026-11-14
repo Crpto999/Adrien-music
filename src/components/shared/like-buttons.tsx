@@ -1,5 +1,5 @@
 import { useState, type MouseEvent } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   IconHeart,
   IconHeartFilled,
@@ -10,33 +10,16 @@ import {
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { fetchLikedSongs } from "@/lib/innertube/library";
-import type { ShelfItem } from "@/lib/innertube/types";
 import { toggleDisliked, toggleLiked } from "@/lib/like-actions";
 import type { LastfmTrackMeta } from "@/lib/lastfm/track";
 import { useTrackMetaStore } from "@/lib/store/track-meta";
 import { useDislikesStore } from "@/lib/store/dislikes";
 import { useSettingsStore } from "@/lib/store/settings";
 import { useNeteaseLikedIds } from "@/lib/providers/netease-liked";
+import { useTrackLikeStatus } from "@/lib/providers/use-like-status";
 import type { ProviderId } from "@/lib/providers/types";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-
-// Module-level memo of the liked-id Set. With ~5k liked tracks and ~100
-// LikeDislikeButtons on a single page, doing `(liked.data ?? []).some(...)`
-// per render becomes ~500k comparisons. The Set + identity-keyed memo
-// collapses that to one rebuild per actual data change, shared across all
-// observers.
-let likedSetMemo: { data: ShelfItem[] | undefined; set: Set<string> } = {
-  data: undefined,
-  set: new Set(),
-};
-export function getLikedIdsSet(data: ShelfItem[] | undefined): Set<string> {
-  if (likedSetMemo.data === data) return likedSetMemo.set;
-  const set = new Set((data ?? []).map((t) => t.id));
-  likedSetMemo = { data, set };
-  return set;
-}
 
 type Props = {
   videoId: string;
@@ -58,6 +41,13 @@ type Props = {
     provider?: ProviderId;
     /** That platform's own id for the track. */
     providerTrackId?: string;
+    /**
+     * The rating the row already carried, when the response that
+     * produced it said so. A signed-in search or browse response
+     * carries the user's rating per row, so the heart can be filled
+     * without asking for anything.
+     */
+    likeStatus?: "LIKE" | "DISLIKE" | "INDIFFERENT";
   };
 };
 
@@ -76,32 +66,42 @@ export function LikeDislikeButtons({
   const both = useSettingsStore((s) => s.ratingButtons === "both");
   const isDisliked = useDislikesStore((s) => !!s.ids[videoId]);
 
-  // Fetched lazily on first observer (e.g. when the player bar mounts
-  // with a track or a track list renders). Tanstack-query dedupes
-  // across the dozens of LikeDislikeButtons instances on a page, so
-  // this still triggers a single network round of continuations. The
-  // result is persisted via `shouldPersistQuery` in query-client.ts,
-  // so reloads stay accurate without re-fetching.
-  const liked = useQuery({
-    queryKey: ["liked-songs"],
-    queryFn: () => fetchLikedSongs(),
-    staleTime: 60 * 60 * 1000,
-    retry: false,
-  });
-
-  // A NetEase row's heart belongs to the NetEase account, so its
-  // filled state comes from the account's own collection rather than
-  // the app's YouTube liked list — which knows nothing about a NetEase
-  // song id.
+  // The rating for *this* track, fetched on demand.
+  //
+  // A NetEase row's heart belongs to the NetEase account, so the
+  // NetEase collection is one of the two answers. But the user's
+  // YouTube rating for the *same song* is the other one, and it is
+  // asked for too — lazily, by translating the track into the
+  // YouTube recording that holds it (see `providers/youtube-id.ts`).
+  // That way a song is known to be liked no matter which source the
+  // audio is coming from.
   const isNetease =
     (meta as { provider?: ProviderId } | undefined)?.provider === "netease";
   const neteaseLiked = useNeteaseLikedIds(isNetease);
   const neteaseSongId =
     (meta as { providerTrackId?: string } | undefined)?.providerTrackId ?? "";
 
+  // The rating the row already carried, if any. It is the answer for
+  // a YouTube row that came back from a signed-in response, and it
+  // saves the per-track request entirely.
+  const carriedStatus =
+    (meta as { likeStatus?: "LIKE" | "DISLIKE" | "INDIFFERENT" } | undefined)
+      ?.likeStatus ?? undefined;
+
+  const { status } = useTrackLikeStatus(
+    meta ?? { videoId, title: "", artists: [] },
+    // A row that already carries its rating needs no request at all.
+    { skip: carriedStatus !== undefined },
+  );
+
+  // The song is liked if either platform says so. The two are kept in
+  // step by the heart's own cross-platform sync, so they agree in
+  // practice — but either one being on is enough to fill the heart,
+  // because the user is telling us the song is one they love.
   const isLiked = isNetease
-    ? (neteaseLiked.data?.includes(neteaseSongId) ?? false)
-    : getLikedIdsSet(liked.data).has(videoId);
+    ? (neteaseLiked.data?.includes(neteaseSongId) ?? false) ||
+      status === "LIKE"
+    : (carriedStatus ?? status) === "LIKE";
 
   const btnSize = compact ? "size-7" : "size-9";
   const iconSize = compact ? "size-3.5" : "size-4";

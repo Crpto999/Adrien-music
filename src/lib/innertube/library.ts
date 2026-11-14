@@ -88,15 +88,6 @@ export function fetchLibraryArtists(): Promise<LibrarySection[]> {
 }
 
 /**
- * Liked songs playlist. YTM uses the magic id `LM` (auto-generated).
- */
-export async function fetchLikedSongs(): Promise<ShelfItem[]> {
-  const { fetchPlaylist } = await import("./playlist");
-  const page = await fetchPlaylist("LM");
-  return page.tracks;
-}
-
-/**
  * Union of every track the user's library pins: Liked Songs, every
  * saved/created playlist, and saved albums. Deduped by videoId.
  *

@@ -1,5 +1,9 @@
 import { useCallback, useState } from "react";
-import { IconCircleFilled, IconCircleOff, IconLoader2 } from "@tabler/icons-react";
+import {
+  IconCircleFilled,
+  IconCircleOff,
+  IconLoader2,
+} from "@tabler/icons-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +22,10 @@ import {
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { type QueueTrack } from "@/lib/store/playback";
-import { useAlternativeSources, usePlayability } from "@/lib/providers/alternatives";
+import {
+  useAlternativeSources,
+  usePlayability,
+} from "@/lib/providers/alternatives";
 import { switchTrackProvider } from "@/lib/providers/switch";
 import {
   PROVIDER_LABELS,
@@ -89,17 +96,26 @@ export function SourceIndicator({
   const switchTo = useCallback(
     async (ref: ProviderRef) => {
       if (!track) return;
-      if (ref.provider === provider && ref.providerTrackId === providerTrackId) {
+      if (
+        ref.provider === provider &&
+        ref.providerTrackId === providerTrackId
+      ) {
         return;
       }
       setSwitching(ref.provider);
       try {
         const ok = await switchTrackProvider(ref);
         if (!ok) {
-          toast.error(t("settings.providers.switchFailed", { source: PROVIDER_LABELS[ref.provider] }));
+          toast.error(
+            t("settings.providers.switchFailed", {
+              source: PROVIDER_LABELS[ref.provider],
+            }),
+          );
         } else {
           toast.success(
-            t("settings.providers.switchedTo", { source: PROVIDER_LABELS[ref.provider] }),
+            t("settings.providers.switchedTo", {
+              source: PROVIDER_LABELS[ref.provider],
+            }),
           );
         }
       } catch (e) {
@@ -114,8 +130,7 @@ export function SourceIndicator({
   if (!track) return null;
 
   const others = alternatives.filter(
-    (a) =>
-      !(a.provider === provider && a.providerTrackId === providerTrackId),
+    (a) => !(a.provider === provider && a.providerTrackId === providerTrackId),
   );
 
   return (
@@ -135,7 +150,7 @@ export function SourceIndicator({
                 // The bottom bar's row of secondary actions is dense, so
                 // the label is capped rather than allowed to push the
                 // transport cluster off centre.
-                variant === "bar" && "max-w-[7.5rem]",
+                variant === "bar" && "max-w-[9.5rem]",
                 className,
               )}
             >
@@ -151,8 +166,7 @@ export function SourceIndicator({
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          {t("settings.providers.currentSource")} ·{" "}
-          {PROVIDER_LABELS[provider]}
+          {t("settings.providers.currentSource")} · {PROVIDER_LABELS[provider]}
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" side="top" className="w-60">
@@ -212,7 +226,9 @@ export function SourceIndicator({
                 ) : (
                   <IconCircleFilled className="size-2 shrink-0 text-t8" />
                 )}
-                <span className="truncate">{PROVIDER_LABELS[ref.provider]}</span>
+                <span className="truncate">
+                  {PROVIDER_LABELS[ref.provider]}
+                </span>
                 {canPlay === false ? (
                   <span className="ml-auto shrink-0 text-[10.5px] text-t8">
                     {t("settings.providers.sourceUnavailable")}

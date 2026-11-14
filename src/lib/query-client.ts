@@ -82,10 +82,12 @@ export function shouldPersistQuery(queryKey: readonly unknown[]): boolean {
     head === "home" ||
     head === "artist" ||
     head === "album" ||
-    // Persisted so heart fills are correct on reload — fetching the
-    // full list is 7+ continuation round-trips, you don't want to pay
-    // that on every cold start.
-    head === "liked-songs" ||
+    // A track's YouTube rating is a small, per-track fact, and the heart
+    // is wrong without it — so the cache is worth keeping on disk. (It
+    // is *not* the old whole-liked-playlist cache, which was far too
+    // large to persist and was the reason the heart was wrong after a
+    // reload.)
+    head === "youtube-like-status" ||
     // Lyrics are immutable per (title, artist, album, duration) tuple
     // and the LRCLIB / YTM round-trip is the slowest part of
     // a track switch. Persisting collapses repeat plays of the same
@@ -100,18 +102,18 @@ export function shouldPersistQuery(queryKey: readonly unknown[]): boolean {
 /**
  * Hard ceiling per persisted query. Beyond this size the cost of
  * serializing + writing to disk on every mutation outweighs the
- * cold-start win. Liked-songs accounts of 5k+ tracks easily blow past
- * this, but the in-session fetch is fast enough that not persisting them
- * costs ~5 s on first cold start instead of frame-blocking serializes
- * forever after.
+ * cold-start win. A whole liked-songs playlist of 5k+ tracks easily
+ * blows past this, but the in-session fetch is fast enough that not
+ * persisting them costs ~5 s on first cold start instead of
+ * frame-blocking serializes forever after.
  */
 const MAX_PERSIST_BYTES_PER_QUERY = 250 * 1024;
 
 /**
  * Verdicts by `data` object. Every persist (throttled to 5 s) runs
  * `shouldDehydrateQuery` on each query, and stringifying an unchanged
- * multi-MB liked-songs list each time just to measure it is pure waste.
- * Query data is immutable; a refetch swaps in a new object, which misses
+ * multi-MB payload each time just to measure it is pure waste. Query
+ * data is immutable; a refetch swaps in a new object, which misses
  * here and gets measured fresh.
  */
 const budgetVerdicts = new WeakMap<object, boolean>();

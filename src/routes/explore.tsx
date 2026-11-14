@@ -36,7 +36,10 @@ const SUBPAGES: {
     labelKey: "nav.newReleases",
     blurbKey: "explore.newReleasesBlurb",
     icon: IconSparkles,
-    gradient: "bg-gradient-to-br from-[#0F0100] to-[#8E1B10]",
+    // This tile's wash follows the theme's accent rather than a fixed
+    // red, so it is red on the light ground and green on the dark one.
+    gradient:
+      "bg-[linear-gradient(140deg,var(--tile-accent-from),var(--tile-accent-to))]",
   },
   {
     to: "/moods",

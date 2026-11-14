@@ -45,3 +45,10 @@ sign-test.txt
 *.sig
 adrify-updater-selftest.bin
 
+# Local font assets. The Noto Sans SC family is fetched from jsDelivr
+# on demand (see src/lib/noto-sans-sc-font.ts) — nothing in the app
+# reads a local copy. A downloaded .zip of the family's woff2 slices
+# is ~120MB, which is over GitHub's 100MB per-file limit and would
+# fail the push outright.
+tests/noto-sans-sc.zip
+

@@ -7,11 +7,12 @@ import { fetchYtMusicLyrics } from "@/lib/lyrics/ytmusic";
 import { fetchCnLyrics } from "@/lib/lyrics/cn";
 import { fetchNeteaseLyrics } from "@/lib/lyrics/netease";
 import { shouldRetryLyricsQuery } from "@/lib/lyrics/http";
+import { normalizeLyrics } from "@/lib/lyrics/normalize";
 import { cleanTrackTitle, lyricsArtist } from "@/lib/track-meta";
 import { toSimplified } from "@/lib/chinese";
 import { isYouTubeVideoId } from "@/lib/providers/queue";
 import { useNetEaseIdStore } from "@/lib/store/netease-ids";
-import type { Lyrics } from "@/lib/lyrics/types";
+import type { Lyrics, TimedLine } from "@/lib/lyrics/types";
 import type { ProviderId } from "@/lib/providers/types";
 import { usePlaybackStore, type QueueTrack } from "@/lib/store/playback";
 
@@ -536,16 +537,23 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
 }
 
 /**
- * Convert a lyric set to Simplified Chinese.
+ * Prepare a lyric set for display: convert it to Simplified Chinese,
+ * then clean it up.
  *
- * Only the text is converted — the timings are untouched, and the
- * source's name is kept as it was so the panel still says where the
- * words came from.
+ * ## The order
  *
- * The translation is converted too, and it needs it more than the
- * original does: the translation is by definition in a *different*
- * language from the song's own words, and the panel shows everything in
- * one script.
+ * The conversion comes first, and it has to. Converting a line's text
+ * can change how many characters it has — 愛 is one character in both
+ * scripts, but a phrase can shorten — and the clean-up works on
+ * character offsets: it finds the bracket that opens the answering
+ * vocal by counting characters into the line. Doing the clean-up
+ * first would have it count offsets in the text as it was *before* the
+ * conversion, and the split would land in the wrong place.
+ *
+ * The word timings are converted too, and they needed it as much as
+ * the line text did: the words carry their own copy of the text, and
+ * the panel draws the words rather than the line. A line converted but
+ * with its words left in the old script shows the two side by side.
  */
 function toSimplifiedLyrics(lyrics: Lyrics | null): Lyrics | null {
   if (!lyrics) return null;
@@ -558,19 +566,40 @@ function toSimplifiedLyrics(lyrics: Lyrics | null): Lyrics | null {
         : {}),
     };
   }
-  return {
+
+  const converted: Lyrics = {
     ...lyrics,
-    lines: lyrics.lines.map((line) => ({
-      ...line,
-      text: toSimplified(line.text),
-    })),
+    lines: lyrics.lines.map((line) => convertLine(line)),
     ...(lyrics.translation !== undefined
       ? {
-          translation: lyrics.translation.map((line) => ({
-            ...line,
-            text: toSimplified(line.text),
+          translation: lyrics.translation.map((line) => convertLine(line)),
+        }
+      : {}),
+  };
+
+  // The clean-up, on the converted text. See `normalize.ts` for what it
+  // does and — more importantly — what it leaves alone.
+  return normalizeLyrics(converted);
+}
+
+/**
+ * One line, converted to Simplified Chinese.
+ *
+ * The timings are untouched; only the text is converted. The answering
+ * vocal is converted with the line it belongs to.
+ */
+function convertLine(line: TimedLine): TimedLine {
+  return {
+    ...line,
+    text: toSimplified(line.text),
+    ...(line.words
+      ? {
+          words: line.words.map((word) => ({
+            ...word,
+            text: toSimplified(word.text),
           })),
         }
       : {}),
+    ...(line.background ? { background: convertLine(line.background) } : {}),
   };
 }

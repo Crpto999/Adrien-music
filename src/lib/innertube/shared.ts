@@ -4,6 +4,7 @@ import { sessionReady } from "@/lib/session-gate";
 import { currentInnertubeLocale } from "@/lib/store/locale";
 import { proxyOptions } from "@/lib/proxy";
 import { COUNTER_TOKENS, hasToken } from "./locale-tokens";
+import { parseRowLikeStatus } from "./like-status";
 import type { ShelfItem, ShelfMore, Thumbnail } from "./types";
 
 export type YtNode = Record<string, any>;
@@ -558,6 +559,7 @@ export function mapPlaylistPanelVideo(raw: YtNode): ShelfItem | null {
   const duration = parseDuration(readRuns(raw.lengthText));
   const thumbnails = readThumbnails(raw.thumbnail);
   const explicit = readExplicit(raw);
+  const likeStatus = parseRowLikeStatus(raw) ?? undefined;
 
   return {
     kind: "song",
@@ -570,6 +572,7 @@ export function mapPlaylistPanelVideo(raw: YtNode): ShelfItem | null {
     albumId,
     duration,
     explicit: explicit || undefined,
+    likeStatus,
   };
 }
 
@@ -937,6 +940,7 @@ export function mapResponsiveListItem(raw: YtNode): ShelfItem | null {
   }
 
   const explicit = readExplicit(raw);
+  const likeStatus = parseRowLikeStatus(raw) ?? undefined;
 
   let thumbnails = readThumbnails(
     raw.thumbnail?.musicThumbnailRenderer?.thumbnail,
@@ -1002,6 +1006,7 @@ export function mapResponsiveListItem(raw: YtNode): ShelfItem | null {
       albumId,
       duration,
       explicit: explicit || undefined,
+      likeStatus,
       playCount,
       dateAdded,
       setVideoId,

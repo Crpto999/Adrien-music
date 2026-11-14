@@ -224,6 +224,12 @@ export async function resolvedDailyTrack(
       artists: song.artists,
       album: song.album ?? undefined,
       duration: song.duration,
+      // The pick's own artwork. The source that won the resolution is
+      // another platform's record, and its cover is not in hand here —
+      // so the pick's picture is kept. Without it the queue entry has
+      // no artwork at all, and the player shows an empty square and an
+      // empty backdrop for a pick that plainly has a cover.
+      coverUrl: song.coverUrl ?? undefined,
     }),
     // The pick is being served by another provider, but the NetEase
     // song id is still the key its own lyrics are filed under.

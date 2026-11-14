@@ -134,7 +134,7 @@ const LIKE_URI: &str = "/api/song/like";
 const LIKE_URL: &str = "https://interface.music.163.com/eapi/song/like";
 
 /// How long a NetEase request may take.
-const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+pub const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The qualities the official endpoint accepts, best first.
 const LEVELS: &[&str] = &["hires", "lossless", "exhigh", "standard"];
@@ -339,7 +339,7 @@ fn parse_song(raw: &serde_json::Value) -> Option<NeteaseSong> {
 /// The search endpoint reports them as `alias`; the compact
 /// recommendation payload uses `alia`. Both are lists of strings, and
 /// both are optional.
-fn parse_aliases(raw: Option<&serde_json::Value>) -> Vec<String> {
+pub(crate) fn parse_aliases(raw: Option<&serde_json::Value>) -> Vec<String> {
     raw.and_then(|v| v.as_array())
         .map(|arr| {
             arr.iter()
@@ -1258,7 +1258,7 @@ fn eapi_encrypt(url: &str, text: &str) -> String {
 /// payload; see the module comment. Every eapi call in this module
 /// goes through here, so the header the payload is signed with and the
 /// cookie the request carries are always the same object.
-async fn eapi_post(
+pub(crate) async fn eapi_post(
     client: &reqwest::Client,
     uri: &str,
     url: &str,

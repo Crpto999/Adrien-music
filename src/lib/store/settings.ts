@@ -9,10 +9,11 @@ export type BackgroundMode = "ambient" | "plain";
 /**
  * Typeface for the whole UI. Stacks live in `lib/interface-font.ts`.
  *
- * `pingfang` is not bundled: the family is downloaded on demand when
- * the user picks it (see `lib/pingfang-font.ts`).
+ * `pingfang` and `noto-sans-sc` are not bundled: each family is
+ * downloaded on demand when the user picks it (see
+ * `lib/pingfang-font.ts` and `lib/noto-sans-sc-font.ts`).
  */
-export type InterfaceFont = "system" | "pingfang";
+export type InterfaceFont = "system" | "pingfang" | "noto-sans-sc";
 /** One heart, or a thumbs-up / thumbs-down pair. */
 export type RatingButtons = "heart" | "both";
 /** How the full-screen now-playing view fills the window

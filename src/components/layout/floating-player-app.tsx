@@ -146,7 +146,7 @@ function FloatingTitleBar() {
           void invoke("close_player_window");
         }}
         aria-label={t("common.close")}
-        className="flex h-full w-11 items-center justify-center text-foreground/85 transition-colors hover:bg-[#c42b1c] hover:text-white"
+        className="flex h-full w-11 items-center justify-center text-foreground/85 transition-colors hover:bg-[var(--close-hover)] hover:text-[var(--close-hover-fg)]"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
           <path

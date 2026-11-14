@@ -26,6 +26,7 @@ use tower_http::services::ServeFile;
 
 mod appid;
 mod cover_url;
+mod data_root;
 mod discord;
 mod hotkeys;
 #[cfg(target_os = "linux")]
@@ -59,6 +60,7 @@ mod thumbbar;
 mod webview_permissions;
 mod netease;
 mod netease_auth;
+mod netease_social;
 #[cfg(test)]
 mod netease_qr_test;
 mod cnproviders;
@@ -2136,16 +2138,29 @@ fn default_cache_root(app: &tauri::AppHandle) -> PathBuf {
 }
 
 /// User-chosen cache root from the settings store, if any.
+///
+/// A preference that points at one of the OS directories the app used
+/// before the data-root override is ignored: the cache follows the data
+/// root now, and honouring the stale value would strand the migrated
+/// tracks in the old location.
 fn stored_cache_root(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri_plugin_store::StoreExt;
     let store = app.store(SETTINGS_STORE_FILE).ok()?;
     let value = store.get(CACHE_DIR_KEY)?;
     let s = value.as_str()?.trim().to_string();
     if s.is_empty() {
-        None
-    } else {
-        Some(PathBuf::from(s))
+        return None;
     }
+    let dir = PathBuf::from(s);
+    let identifier = app.config().identifier.clone();
+    if data_root::is_legacy_dir(&identifier, &dir) {
+        eprintln!(
+            "[data-root] ignoring the stale cache folder {:?}; the cache follows the data root",
+            dir
+        );
+        return None;
+    }
+    Some(dir)
 }
 
 fn stream_cache_dir(app: &tauri::AppHandle) -> PathBuf {
@@ -2220,6 +2235,111 @@ async fn set_cache_dir(
 /// off the async runtime's core threads.
 #[tauri::command]
 async fn pick_cache_folder(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    tauri::async_runtime::spawn_blocking(move || {
+        app.dialog().file().blocking_pick_folder()
+    })
+    .await
+    .ok()
+    .flatten()
+    .and_then(|f| f.into_path().ok())
+    .map(|p| p.display().to_string())
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DataRootInfo {
+    /// The root everything is written under right now.
+    path: String,
+    /// The default root — a `data/` folder next to the executable.
+    default_path: String,
+    /// True when the user picked a root other than the default.
+    is_custom: bool,
+    /// True when the stored preference differs from what this process
+    /// is running with — i.e. a restart is pending.
+    needs_restart: bool,
+}
+
+/// The data root this launch is using, and whether it is the default.
+#[tauri::command]
+fn get_data_root(app: tauri::AppHandle) -> DataRootInfo {
+    let identifier = app.config().identifier.clone();
+    // The override is applied before the app is built, so the resolved
+    // data dir IS the root we chose.
+    let active = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::env::temp_dir());
+    let default = data_root::default_root().unwrap_or_else(|| active.clone());
+    let stored = data_root::stored_root(&identifier);
+    // What the *next* launch would use: the user's choice, or the
+    // default when they haven't made one.
+    let effective = stored.clone().unwrap_or_else(|| default.clone());
+    DataRootInfo {
+        // A pending data move also needs a restart — the copy happens on
+        // the next launch, once the old profile is no longer locked.
+        needs_restart: effective != active || data_root::migrate_from(&identifier).is_some(),
+        path: active.display().to_string(),
+        default_path: default.display().to_string(),
+        is_custom: stored.is_some(),
+    }
+}
+
+/// Point the data root at a different folder, or (`None`) back at the
+/// default. The change takes effect on the next launch — the WebView2
+/// profile and the plugin stores are already open by then.
+///
+/// The existing data is carried over to the new folder so the tracks,
+/// the login state and the preferences follow the user rather than
+/// disappearing. The copy is deferred to the next launch: the WebView2
+/// profile is locked while this instance runs, and copying a locked
+/// SQLite profile would corrupt it.
+#[tauri::command]
+async fn set_data_root(app: tauri::AppHandle, path: Option<String>) -> Result<(), String> {
+    let identifier = app.config().identifier.clone();
+    let current = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::env::temp_dir());
+
+    let target = match &path {
+        None => data_root::default_root().ok_or("can't locate the executable's folder")?,
+        Some(raw) => {
+            let raw = raw.trim().to_string();
+            if raw.is_empty() {
+                return Err("Pick an absolute folder path.".into());
+            }
+            let dir = PathBuf::from(&raw);
+            if !dir.is_absolute() {
+                return Err("Pick an absolute folder path.".into());
+            }
+            tokio::fs::create_dir_all(&dir)
+                .await
+                .map_err(|e| format!("Can't create the folder: {e}"))?;
+            if !data_root::is_writable(&dir) {
+                return Err("Folder isn't writable.".into());
+            }
+            dir
+        }
+    };
+
+    if target != current {
+        // The data moves on the next launch, when the old profile is no
+        // longer locked by this instance.
+        data_root::store_migrate_from(&identifier, &current);
+    }
+
+    if path.is_none() {
+        data_root::clear_stored_root(&identifier);
+    } else {
+        data_root::store_root(&identifier, &target)?;
+    }
+    Ok(())
+}
+
+/// Native directory picker for the data-root setting.
+#[tauri::command]
+async fn pick_data_root(app: tauri::AppHandle) -> Option<String> {
     use tauri_plugin_dialog::DialogExt;
     tauri::async_runtime::spawn_blocking(move || {
         app.dialog().file().blocking_pick_folder()
@@ -4263,6 +4383,78 @@ fn runtime_icon(app: &tauri::AppHandle) -> tauri::image::Image<'static> {
         .to_owned()
 }
 
+/// Decide the data root for this launch.
+///
+/// Normally that's a `data/` folder next to the executable, so the app is
+/// self-contained. When that folder can't be written to — a per-machine
+/// install under `Program Files`, or the app running from a read-only
+/// share — there is nowhere to put the caches, the login state and the
+/// WebView2 profile. Rather than silently scattering them across the OS
+/// directories, we ask the user to pick a writable folder and remember
+/// the choice.
+fn resolve_data_root(identifier: &str) -> Option<PathBuf> {
+    if let Some(root) = data_root::resolve_root(identifier) {
+        eprintln!("[data-root] using {:?}", root);
+        return Some(root);
+    }
+
+    // Neither the default nor a previously chosen root is writable. Ask
+    // for one. (A previously chosen root that stopped being writable is
+    // the common case here — a removable drive that is no longer plugged
+    // in — so the user's data is still where they left it.)
+    let default = data_root::default_root();
+    let fallback = default
+        .clone()
+        .or_else(data_root::exe_dir)
+        .unwrap_or_else(|| std::path::PathBuf::from("<exe dir>"));
+    eprintln!("[data-root] {:?} is not writable; asking for a data folder", fallback);
+
+    let picked = pick_data_folder(Some(&fallback));
+    let Some(picked) = picked else {
+        eprintln!("[data-root] no folder chosen; falling back to the OS data directory");
+        return None;
+    };
+
+    if let Err(e) = data_root::store_root(identifier, &picked) {
+        eprintln!("[data-root] couldn't remember the chosen folder: {e}");
+    }
+    eprintln!("[data-root] using {:?}", picked);
+    Some(picked)
+}
+
+/// Native folder picker used when the executable's folder is read-only.
+///
+/// `rfd` is used directly rather than the Tauri dialog plugin because this
+/// runs before the app (and its event loop) exists. It is the same crate
+/// the dialog plugin is built on, so it pulls in no new dependency.
+fn pick_data_folder(start_dir: Option<&std::path::Path>) -> Option<PathBuf> {
+    // Say why we're asking: a bare folder picker with no explanation is
+    // confusing when the app has just started for the first time.
+    rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Warning)
+        .set_title("adrify can't write to its own folder")
+        .set_description(format!(
+            "The folder adrify is installed in is read-only, so it can't keep its \
+             cache, your login and your settings there.\n\nPick a folder for them instead.",
+        ))
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
+
+    let mut dialog = rfd::FileDialog::new();
+    dialog = dialog.set_title("Choose where adrify should store its data");
+    if let Some(dir) = start_dir {
+        if dir.is_dir() {
+            dialog = dialog.set_directory(dir);
+        }
+    }
+    let picked = dialog.pick_folder()?;
+    if !data_root::is_writable(&picked) {
+        eprintln!("[data-root] the chosen folder {:?} is not writable", picked);
+        return None;
+    }
+    Some(picked)
+}
+
 fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "Show adrify", true, None::<&str>)?;
     let play_item = MenuItem::with_id(app, "play_pause", "Play / Pause", true, Some("Space"))?;
@@ -4328,6 +4520,29 @@ pub fn run() {
     // than "Unknown app". Must run before any window is created. No-op off
     // Windows.
     appid::init();
+
+    // Decide where the app's data lives BEFORE the app is built: the
+    // WebView2 profile, the plugin stores and the log directory are all
+    // resolved while the first window is created, so the override has to
+    // be in the config by then. See src/data_root.rs.
+    let mut context = tauri::generate_context!();
+    let identifier = context.config().identifier.clone();
+    let data_root = resolve_data_root(&identifier);
+    if let Some(root) = &data_root {
+        context.config_mut().app.app_directories_override =
+            Some(tauri::utils::config::AppDirectoriesOverride::Root(root.clone()));
+        // Carry over the data the previous layout left in the OS dirs.
+        data_root::migrate_legacy_data(&identifier, root);
+        // The user moved the root: the data from the old folder follows
+        // them. This happens here rather than in the command that changed
+        // the root, because the WebView2 profile is only unlocked once
+        // the previous instance has exited.
+        if let Some(from) = data_root::migrate_from(&identifier) {
+            eprintln!("[data-root] moving the data from {:?} to {:?}", from, root);
+            data_root::copy_root_contents(&from, root);
+            data_root::clear_migrate_from(&identifier);
+        }
+    }
 
     let state = StreamServerState::default();
     let port_handle = state.port.clone();
@@ -4411,6 +4626,9 @@ pub fn run() {
             get_cache_dir,
             set_cache_dir,
             pick_cache_folder,
+            get_data_root,
+            set_data_root,
+            pick_data_root,
             focus_main_window,
             open_player_window,
             close_player_window,
@@ -4438,6 +4656,11 @@ pub fn run() {
             netease::netease_liked_ids,
             netease::netease_resolve,
             netease::netease_set_like,
+            netease_social::netease_comments,
+            netease_social::netease_comment_replies,
+            netease_social::netease_song_wiki,
+            netease_social::netease_artist_wiki,
+            netease_social::netease_artist_by_name,
             netease_auth::netease_start_login,
             netease_auth::netease_qr_code,
             netease_auth::netease_cancel_login,
@@ -4612,7 +4835,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
 

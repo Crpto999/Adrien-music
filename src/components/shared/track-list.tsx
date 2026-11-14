@@ -456,7 +456,7 @@ type RowProps = {
 /** The accent disc with a check that marks a selected row. */
 function SelectedCheck() {
   return (
-    <span className="grid size-[22px] place-items-center rounded-full bg-acc1 text-white">
+    <span className="grid size-[22px] place-items-center rounded-full bg-acc1 text-brand-foreground">
       <IconCheck className="size-3" stroke={3.2} />
     </span>
   );

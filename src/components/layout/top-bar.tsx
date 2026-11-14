@@ -177,7 +177,7 @@ export function TopBar() {
             type="button"
             onClick={() => win().close()}
             aria-label={t("common.close")}
-            className="flex h-full w-11 items-center justify-center text-foreground/85 transition-colors hover:bg-[#c42b1c] hover:text-white"
+            className="flex h-full w-11 items-center justify-center text-foreground/85 transition-colors hover:bg-[var(--close-hover)] hover:text-[var(--close-hover-fg)]"
           >
             <CloseGlyph />
           </button>

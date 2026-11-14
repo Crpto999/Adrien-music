@@ -5,7 +5,6 @@ import {
   likeTrack,
   removeRating,
 } from "@/lib/innertube/mutations";
-import type { ShelfItem } from "@/lib/innertube/types";
 import { syncLastfmLove } from "@/lib/lastfm/love";
 import type { LastfmTrackMeta } from "@/lib/lastfm/track";
 import {
@@ -15,20 +14,33 @@ import {
   syncYouTubeLike,
 } from "@/lib/providers/netease-like";
 import { isYouTubeVideoId } from "@/lib/providers/queue";
+import { likeStatusKey } from "@/lib/providers/use-like-status";
 import { useDislikesStore } from "@/lib/store/dislikes";
 import { rememberPlatformPair } from "@/lib/store/netease-ids";
 import { translate } from "@/lib/i18n";
 import type { QueueTrack } from "@/lib/store/playback";
 
-// Patch the cached liked-songs list optimistically. The server is the
-// source of truth, but `["liked-songs"]` is `enabled: false` in the
-// components that only *read* it, so an `invalidateQueries` call would
-// NOT refetch — meaning the heart wouldn't fill until the user visited
-// Settings or the Liked Songs page. Mutating the cache directly keeps
-// every observer (player bar, track rows, context menus, settings cache
-// list) in sync without a round-trip.
-function makeLikedPlaceholder(videoId: string): ShelfItem {
-  return { id: videoId, kind: "song", title: "", thumbnails: [] };
+/**
+ * Patch the cached rating for a track.
+ *
+ * The rating is fetched per track and keyed on the YouTube video id, so
+ * a heart has to update *that* entry — and, for a track from another
+ * platform, the entry under the YouTube id it resolves to.
+ *
+ * The patch is written to the cache directly rather than left to a
+ * refetch: the user is looking at the button they just pressed, and a
+ * round-trip would leave it stale for a beat.
+ */
+function patchLikeStatus(
+  queryClient: QueryClient,
+  videoId: string | null | undefined,
+  liked: boolean,
+): void {
+  if (!videoId) return;
+  queryClient.setQueryData(
+    likeStatusKey(videoId),
+    liked ? "LIKE" : "INDIFFERENT",
+  );
 }
 
 /**
@@ -170,14 +182,20 @@ export async function toggleLiked({
       useDislikesStore.getState().remove(videoId);
     }
     // The NetEase collection is the platform's, so the app's cache of it
-    // is what gets patched — not the YouTube liked list.
+    // is what gets patched — not the YouTube rating.
     patchNeteaseLikedIds(queryClient, songId, !wasLiked);
     toast.success(
       translate(wasLiked ? "toast.neteaseUnliked" : "toast.neteaseLiked"),
     );
     // And to YouTube, which has to look the song up in its own catalogue
-    // first — the two platforms' ids are not interchangeable.
-    void syncYouTubeLike(!wasLiked, track);
+    // first — the two platforms' ids are not interchangeable. The
+    // lookup also tells us which YouTube video the rating lives under,
+    // so the heart fills there too.
+    void syncYouTubeLike(!wasLiked, track).then((videoId) => {
+      if (videoId) {
+        patchLikeStatus(queryClient, videoId, !wasLiked);
+      }
+    });
     await invalidateLikedLists(queryClient);
     syncLastfmLove(track ?? {}, !wasLiked);
     return;
@@ -191,6 +209,9 @@ export async function toggleLiked({
       // A like replaces a dislike on the server; mirror that locally.
       useDislikesStore.getState().remove(videoId);
     }
+    // The rating for this video is now known — patch it so the heart
+    // fills without waiting for a refetch.
+    patchLikeStatus(queryClient, videoId, !wasLiked);
     // A track the app knows on NetEase — a daily pick that was
     // redirected to YouTube — keeps the correspondence alive, so the
     // track can still be recognised as the NetEase recording it came
@@ -232,37 +253,14 @@ export async function toggleLiked({
       await likeTrack(matched);
       useDislikesStore.getState().remove(videoId);
     }
+    // The rating is now known under the matched id.
+    patchLikeStatus(queryClient, matched, !wasLiked);
   }
-
-  // A cold-start membership fetch may have captured the list before this
-  // mutation. Cancel it at the cache commit point so its older snapshot cannot
-  // overwrite the patch below. If we interrupted one, restart it after the
-  // patch to recover the complete membership list rather than leaving a
-  // partial placeholder-only cache.
-  const likedSongsKey = ["liked-songs"] as const;
-  const interruptedFetch =
-    queryClient.isFetching({ queryKey: likedSongsKey, exact: true }) > 0;
-  await queryClient.cancelQueries({ queryKey: likedSongsKey, exact: true });
 
   if (wasLiked) {
-    queryClient.setQueryData<ShelfItem[]>(["liked-songs"], (old) =>
-      (old ?? []).filter((t) => t.id !== videoId),
-    );
     toast.success(translate("toast.removedFromLiked"));
   } else {
-    queryClient.setQueryData<ShelfItem[]>(["liked-songs"], (old) => {
-      const list = old ?? [];
-      if (list.some((t) => t.id === videoId)) return list;
-      return [makeLikedPlaceholder(videoId), ...list];
-    });
     toast.success(translate("toast.addedToLiked"));
-  }
-  if (interruptedFetch) {
-    void queryClient.invalidateQueries({
-      queryKey: likedSongsKey,
-      exact: true,
-      refetchType: "all",
-    });
   }
   // Mirror the like/unlike to Last.fm as a loved / unloved track.
   syncLastfmLove(track ?? {}, !wasLiked);
@@ -279,11 +277,11 @@ export async function toggleLiked({
     // NetEase, which has to look the song up in its own catalogue.
     void syncNeteaseLike(!wasLiked, track);
   }
-  // The heart-fill cache (["liked-songs"]) is separate from the
-  // Library → Songs list (["library","liked-songs-pages"]) and the
-  // Liked Songs (LM) playlist page (["playlist-pages", …"LM"…]). Mark
-  // those stale so they don't keep showing an outdated list. They're
-  // heavy infinite queries, so invalidate only refetches if mounted.
+  // The Library → Songs list and the Liked Songs (LM) playlist page are
+  // separate from the per-track rating cache, and they list the actual
+  // songs — so a heart has to mark them stale too, or the visible
+  // list keeps showing the old membership. They are heavy infinite
+  // queries, so invalidating them only refetches if mounted.
   void invalidateLikedLists(queryClient);
 }
 
@@ -342,16 +340,16 @@ export async function toggleDisliked({
   if (wasDisliked) {
     await removeRating(videoId);
     dislikes.remove(videoId);
+    // The rating is now "no rating at all".
+    patchLikeStatus(queryClient, videoId, false);
     toast.success(translate("toast.dislikeRemoved"));
     return;
   }
   await dislikeTrack(videoId);
   dislikes.add(videoId);
+  // A dislike replaces a like, so the track is no longer liked.
+  patchLikeStatus(queryClient, videoId, false);
   if (wasLiked) {
-    await queryClient.cancelQueries({ queryKey: ["liked-songs"], exact: true });
-    queryClient.setQueryData<ShelfItem[]>(["liked-songs"], (old) =>
-      (old ?? []).filter((t) => t.id !== videoId),
-    );
     syncLastfmLove(track ?? {}, false);
     void queryClient.invalidateQueries({
       queryKey: ["library", "liked-songs-pages"],

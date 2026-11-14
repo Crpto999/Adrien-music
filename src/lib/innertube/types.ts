@@ -1,4 +1,5 @@
 import type { ProviderId } from "@/lib/providers/types";
+import type { LikeStatus } from "./like-status";
 
 export type Thumbnail = {
   url: string;
@@ -41,6 +42,17 @@ export type ShelfItem = {
    * `browse/edit_playlist`'s ACTION_REMOVE_VIDEO.
    */
   setVideoId?: string;
+  /**
+   * The user's own YouTube rating for this row, when the response
+   * carried it.
+   *
+   * A signed-in response carries the rating on the row's own menu, so a
+   * row that comes back from a search or a browse already knows whether
+   * the user liked it — no second request, and no library-wide list.
+   * It is `undefined` when the response did not say (an anonymous
+   * request, or a row shape that carries no rating).
+   */
+  likeStatus?: LikeStatus;
   /**
    * The provider this row's track lives on, when it is not YouTube.
    *

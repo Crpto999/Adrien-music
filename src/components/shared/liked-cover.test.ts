@@ -64,7 +64,7 @@ describe("theme-aware Liked songs artwork", () => {
     const html = renderToStaticMarkup(
       createElement(LikedCoverArt, { art: LIKED_COVERS.adrify }),
     );
-    expect(html).toContain("#FF5F79");
+    expect(html).toContain("var(--liked-cover-wash)");
     expect(html).toContain('fill="rgba(255,255,255,0.94)"');
   });
 

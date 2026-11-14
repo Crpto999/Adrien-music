@@ -3,6 +3,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* The two ends of the lyric sweep's gradient.
+   Registered as custom properties because a gradient cannot animate a
+   plain colour: with a registered `<color>` the browser interpolates
+   it, so a line can cross-fade between its lit and unlit colours while
+   the highlight travels across it. `@property` has to be at the top
+   level — it is not valid inside `@layer`. */
+@property --lyric-lit {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f5f5f5;
+}
+@property --lyric-dim {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #6a6a6a;
+}
+
 :root {
   /* Height of the custom title bar (see top-bar.tsx). Used by the
      floating sidebar / player CSS so they sit *under* the strip
@@ -14,43 +31,49 @@
   --brand-rgb: 250, 31, 75;
   --brand-foreground: oklch(0.985 0 0);
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --background: #faf8f5;
+  --foreground: #1a1917;
+  --card: #ffffff;
+  --card-foreground: #1a1917;
+  --popover: #ffffff;
+  --popover-foreground: #1a1917;
   --primary: var(--brand);
   --primary-foreground: var(--brand-foreground);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --secondary: #f2efe9;
+  --secondary-foreground: #2a2825;
+  --muted: #f2efe9;
+  --muted-foreground: #6e6a66;
   --accent: oklch(0 0 0 / 7%);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent-foreground: #2a2825;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: #e5e1da;
+  --input: #e5e1da;
   --ring: var(--brand);
   --radius: 0.625rem;
 
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar: #f4f1ec;
+  --sidebar-foreground: #1a1917;
   --sidebar-primary: var(--brand);
   --sidebar-primary-foreground: var(--brand-foreground);
   --sidebar-accent: oklch(0 0 0 / 7%);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-accent-foreground: #2a2825;
+  --sidebar-border: #e5e1da;
   --sidebar-ring: var(--brand);
+
+  /* The window's close button keeps the platform convention (red on
+     hover) in the light theme. The dark theme overrides it with the
+     accent hue so no red survives there. */
+  --close-hover: #c42b1c;
+  --close-hover-fg: #ffffff;
 
   /* Translucent surfaces that float over the blurred album art behind
      the UI (sidebar, player card, active track row). In light mode we
      tint the cover with white; in dark mode with near-black. The
      hairline is a faint contrasting outline on the same surface. */
-  --surface: oklch(1 0 0 / 55%);
-  --surface-hover: oklch(1 0 0 / 70%);
-  --surface-active: oklch(1 0 0 / 85%);
+  --surface: rgba(250, 248, 245, 0.55);
+  --surface-hover: rgba(250, 248, 245, 0.7);
+  --surface-active: rgba(250, 248, 245, 0.85);
   --hairline: oklch(0 0 0 / 12%);
   --titlebar-hover: oklch(0 0 0 / 7%);
 
@@ -150,11 +173,11 @@
      the label has to flip with it. */
   --active-foreground: #ffffff;
 
-  /* The account tier badge's accent. A status green reads as "good" in
-     the red themes, but on the cyberpunk ground a green badge is just
-     another dim colour among the neons — that theme swaps it for the
-     emphasis hue, which is the loudest thing the palette can show. */
-  --tier-accent: var(--status-success);
+  /* The account tier badge's accent. The tier chip states the account's
+     plan, so it wears the *secondary* colour — the accent hue — in
+     every theme: the red one in the light theme, the green one in the
+     dark one, the emphasis magenta on the cyberpunk ground. */
+  --tier-accent: var(--brand);
 
   /* ------------------------------------------------------------------
      Functional status colours.
@@ -177,6 +200,9 @@
   --status-warning-rgb: 255, 209, 102;
   --status-error: #e11d48;
   --status-error-rgb: 225, 29, 72;
+  /* The label colour on a filled error surface. White on the light
+     theme's deep red, near-black on the dark theme's bright green. */
+  --status-error-foreground: #ffffff;
   /* "Live" / "playing now" — the one status that deliberately uses the
      emphasis hue, because it is a brand moment rather than a signal. */
   --status-live: #ff1fe8;
@@ -191,56 +217,85 @@
      flat accent sits behind it as the fallback fill. */
   --progress-fill: linear-gradient(90deg, #fa1f4b, #d61239);
 
-  --t1: #18181b;
-  --t2: #27272a;
-  --t3: #3f3f46;
-  --t4: #52525b;
-  --t5: #6b6b74;
-  --t6: #74747d;
-  --t7: #82828b;
-  --t8: #94949d;
-  --t9: #8e8e97;
-  --t10: #a2a2aa;
-  --tph: #8b8b94;
+  --t1: #1a1917;
+  --t2: #2a2825;
+  --t3: #403d38;
+  --t4: #55514b;
+  --t5: #6e6a66;
+  --t6: #77736e;
+  --t7: #85817b;
+  --t8: #96918b;
+  --t9: #918c86;
+  --t10: #a5a09a;
+  --tph: #8d8882;
 
-  --win: #ffffff;
+  --win: #faf8f5;
   --surf1: #ffffff;
-  --surf2: #f1f1f4;
-  --surf3: #f1f1f4;
-  --surf4: #e4e4e8;
-  --surf5: #d9d9df;
-  --surf6: #d2d2d9;
-  --surf7: #c3c3ca;
+  --surf2: #f3f0ea;
+  --surf3: #f3f0ea;
+  --surf4: #e8e4dd;
+  --surf5: #ddd9d1;
+  --surf6: #d6d1c9;
+  --surf7: #c7c1b8;
 
-  --desk1: #f2f2f5;
-  --desk2: #e7e7eb;
-  --desk3: #dbdbe1;
-  --scrim: rgba(255, 255, 255, 0.68);
-  --sidepanel: rgba(0, 0, 0, 0.028);
+  --desk1: #f4f1ec;
+  --desk2: #ebe7e0;
+  --desk3: #e0dbd3;
+  --scrim: rgba(250, 248, 245, 0.68);
+  --sidepanel: rgba(26, 25, 23, 0.028);
 
-  --glass1: rgba(255, 255, 255, 0.55);
-  --glass2: rgba(255, 255, 255, 0.86);
-  --glass3: rgba(252, 252, 253, 0.8);
-  --glass4: rgba(252, 252, 253, 0.86);
-  --glass5: rgba(252, 252, 253, 0.88);
-  --glass6: rgba(252, 252, 253, 0.9);
+  --glass1: rgba(250, 248, 245, 0.55);
+  --glass2: rgba(250, 248, 245, 0.86);
+  --glass3: rgba(252, 251, 249, 0.8);
+  --glass4: rgba(252, 251, 249, 0.86);
+  --glass5: rgba(252, 251, 249, 0.88);
+  --glass6: rgba(252, 251, 249, 0.9);
 
   /* Text on the full-screen player's blurred cover (fullscreen-player.tsx). */
-  --fs-title: #18181b;
-  --fs-sub: #52525b;
-  --fs-label: #74747d;
-  --fs-txt: #27272a;
-  --fs-txt2: #3f3f46;
-  --fs-txt3: #52525b;
-  --fs-time: #6b6b74;
-  --fs-seg: #74747d;
+  --fs-title: #1a1917;
+  --fs-sub: #55514b;
+  --fs-label: #77736e;
+  --fs-txt: #2a2825;
+  --fs-txt2: #403d38;
+  --fs-txt3: #55514b;
+  --fs-time: #6e6a66;
+  --fs-seg: #77736e;
 
-  --g6a: rgba(255, 255, 255, 0.6);
-  --g6b: rgba(255, 255, 255, 0.65);
-  --g9a: rgba(255, 255, 255, 0.55);
-  --g9b: rgba(255, 255, 255, 0.35);
-  --g9c: rgba(252, 252, 253, 0.88);
-  --g9d: rgba(255, 255, 255, 0.7);
+  --g6a: rgba(250, 248, 245, 0.6);
+  --g6b: rgba(250, 248, 245, 0.65);
+  --g9a: rgba(250, 248, 245, 0.55);
+  --g9b: rgba(250, 248, 245, 0.35);
+  --g9c: rgba(252, 251, 249, 0.88);
+  --g9d: rgba(250, 248, 245, 0.7);
+
+  /* The accent-tinted tile gradients (the Explore shelf tiles). They
+     follow the theme's accent, so they are red on the light ground
+     and green on the dark one. */
+  --tile-accent-from: #0f0100;
+  --tile-accent-to: #8e1b10;
+
+  /* The NetEase daily cover's wash. It used to be the platform's own
+     red, hard-coded — which left a red tile sitting in a dark theme
+     that has no red anywhere else in it. It follows the theme's
+     accent now, like the Explore tiles above.
+
+     Three stops rather than two: the middle one is the accent itself,
+     so the tile reads as the accent colour with a lit top-left corner
+     and a shadowed bottom-right, not as a flat two-tone ramp. */
+  --netease-cover-from: #ff6b5f;
+  --netease-cover-mid: #e8214c;
+  --netease-cover-to: #7d1024;
+
+  /* The Liked-songs cover's glass and glow hearts pick up the theme. */
+  --liked-heart-glass: rgba(255, 255, 255, 0.55);
+  --liked-heart-glow: rgba(250, 31, 75, 0.85);
+  --liked-cover-wash: radial-gradient(
+    130% 110% at 22% 12%,
+    #ff5f79,
+    #e8214c 34%,
+    #8e1230 68%,
+    #2a0913
+  );
 
   --w020: rgba(0, 0, 0, 0.035);
   --w028: rgba(0, 0, 0, 0.04);
@@ -288,31 +343,40 @@
   --k850: rgba(0, 0, 0, 0.16);
   --k900: rgba(0, 0, 0, 0.18);
 
-  --fs-title: #18181b;
-  --fs-sub: #52525b;
-  --fs-label: #74747d;
+  --fs-title: #1a1917;
+  --fs-sub: #55514b;
+  --fs-label: #77736e;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  /* The dark theme's accent is the green one: the whole brand family
+     (primary, the accent ramp, the support / emphasis hues) moves to
+     green here, so no red survives anywhere on this ground. */
+  --brand: #17f700;
+  --brand-rgb: 23, 247, 0;
+  --brand-foreground: #101010;
+  --acc1: #17f700;
+  --acc1rgb: 23, 247, 0;
+
+  --background: #171717;
+  --foreground: #f5f5f5;
+  --card: #1d1d1d;
+  --card-foreground: #f5f5f5;
+  --popover: #1d1d1d;
+  --popover-foreground: #f5f5f5;
   --primary: var(--brand);
   --primary-foreground: var(--brand-foreground);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --secondary: #262626;
+  --secondary-foreground: #f5f5f5;
+  --muted: #262626;
+  --muted-foreground: #a1a1a1;
   /* Translucent white for hover/active states — reads consistently
      across both solid dark surfaces (popovers, dropdowns) and over
      the blurred album-art background. */
   --accent: oklch(1 0 0 / 10%);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
+  --accent-foreground: #f5f5f5;
+  --destructive: #17f700;
+  --destructive-foreground: #101010;
   --border: oklch(1 0 0 / 10%);
   /* Control-outline colour: outline buttons, segmented toggles, stat
      cards and input fields all border with this. Kept level with
@@ -322,20 +386,25 @@
   --input: oklch(1 0 0 / 10%);
   --ring: var(--brand);
 
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: #1d1d1d;
+  --sidebar-foreground: #f5f5f5;
   --sidebar-primary: var(--brand);
   --sidebar-primary-foreground: var(--brand-foreground);
   --sidebar-accent: oklch(1 0 0 / 10%);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-accent-foreground: #f5f5f5;
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: var(--brand);
 
+  /* The window's close button follows the accent hue here — the dark
+     theme has no red in it at all. */
+  --close-hover: var(--brand);
+  --close-hover-fg: #171717;
+
   /* Dark-mode surface: near-black tint at 30% alpha — lets more of the
      blurred album-art bleed through the sidebar / player card. */
-  --surface: oklch(0 0 0 / 30%);
-  --surface-hover: oklch(0 0 0 / 50%);
-  --surface-active: oklch(0 0 0 / 60%);
+  --surface: rgba(23, 23, 23, 0.3);
+  --surface-hover: rgba(23, 23, 23, 0.5);
+  --surface-active: rgba(23, 23, 23, 0.6);
   --hairline: oklch(1 0 0 / 10%);
   --titlebar-hover: oklch(1 0 0 / 10%);
 
@@ -348,74 +417,88 @@
   /* Dark half of the design-system palette; see the block in :root for
      what the names mean. --acc1 deliberately does not flip -- the accent
      stays vivid in both themes. */
-  --acc2: #ff5e7e;
-  --acc3: #ff8aa1;
-  --acc4: #ffb3c2;
-  --acc5: #fd4b6f;
+  --acc2: #5cff3d;
+  --acc3: #8aff5c;
+  --acc4: #b3ff8a;
+  --acc5: #3cff14;
 
   /* Brand roles — see the :root block for what they mean. The dark
      theme lifts the support/emphasis hues so they stay legible on a
      near-black ground. */
-  --brand-secondary: #ff8aa1;
-  --brand-secondary-rgb: 255, 138, 161;
-  --brand-secondary-soft: #ffb3c2;
-  --brand-accent: #ff5e7e;
-  --brand-accent-rgb: 255, 94, 126;
-  --brand-accent-soft: #ffb3c2;
-  --brand-soft: #ff8aa1;
+  --brand-secondary: #7dff5c;
+  --brand-secondary-rgb: 125, 255, 92;
+  --brand-secondary-soft: #a8ff8c;
+  --brand-accent: #4dff2b;
+  --brand-accent-rgb: 77, 255, 43;
+  --brand-accent-soft: #a8ff8c;
+  --brand-soft: #7dff5c;
 
   --active: var(--brand-secondary);
   --active-rgb: var(--brand-secondary-rgb);
   --active-soft: var(--brand-secondary-soft);
-  /* The dark theme's support hue is a pale pink, so a filled
+  /* The dark theme's support hue is a bright green, so a filled
      activation surface takes the dark theme's own foreground rather
      than white. */
-  --active-foreground: oklch(0.145 0 0);
+  --active-foreground: #101010;
 
-  --tier-accent: var(--status-success);
+  --tier-accent: var(--brand);
+
+  /* The Liked-songs cover's glass and glow hearts pick up the theme. */
+  --liked-heart-glass: rgba(255, 255, 255, 0.55);
+  --liked-heart-glow: rgba(23, 247, 0, 0.85);
+  --liked-cover-wash: radial-gradient(
+    130% 110% at 22% 12%,
+    #6bff3d,
+    #2bd10a 34%,
+    #14800a 68%,
+    #0a2409
+  );
 
   /* Functional status colours. Success / info / warning are the same
-     everywhere; error follows the brand family, so it is the deeper
-     red on the dark theme and the hot pink on the cyberpunk one. */
-  --status-error: #ff4d78;
-  --status-error-rgb: 255, 77, 120;
+     everywhere; error follows the brand family, so it is the green
+     accent on the dark theme and the hot pink on the cyberpunk one. */
+  --status-error: #17f700;
+  --status-error-rgb: 23, 247, 0;
+  /* The dark theme's error surface is the bright accent green, so the
+     label on top of it is near-black rather than white. */
+  --status-error-foreground: #101010;
 
   /* The playback progress fill — see the :root block. */
-  --progress-fill: linear-gradient(90deg, #fd4b6f, #ff5e7e);
+  --progress-fill: linear-gradient(90deg, #3cff14, #5cff3d);
 
-  --t1: #f5f4f2;
-  --t2: #ededef;
-  --t3: #dcdce0;
-  --t4: #b7b7be;
-  --t5: #9a9aa1;
-  --t6: #8c8c94;
-  --t7: #7b7b83;
-  --t8: #6e6e76;
-  --t9: #5c5c63;
-  --t10: #4a4a51;
-  --tph: #afafb7;
+  --t1: #f5f5f5;
+  --t2: #ebebeb;
+  --t3: #d8d8d8;
+  --t4: #b3b3b3;
+  --t5: #969696;
+  --t6: #888888;
+  --t7: #777777;
+  --t8: #6a6a6a;
+  --t9: #585858;
+  --t10: #464646;
+  --tph: #a8a8a8;
 
-  --win: #131316;
-  --surf1: #1b1b1f;
-  --surf2: #26262b;
-  --surf3: #151517;
-  --surf4: #232328;
-  --surf5: #2c2c31;
-  --surf6: #2e2e34;
-  --surf7: #45454c;
+  --win: #171717;
+  --surf1: #1f1f1f;
+  --surf2: #2a2a2a;
+  --surf3: #191919;
+  --surf4: #262626;
+  --surf5: #2f2f2f;
+  --surf6: #313131;
+  --surf7: #474747;
 
-  --desk1: #191920;
-  --desk2: #0f0f11;
-  --desk3: #0b0b0d;
-  --scrim: rgba(11, 11, 13, 0.48);
-  --sidepanel: rgba(14, 13, 13, 0.42);
+  --desk1: #1d1d1d;
+  --desk2: #141414;
+  --desk3: #101010;
+  --scrim: rgba(10, 10, 10, 0.48);
+  --sidepanel: rgba(23, 23, 23, 0.42);
 
-  --glass1: rgba(10, 10, 12, 0.38);
-  --glass2: rgba(13, 13, 16, 0.85);
-  --glass3: rgba(27, 27, 31, 0.72);
-  --glass4: rgba(27, 27, 31, 0.82);
-  --glass5: rgba(24, 24, 28, 0.86);
-  --glass6: rgba(20, 20, 23, 0.88);
+  --glass1: rgba(23, 23, 23, 0.38);
+  --glass2: rgba(23, 23, 23, 0.85);
+  --glass3: rgba(31, 31, 31, 0.72);
+  --glass4: rgba(31, 31, 31, 0.82);
+  --glass5: rgba(29, 29, 29, 0.86);
+  --glass6: rgba(26, 26, 26, 0.88);
 
   --fs-title: #ffffff;
   --fs-sub: rgba(255, 255, 255, 0.62);
@@ -426,12 +509,22 @@
   --fs-time: rgba(255, 255, 255, 0.6);
   --fs-seg: rgba(255, 255, 255, 0.55);
 
-  --g6a: rgba(6, 6, 8, 0.5);
-  --g6b: rgba(6, 6, 8, 0.55);
-  --g9a: rgba(9, 9, 11, 0.42);
-  --g9b: rgba(9, 9, 11, 0.2);
-  --g9c: rgba(9, 9, 11, 0.86);
-  --g9d: rgba(9, 9, 11, 0.62);
+  --g6a: rgba(10, 10, 10, 0.5);
+  --g6b: rgba(10, 10, 10, 0.55);
+  --g9a: rgba(15, 15, 15, 0.42);
+  --g9b: rgba(15, 15, 15, 0.2);
+  --g9c: rgba(15, 15, 15, 0.86);
+  --g9d: rgba(15, 15, 15, 0.62);
+
+  /* The accent-tinted tile gradients — green on the dark ground. */
+  --tile-accent-from: #010f00;
+  --tile-accent-to: #0a8e10;
+
+  /* The NetEase daily cover's wash — green on the dark ground, so the
+     tile belongs to the theme instead of staying NetEase red. */
+  --netease-cover-from: #7dff5c;
+  --netease-cover-mid: #17f700;
+  --netease-cover-to: #0a4d05;
 
   --w020: rgba(255, 255, 255, 0.02);
   --w028: rgba(255, 255, 255, 0.028);
@@ -533,6 +626,11 @@
   --sidebar-accent-foreground: #7df4ff;
   --sidebar-border: #27304a;
   --sidebar-ring: #00e5ff;
+
+  /* The close button keeps the platform convention (red on hover) here
+     too — the cyberpunk theme is untouched by the light/dark rework. */
+  --close-hover: #c42b1c;
+  --close-hover-fg: #ffffff;
 
   /* Translucent surfaces that float over the blurred album art. The
      cyan tint keeps them in the theme's family instead of the
@@ -700,6 +798,16 @@
   --g9c: rgba(8, 10, 18, 0.88);
   --g9d: rgba(8, 10, 18, 0.62);
 
+  /* The accent-tinted tile gradients — unchanged on this theme. */
+  --tile-accent-from: #0f0100;
+  --tile-accent-to: #8e1b10;
+
+  /* The NetEase daily cover's wash — the cyberpunk accent, violet into
+     magenta, matching the theme's own gradient language. */
+  --netease-cover-from: #00e5ff;
+  --netease-cover-mid: #7c3cff;
+  --netease-cover-to: #ff1fe8;
+
   /* White overlays: the cyan-leaning surface tint. */
   --w020: rgba(0, 229, 255, 0.03);
   --w028: rgba(0, 229, 255, 0.038);
@@ -749,8 +857,15 @@
   --k900: rgba(0, 0, 0, 0.9);
 
   /* The Liked-songs cover's glass and glow hearts pick up the theme. */
-  --liked-heart-glass: rgba(244, 250, 255, 0.55);
-  --liked-heart-glow: rgba(255, 31, 232, 0.85);
+  --liked-heart-glass: rgba(255, 255, 255, 0.55);
+  --liked-heart-glow: rgba(250, 31, 75, 0.85);
+  --liked-cover-wash: radial-gradient(
+    130% 110% at 22% 12%,
+    #ff5f79,
+    #e8214c 34%,
+    #8e1230 68%,
+    #2a0913
+  );
 
   /* The brand gradient from the design spec, used by the few places
      that want the full cyan -> violet -> magenta sweep. */
@@ -824,6 +939,7 @@
   --color-status-info: var(--status-info);
   --color-status-warning: var(--status-warning);
   --color-status-error: var(--status-error);
+  --color-status-error-foreground: var(--status-error-foreground);
   --color-status-live: var(--status-live);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -1005,7 +1121,9 @@
      under the bar. */
   [data-slot="sidebar-container"] {
     top: var(--titlebar-h) !important;
-    height: calc(100svh - var(--titlebar-h) - var(--bottom-bar-h, 0px)) !important;
+    height: calc(
+      100svh - var(--titlebar-h) - var(--bottom-bar-h, 0px)
+    ) !important;
   }
 
   /* Width follows the pointer directly while resizing. The regular
@@ -1296,6 +1414,99 @@
     transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
+  /* ------------------------------------------------------------------
+     The lyric sweep.
+
+     The highlight moves *through* the words rather than jumping from
+     one to the next, which is what the singing actually does. Each
+     piece of a line carries a gradient whose bright end sits at
+     `--lyric-sweep` — the percentage of that piece which has been sung
+     — so the bright edge travels across the piece as the song plays.
+
+     The colours are registered custom properties rather than plain
+     ones, because a gradient cannot animate a plain colour: with a
+     registered `<color>` property the browser interpolates it, so the
+     whole line can cross-fade between its lit and unlit colours while
+     the sweep moves within it. That is what the `--lyric-lit` /
+     `--lyric-dim` pair is for, and why they are declared with
+     `@property` at the top of this file rather than inline.
+  */
+  .lyrics-line {
+    /* The two ends of the sweep. A line that is not being sung has the
+       same colour at both ends, so it reads as one flat colour — which
+       is what a line nobody is singing should look like. */
+    --lyric-lit: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+    --lyric-dim: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+    transition:
+      --lyric-lit 1260ms ease-in-out,
+      --lyric-dim 1260ms ease-in-out;
+  }
+
+  /* The line being sung: bright where it has been sung, dim ahead of
+     the highlight. */
+  .lyrics-line[data-lyrics-state="active"] {
+    --lyric-lit: var(--foreground);
+    --lyric-dim: color-mix(in oklab, var(--foreground) 42%, transparent);
+  }
+
+  /* A line that has already been sung. */
+  .lyrics-line[data-lyrics-state="past"] {
+    --lyric-lit: color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+    --lyric-dim: color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+  }
+
+  /* One piece of a line.
+     `--lyric-sweep` is written by the renderer, as the percentage of
+     this piece which has been sung. The feather softens the leading
+     edge over about a character: a hard boundary is legible as a
+     boundary — the eye reads a bar travelling across the words rather
+     than the words themselves lighting up as they are sung. */
+  .lyric-sweep {
+    --lyric-sweep: 100%;
+    --lyric-feather: min(
+      12%,
+      var(--lyric-sweep),
+      calc(100% - var(--lyric-sweep))
+    );
+    background-image: linear-gradient(
+      90deg,
+      var(--lyric-lit) 0,
+      var(--lyric-lit) calc(var(--lyric-sweep) - var(--lyric-feather)),
+      var(--lyric-dim) calc(var(--lyric-sweep) + var(--lyric-feather)),
+      var(--lyric-dim) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    transition: color 200ms ease;
+  }
+
+  /* Hover on a line that is not being sung: the whole line takes the
+     theme accent.
+
+     The rule lives here rather than in the component because Tailwind
+     cannot express it. `group-hover/words:lyric-sweep-hover` would
+     need `lyric-sweep-hover` to be a Tailwind *utility*, and this is
+     a plain class in this file, so the variant was never emitted into
+     the bundle and the hover silently did nothing.
+
+     The accent has to be applied to the piece itself rather than
+     inherited from the button: a piece sets `color: transparent` for
+     the gradient clip, and an explicit colour on the piece beats the
+     button's inherited `hover:text-brand` no matter what the button
+     says.
+
+     The active line is excluded on purpose. Its gradient *is* the
+     karaoke sweep, and flattening it on hover would throw the
+     highlight away for as long as the pointer rested on the line —
+     which is exactly the line the user is reading most carefully. */
+  .lyrics-line:not([data-lyrics-state="active"]) .group\/words:hover .lyric-sweep {
+    background-image: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: var(--brand);
+  }
+
   /* Fine SVG noise overlaid on the heavily-blurred `BackgroundCover` art.
      Without it, `blur-3xl` produces gradients smooth enough to lose
      precision through 8-bit channel quantization — especially in the
@@ -1309,21 +1520,17 @@
   }
 
   /* Liked songs has no artwork of its own, so it wears a generated
-     cover: the design system's red radial wash with a white heart
-     centred at 52% of the tile. Used at playlist-row size in the
-     sidebar. Ported from upstream (needed by the Liked-cover picker);
-     the What's New entrance animation from the same upstream commit is
-     intentionally skipped — this fork removed What's New in fef3c0d. */
+     cover: the theme's radial wash with a white heart centred at 52%
+     of the tile. Used at playlist-row size in the sidebar. The wash
+     follows the accent, so it is red on the light ground and green on
+     the dark one. Ported from upstream (needed by the Liked-cover
+     picker); the What's New entrance animation from the same upstream
+     commit is intentionally skipped — this fork removed What's New in
+     fef3c0d. */
   .liked-cover {
     background-image:
       url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' fill-opacity='0.94'><path d='M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z'/></svg>"),
-      radial-gradient(
-        130% 110% at 22% 12%,
-        #ff5f79,
-        #e8214c 34%,
-        #8e1230 68%,
-        #2a0913
-      );
+      var(--liked-cover-wash);
     background-position: center, center;
     background-repeat: no-repeat, no-repeat;
     background-size:

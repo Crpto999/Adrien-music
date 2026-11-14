@@ -4,10 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchLikedSongs } from "@/lib/innertube/library";
-import type { ShelfItem } from "@/lib/innertube/types";
-import { getLikedIdsSet } from "@/components/shared/like-buttons";
+import { fetchLikeStatus } from "@/lib/innertube/like-status";
 import { toggleLiked } from "@/lib/like-actions";
+import { likeStatusKey } from "@/lib/providers/use-like-status";
 import { fetchWatchQueueContinuation } from "@/lib/innertube/radio";
 import { fetchVariedRadio } from "@/lib/innertube/radio-variety";
 import { prefetchStreamFor, saveTrackMeta, streamUrlForProvider } from "@/lib/stream";
@@ -163,6 +162,30 @@ function useResolvedSource(
   return { source: state.source, settled: state.settled };
 }
 
+/**
+ * The element currently owning playback.
+ *
+ * Module-level so that a component which needs to know where the song
+ * is *right now* — rather than where it was at the last store update —
+ * can read it directly.
+ *
+ * The store's `position` only ticks about four times a second (that is
+ * the browser's `timeupdate` cadence), which is far too coarse to draw
+ * a lyric highlight with: the sweep would step four times a second
+ * instead of moving. The element's `currentTime` is exact and
+ * continuous, so a per-frame reader uses it.
+ *
+ * `null` until the engine has created its elements, and again in the
+ * floating window, where the engine does not run — the audio lives in
+ * the main window and only the transport state crosses over.
+ */
+let activeAudioElement: HTMLAudioElement | null = null;
+
+/** The element currently owning playback, or `null` when there is none. */
+export function currentAudioElement(): HTMLAudioElement | null {
+  return activeAudioElement;
+}
+
 export function useAudioEngine() {
   // The element currently owning playback; `audioRef` keeps the name the
   // effects below were written against.
@@ -222,6 +245,7 @@ export function useAudioEngine() {
     const b = make();
     audioRef.current = a;
     standbyRef.current = b;
+    activeAudioElement = a;
     {
       const s = usePlaybackStore.getState();
       const t = s.index >= 0 ? s.queue[s.index] : undefined;
@@ -244,6 +268,7 @@ export function useAudioEngine() {
       }
       audioRef.current = null;
       standbyRef.current = null;
+      activeAudioElement = null;
     };
   }, []);
 
@@ -418,6 +443,7 @@ export function useAudioEngine() {
       // resolve effect below recognises via adoptRef and leaves alone.
       audioRef.current = to;
       standbyRef.current = from;
+      activeAudioElement = to;
       adoptRef.current = {
         index: next.index,
         streamVideoId: next.streamVideoId,
@@ -658,6 +684,7 @@ export function useAudioEngine() {
       const token = ++resolveTokenRef.current;
       audioRef.current = to;
       standbyRef.current = from;
+      activeAudioElement = to;
       loadedStreamRef.current = streamVideoId;
       to.muted = st.muted;
       to.volume = 0;
@@ -1046,12 +1073,15 @@ export function useAudioEngine() {
           const t = store.index >= 0 ? store.queue[store.index] : undefined;
           if (!t) break;
           // Read the liked state at click time rather than closing over it,
-          // so this listener stays mounted for the session.
-          const cached = queryClient.getQueryData<ShelfItem[]>(["liked-songs"]);
+          // so this listener stays mounted for the session. The rating is
+          // cached per track, so this is a cache read — not a request.
+          const wasLiked =
+            queryClient.getQueryData<string>(likeStatusKey(t.videoId)) ===
+            "LIKE";
           void toggleLiked({
             queryClient,
             videoId: t.videoId,
-            wasLiked: getLikedIdsSet(cached).has(t.videoId),
+            wasLiked,
             track: t,
           }).catch((err) => toast.error(String(err)));
           break;
@@ -1211,18 +1241,19 @@ export function useAudioEngine() {
   const duration = usePlaybackStore((s) => s.duration);
   const shuffle = usePlaybackStore((s) => s.shuffle);
   const repeat = usePlaybackStore((s) => s.repeat);
-  // Subscribed but never fetched here: the liked list is loaded by whichever
-  // heart button is on screen (`enabled: false` just reads the shared cache),
-  // and this only needs to know whether the current track is in it so the
-  // taskbar toolbar's heart can be filled.
-  const likedSongs = useQuery({
-    queryKey: ["liked-songs"],
-    queryFn: () => fetchLikedSongs(),
+  // The rating for the track that is playing, read from the shared
+  // per-track cache. It is *not* fetched here: the heart button on
+  // screen is what asks for it, and this only needs to know whether
+  // the current track is liked so the taskbar toolbar's heart can be
+  // filled.
+  const likedStatus = useQuery({
+    queryKey: likeStatusKey(track?.videoId ?? ""),
+    queryFn: () => fetchLikeStatus(track?.videoId ?? ""),
     enabled: false,
-    staleTime: 60 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
     retry: false,
   }).data;
-  const liked = track ? getLikedIdsSet(likedSongs).has(track.videoId) : false;
+  const liked = likedStatus === "LIKE";
   // Signature of the metadata last handed to navigator.mediaSession. Re-setting
   // `ms.metadata` makes WebKit re-fetch the artwork URL, so the 2s position
   // refresh must not rebuild it — mirrors the LAST_META guard in media.rs.

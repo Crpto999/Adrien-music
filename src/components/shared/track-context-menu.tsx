@@ -58,10 +58,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getLikedIdsSet } from "@/components/shared/like-buttons";
 import { useNeteaseLikedIds } from "@/lib/providers/netease-liked";
+import { useTrackLikeStatus } from "@/lib/providers/use-like-status";
 import { fetchVariedRadio } from "@/lib/innertube/radio-variety";
-import { fetchLikedSongs } from "@/lib/innertube/library";
 import {
   createPlaylistWithTracks,
   fetchUserPlaylists,
@@ -121,13 +120,6 @@ export function useTrackMenuController(item: ShelfItem) {
   const qc = useQueryClient();
   const [newPlaylistOpen, setNewPlaylistOpen] = useState(false);
 
-  const liked = useQuery({
-    queryKey: ["liked-songs"],
-    queryFn: () => fetchLikedSongs(),
-    staleTime: 60 * 60 * 1000,
-    retry: false,
-  });
-
   const playlists = useQuery({
     queryKey: ["user-playlists"],
     queryFn: () => fetchUserPlaylists(),
@@ -136,21 +128,30 @@ export function useTrackMenuController(item: ShelfItem) {
     enabled: false,
   });
 
-  // O(1) lookup via shared id-set memo (see like-buttons.tsx for the
-  // module-level memo). Avoids the per-render N×M scan we'd otherwise
-  // get on long playlists.
-  //
   // A NetEase row's heart belongs to the NetEase account, so its state
-  // comes from the account's own collection — the app's YouTube liked
-  // list knows nothing about a NetEase song id.
+  // comes from the account's own collection — the app's YouTube rating
+  // says nothing about a NetEase song id.
   const isNetease = item.provider === "netease";
   const neteaseLiked = useNeteaseLikedIds(isNetease);
+
+  // The rating for this row, fetched on demand. A signed-in response
+  // already carried it on the row's own menu, in which case there is
+  // nothing left to ask for.
+  //
+  // For a track from another platform the lookup goes through the
+  // YouTube recording that holds it, so the answer is the user's
+  // YouTube rating for the same song.
+  const { status } = useTrackLikeStatus(item, {
+    skip: item.likeStatus !== undefined,
+  });
+
   const isLiked = useMemo(
     () =>
       isNetease
-        ? (neteaseLiked.data?.includes(item.providerTrackId ?? "") ?? false)
-        : getLikedIdsSet(liked.data).has(item.id),
-    [isNetease, neteaseLiked.data, liked.data, item.id, item.providerTrackId],
+        ? (neteaseLiked.data?.includes(item.providerTrackId ?? "") ?? false) ||
+          status === "LIKE"
+        : (item.likeStatus ?? status) === "LIKE",
+    [isNetease, neteaseLiked.data, item.likeStatus, status, item.providerTrackId],
   );
 
   const runLike = async () => {

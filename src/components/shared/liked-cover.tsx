@@ -40,7 +40,9 @@ export const LIKED_COVERS: Record<LikedCoverPreset, CoverArt> = {
   adrify: {
     label: "adrify",
     labelKey: "app.name",
-    bg: "radial-gradient(130% 110% at 22% 12%,#FF5F79,#E8214C 34%,#8E1230 68%,#2A0913)",
+    // The brand wash follows the theme's accent: red on the light
+    // ground, green on the dark one.
+    bg: "var(--liked-cover-wash)",
     ring: "var(--w140)",
     fill: "rgba(255,255,255,0.94)",
   },
@@ -62,7 +64,9 @@ export const LIKED_COVERS: Record<LikedCoverPreset, CoverArt> = {
   glow: {
     label: "Glow",
     labelKey: "cover.glow",
-    bg: "radial-gradient(150% 130% at 100% 84%, rgba(250,31,75,0.3) 0%, rgba(250,31,75,0.16) 32%, rgba(250,31,75,0.05) 62%, var(--w040) 100%)",
+    // The wash follows the theme's accent, so the same preset reads as
+    // red on the light ground and green on the dark one.
+    bg: "radial-gradient(150% 130% at 100% 84%, rgba(var(--acc1rgb),0.3) 0%, rgba(var(--acc1rgb),0.16) 32%, rgba(var(--acc1rgb),0.05) 62%, var(--w040) 100%)",
     blur: "blur(18px)",
     ring: "var(--w120)",
     fill: "var(--liked-heart-glow)",

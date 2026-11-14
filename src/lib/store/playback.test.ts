@@ -38,6 +38,7 @@ function setup(partial: Partial<PlaybackState>): void {
     streamUrl: "blob:prev",
     position: 42,
     pendingSeek: undefined,
+    history: [],
     ...partial,
   });
 }
@@ -437,5 +438,176 @@ describe("setTrackProvider", () => {
     const t = usePlaybackStore.getState().queue[0];
     expect(t.discoveredOn).toBe("youtube");
     expect(t.discoveredTrackId).toBe("yt123");
+  });
+});
+
+// The playback history used to be derived from the part of the queue
+// that sat behind the playhead. That made it empty almost every time:
+// the queue is a plan, and it gets replaced wholesale (an album's track
+// list, a single track from search), taking the "already played"
+// prefix with it. The history is now a log of its own.
+describe("playback history", () => {
+  beforeEach(() => setup({}));
+
+  it("records the track a queue starts on", () => {
+    setup({ queue: [], index: -1 });
+    usePlaybackStore.getState().setQueue([track("a"), track("b")], 0);
+    expect(usePlaybackStore.getState().history.map((t) => t.videoId)).toEqual([
+      "a",
+    ]);
+  });
+
+  it("records every track as playback advances", () => {
+    setup({
+      queue: [track("a"), track("b"), track("c")],
+      index: 0,
+      history: [track("a")],
+    });
+    usePlaybackStore.getState().next();
+    usePlaybackStore.getState().next();
+    expect(usePlaybackStore.getState().history.map((t) => t.videoId)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
+  it("keeps the history when the queue is replaced", () => {
+    // The regression this log exists for: replacing the queue used to
+    // take the history with it, which is why the tab looked empty.
+    setup({
+      queue: [track("a"), track("b")],
+      index: 0,
+      history: [track("a")],
+    });
+    usePlaybackStore.getState().next();
+    usePlaybackStore.getState().setQueue([track("z")], 0);
+    expect(usePlaybackStore.getState().history.map((t) => t.videoId)).toEqual([
+      "a",
+      "b",
+      "z",
+    ]);
+  });
+
+  it("records a track played from the search results", () => {
+    setup({ queue: [], index: -1 });
+    usePlaybackStore.getState().playNow(track("solo"));
+    expect(usePlaybackStore.getState().history.map((t) => t.videoId)).toEqual([
+      "solo",
+    ]);
+  });
+
+  it("records the same track again when it is played again", () => {
+    // The log records what happened, not what is distinct: a replay is
+    // a second play.
+    setup({ queue: [track("a"), track("b")], index: 1, history: [track("b")] });
+    usePlaybackStore.getState().prev();
+    expect(usePlaybackStore.getState().history.map((t) => t.videoId)).toEqual([
+      "b",
+      "a",
+    ]);
+  });
+
+  it("does not record a track that was only queued", () => {
+    setup({ queue: [], index: -1 });
+    usePlaybackStore.getState().enqueueEnd(track("waiting"));
+    expect(usePlaybackStore.getState().history).toEqual([]);
+  });
+
+  it("survives clearQueue — that empties the plan, not the record", () => {
+    setup({
+      queue: [track("a"), track("b")],
+      index: 0,
+      history: [track("a")],
+    });
+    usePlaybackStore.getState().next();
+    usePlaybackStore.getState().clearQueue();
+    expect(usePlaybackStore.getState().history.map((t) => t.videoId)).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("is cleared explicitly", () => {
+    setup({
+      queue: [track("a"), track("b")],
+      index: 0,
+      history: [track("a")],
+    });
+    usePlaybackStore.getState().next();
+    usePlaybackStore.getState().clearHistory();
+    expect(usePlaybackStore.getState().history).toEqual([]);
+  });
+
+  it("plays a history entry again when it is picked", () => {
+    setup({
+      queue: [track("a"), track("b")],
+      index: 0,
+      history: [track("a")],
+    });
+    usePlaybackStore.getState().next();
+    expect(usePlaybackStore.getState().history.map((t) => t.videoId)).toEqual([
+      "a",
+      "b",
+    ]);
+    // Picking the first entry plays it again — it cuts in line at the
+    // front of the queue rather than jumping to a queue slot, because
+    // a history entry is not a queue slot.
+    usePlaybackStore.getState().playFromHistory(0);
+    const s = usePlaybackStore.getState();
+    expect(s.queue[s.index].videoId).toBe("a");
+    expect(s.history.map((t) => t.videoId)).toEqual(["a", "b", "a"]);
+  });
+});
+
+// "Cut in line": picking a single track plays it right away and moves
+// the queued tracks behind it, instead of throwing the plan away.
+describe("playNow cuts in line", () => {
+  beforeEach(() => setup({}));
+
+  it("plays the picked track and moves the queued tracks behind it", () => {
+    setup({ queue: [track("a"), track("b")], index: 0 });
+    usePlaybackStore.getState().playNow(track("x"));
+    const s = usePlaybackStore.getState();
+    expect(s.queue.map((t) => t.videoId)).toEqual(["x", "a", "b"]);
+    expect(s.index).toBe(0);
+  });
+
+  it("moves the whole queue behind the new track", () => {
+    // The tracks that already played move behind it too — the queue is
+    // the plan, and the plan is not thrown away.
+    setup({ queue: [track("a"), track("b"), track("c")], index: 1 });
+    usePlaybackStore.getState().playNow(track("x"));
+    const s = usePlaybackStore.getState();
+    expect(s.queue.map((t) => t.videoId)).toEqual(["x", "a", "b", "c"]);
+    expect(s.index).toBe(0);
+  });
+
+  it("does not queue the picked track twice", () => {
+    setup({ queue: [track("a"), track("x")], index: 0 });
+    usePlaybackStore.getState().playNow(track("x"));
+    const ids = usePlaybackStore.getState().queue.map((t) => t.videoId);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("x");
+  });
+
+  it("puts the extras right after the picked track", () => {
+    setup({ queue: [], index: -1 });
+    usePlaybackStore.getState().playNow(track("x"), [track("x2"), track("x3")]);
+    expect(usePlaybackStore.getState().queue.map((t) => t.videoId)).toEqual([
+      "x",
+      "x2",
+      "x3",
+    ]);
+  });
+
+  it("keeps the queued tracks behind the extras", () => {
+    setup({ queue: [track("a")], index: 0 });
+    usePlaybackStore.getState().playNow(track("x"), [track("x2")]);
+    expect(usePlaybackStore.getState().queue.map((t) => t.videoId)).toEqual([
+      "x",
+      "x2",
+      "a",
+    ]);
   });
 });

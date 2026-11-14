@@ -192,7 +192,7 @@ function LastfmStatusBadge() {
       ) : null}
       <Badge
         variant="secondary"
-        className="bg-rose-500/15 text-rose-600 dark:text-rose-400"
+        className="bg-acc1/15 text-acc1"
       >
         {username ? `@${username}` : t("settings.integrations.connected")}
       </Badge>
@@ -211,7 +211,7 @@ function NeteaseStatusBadge() {
   return (
     <Badge
       variant="secondary"
-      className="bg-red-500/15 text-red-600 dark:text-red-400"
+      className="bg-acc1/15 text-acc1"
     >
       {data.nickname || t("settings.integrations.connected")}
     </Badge>
@@ -359,10 +359,10 @@ function LastfmGroup() {
                   </AvatarFallback>
                 </Avatar>
               ) : null}
-              <Badge
-                variant="secondary"
-                className="bg-rose-500/15 text-rose-600 dark:text-rose-400"
-              >
+                <Badge
+                  variant="secondary"
+                  className="bg-acc1/15 text-acc1"
+                >
                 {username ? `@${username}` : t("settings.integrations.connected")}
               </Badge>
               <Button variant="outline" size="sm" onClick={unlink}>
@@ -782,7 +782,7 @@ function NeteaseGroup() {
                 ) : null}
                 <Badge
                   variant="secondary"
-                  className="bg-red-500/15 text-red-600 dark:text-red-400"
+                  className="bg-acc1/15 text-acc1"
                 >
                   {data.nickname || t("settings.integrations.connected")}
                 </Badge>
