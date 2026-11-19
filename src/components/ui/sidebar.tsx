@@ -413,9 +413,10 @@ function SidebarGroupLabel({
       data-slot="sidebar-group-label"
       data-sidebar="group-label"
       className={cn(
-        // Section label, per the design system: 10.5px, 600, uppercase
-        // on a 0.09em track, in `--t5`.
-        "flex h-6 shrink-0 items-center overflow-hidden rounded-md px-2 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-t5 ring-sidebar-ring outline-hidden focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        // Section label, per the design system: 12px, 600, uppercase
+        // on a 0.09em track, in `--t5` — Fluent-style section header,
+        // large enough to stay legible under ClearType.
+        "flex h-6 shrink-0 items-center overflow-hidden rounded-md px-2 text-xs font-semibold uppercase tracking-[0.09em] text-t5 ring-sidebar-ring outline-hidden focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         // On the rail the label squeezes to zero height instead of being
         // pulled off-screen by a negative margin: the rows below slide up
         // by exactly the label's height, in step with the panel's width.
@@ -489,11 +490,13 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   );
 }
 
-// Nav row, per the design system: 13.5px label, resting `--t5` on
+// Nav row, per the design system: 14px semibold, resting `--t4` on
 // transparent, hover `--w050`/`--t3`, active `--w070` in the theme's
-// accent colour at weight 600. The active row is marked by its fill
-// and weight alone — no accent rail, so every row keeps the same left
-// inset.
+// accent colour at weight 600. Fluent / QQ音乐 read the same way:
+// the nav column is one step above caption size, semibold weight,
+// so CJK strokes stay legible under ClearType at 100% scaling. The
+// active row is marked by its fill and weight alone — no accent rail,
+// so every row keeps the same left inset.
 //
 // The glyph is 24px, matching the *visible* size of the app mark
 // above it: the artwork in the logo file occupies ~61% of its box, so
@@ -501,14 +504,14 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 // mark's visible size (rather than to some element box) is what keeps
 // the rail reading as one column of equal marks.
 //
-// The label keeps its 13.5px caption size: with the glyph now at 24px
-// the ratio between them reads as a heading-and-caption pair rather
-// than two competing elements. The row grows to 32px so the 24px mark
-// has room to breathe. On the collapsed rail the row's own paddings
-// drop to zero and the mark centres on the rail's axis; the label's
-// column collapses to zero width (its fade is handled in index.css).
+// The label is 14px semibold now (was 13.5px medium): with the glyph at
+// 24px the row reads as a nav item rather than a caption. The row grows
+// to 32px so the 24px mark has room to breathe. On the collapsed rail
+// the row's own paddings drop to zero and the mark centres on the rail's
+// axis; the label's column collapses to zero width (its fade is handled
+// in index.css).
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button relative grid w-full grid-cols-[28px_minmax(0,1fr)_auto] content-center items-center gap-1 overflow-hidden rounded-md py-2 ps-0.5 pe-2.5 text-left text-[13.5px] font-medium text-t5 ring-sidebar-ring outline-hidden group-has-data-[sidebar=menu-action]/menu-item:pr-8 [&>*:first-child]:justify-self-center hover:bg-w050 hover:text-t3 focus-visible:ring-2 active:bg-w070 active:text-t1 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-w070 data-[active=true]:font-semibold data-[active=true]:text-brand data-[state=open]:hover:bg-w050 data-[state=open]:hover:text-t3 [&>span:last-child]:truncate [&>svg]:size-6 [&>svg]:shrink-0 group-data-[collapsible=icon]:grid-cols-[minmax(0,1fr)_0px_auto] group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:ps-0 group-data-[collapsible=icon]:pe-0",
+  "peer/menu-button relative grid w-full grid-cols-[28px_minmax(0,1fr)_auto] content-center items-center gap-1 overflow-hidden rounded-md py-2 ps-0.5 pe-2.5 text-left text-sm font-semibold text-t4 ring-sidebar-ring outline-hidden group-has-data-[sidebar=menu-action]/menu-item:pr-8 [&>*:first-child]:justify-self-center hover:bg-w050 hover:text-t3 focus-visible:ring-2 active:bg-w070 active:text-t1 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-w070 data-[active=true]:font-semibold data-[active=true]:text-brand data-[state=open]:hover:bg-w050 data-[state=open]:hover:text-t3 [&>span:last-child]:truncate [&>svg]:size-6 [&>svg]:shrink-0 group-data-[collapsible=icon]:grid-cols-[minmax(0,1fr)_0px_auto] group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:ps-0 group-data-[collapsible=icon]:pe-0",
   {
     variants: {
       variant: {

@@ -1,4 +1,5 @@
 import { useSettingsStore, type InterfaceFont } from "@/lib/store/settings";
+import { IS_MAC, IS_WINDOWS } from "@/lib/platform";
 import {
   PINGFANG_FAMILY,
   activatePingfang,
@@ -14,52 +15,73 @@ import {
  * The Interface font setting.
  *
  * Three choices: the system stack, which is what the app has always
- * used, and two downloaded typefaces — PingFang SC and Noto Sans SC.
- * The chosen stack is written to `--app-font` on the document root,
- * which `index.css` reads for the whole tree.
- *
- * Neither downloaded family is bundled — each is fetched the first time
- * the user picks it (see `lib/pingfang-font.ts` and
+ * used, and two downloaded typefaces — PingFang SC (macOS only) and
+ * Noto Sans SC. Neither downloaded family is bundled — each is fetched
+ * the first time the user picks it (see `lib/pingfang-font.ts` and
  * `lib/noto-sans-sc-font.ts`), which is why the setting row asks
  * before it fetches them. Once a family is registered with the
  * document the stack below resolves to it.
+ *
+ * The stacks are split per platform, the way Fluent / QQ音乐 do it:
+ * Windows renders Latin in Segoe UI and CJK in Microsoft YaHei UI,
+ * macOS in SF / PingFang, Linux in Noto. A single cross-platform stack
+ * mixes hinting models and is the main reason CJK looked blurry on
+ * Windows (ClearType vs. gray-scale AA, different x-heights).
  *
  * Imported once from main.tsx, so the main and floating windows both
  * apply it, and the floating window follows changes through the
  * settings store's cross-window rehydrate.
  */
 
+/**
+ * @deprecated Kept for tests / external callers; prefer `systemStack()`.
+ * The old single cross-platform Latin head.
+ */
 export const SYSTEM_FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif';
 
-/**
- * CJK fallbacks appended to every stack.
- *
- * The system stack has no CJK coverage of its own on every platform, so
- * without these a Chinese UI renders its Chinese text in whatever the
- * OS picks — which on Windows is a mismatched serif-ish fallback and
- * looks nothing like the rest of the app.
- *
- * The order matters: `Microsoft YaHei` and `PingFang SC` are the UI
- * faces on Windows and macOS respectively, and the Noto / Source Han
- * entries cover Linux. The generic `sans-serif` at the end is the
- * platform's last resort.
- */
-const CJK_FALLBACKS = [
-  '"Microsoft YaHei"',
-  '"PingFang SC"',
-  '"Hiragino Sans GB"',
-  '"Noto Sans CJK SC"',
-  '"Source Han Sans SC"',
-  '"Noto Sans SC"',
-  '"WenQuanYi Micro Hei"',
-  '"Heiti SC"',
-  "sans-serif",
-].join(", ");
+/** Latin heads, per platform. */
+const LATIN_WINDOWS =
+  '"Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
+const LATIN_MAC =
+  '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif';
+const LATIN_LINUX =
+  'system-ui, "Noto Sans", Roboto, "Helvetica Neue", Arial, sans-serif';
 
-/** A stack with the CJK fallbacks appended. */
-function withCjk(stack: string): string {
-  return `${stack}, ${CJK_FALLBACKS}`;
+function latinHead(): string {
+  if (IS_WINDOWS) return LATIN_WINDOWS;
+  if (IS_MAC) return LATIN_MAC;
+  return LATIN_LINUX;
+}
+
+/**
+ * CJK chain, platform head first, universal tail after.
+ *
+ * The platform head is what actually renders (YaHei UI on Windows,
+ * PingFang on macOS, Noto CJK on Linux); the tail only covers a
+ * machine missing its own UI face. Every stack keeps "Microsoft YaHei"
+ * and "sans-serif" in the tail so old tests and exotic systems stay
+ * covered.
+ */
+function cjkChain(): string {
+  const tail = [
+    '"Microsoft YaHei"',
+    '"PingFang SC"',
+    '"Hiragino Sans GB"',
+    '"Noto Sans CJK SC"',
+    '"Source Han Sans SC"',
+    '"WenQuanYi Micro Hei"',
+    '"Heiti SC"',
+    "sans-serif",
+  ].join(", ");
+  if (IS_WINDOWS) return `"Microsoft YaHei UI", ${tail}`;
+  if (IS_MAC) return `"PingFang SC", "Hiragino Sans GB", ${tail}`;
+  return `"Noto Sans CJK SC", "Source Han Sans SC", ${tail}`;
+}
+
+/** The system stack for this platform. */
+export function systemStack(): string {
+  return `${latinHead()}, ${cjkChain()}`;
 }
 
 /**
@@ -68,31 +90,43 @@ function withCjk(stack: string): string {
  * The same stack the "System default" entry uses, so the fallback for
  * an unknown id is not a subtly different one.
  */
-export const SYSTEM_FONT_STACK_WITH_CJK = withCjk(SYSTEM_FONT_STACK);
+export const SYSTEM_FONT_STACK_WITH_CJK = systemStack();
 
 export const INTERFACE_FONTS: {
   id: InterfaceFont;
   label: string;
   stack: string;
+  /** When false on this platform the row hides the entry. */
+  available: boolean;
 }[] = [
   {
     id: "pingfang",
     label: "PingFang SC",
-    stack: withCjk(`"${PINGFANG_FAMILY}"`),
+    // PingFang has no ClearType hinting — blurry on Windows low-dpi
+    // screens — so it stays in the list for macOS and hides on Windows.
+    stack: `"${PINGFANG_FAMILY}", ${cjkChain()}`,
+    available: !IS_WINDOWS,
   },
   {
     id: "noto-sans-sc",
     label: "Noto Sans SC",
-    stack: withCjk(`"${NOTO_SANS_SC_FAMILY}"`),
+    stack: `"${NOTO_SANS_SC_FAMILY}", ${cjkChain()}`,
+    available: true,
   },
-  { id: "system", label: "System default", stack: SYSTEM_FONT_STACK_WITH_CJK },
+  { id: "system", label: "System default", stack: SYSTEM_FONT_STACK_WITH_CJK, available: true },
 ];
 
+/** The entries the settings row shows on this platform. */
+export function visibleInterfaceFonts() {
+  return INTERFACE_FONTS.filter((f) => f.available);
+}
+
 export function interfaceFontStack(id: InterfaceFont): string {
-  return (
-    INTERFACE_FONTS.find((f) => f.id === id)?.stack ??
-    SYSTEM_FONT_STACK_WITH_CJK
-  );
+  // A stored "pingfang" pick from another platform (or an old install)
+  // falls back to system rather than rendering in a hint-less face.
+  const found = INTERFACE_FONTS.find((f) => f.id === id);
+  if (!found || !found.available) return SYSTEM_FONT_STACK_WITH_CJK;
+  return found.stack;
 }
 
 function apply(id: InterfaceFont): void {
@@ -100,6 +134,16 @@ function apply(id: InterfaceFont): void {
     "--app-font",
     interfaceFontStack(id),
   );
+}
+
+function applyPlatformClass(): void {
+  const cls = IS_WINDOWS ? "os-windows" : IS_MAC ? "os-mac" : "os-linux";
+  document.documentElement.classList.remove(
+    "os-windows",
+    "os-mac",
+    "os-linux",
+  );
+  document.documentElement.classList.add(cls);
 }
 
 /**
@@ -121,6 +165,7 @@ async function ensureFamily(id: InterfaceFont): Promise<void> {
 }
 
 if (typeof document !== "undefined") {
+  applyPlatformClass();
   const current = useSettingsStore.getState().interfaceFont;
   apply(current);
   void ensureFamily(current);

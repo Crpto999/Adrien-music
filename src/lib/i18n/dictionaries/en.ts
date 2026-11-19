@@ -302,11 +302,11 @@ export const en = {
     version: "Version {version}",
     betaFor: "beta for {platform}",
     description:
-      'Fast, responsive YouTube Music desktop client. Unofficial — not affiliated with, endorsed by, or sponsored by Google or YouTube. "YouTube" and "YouTube Music" are trademarks of Google LLC.',
+      "adrify started from a simple itch: the songs live in two places — NetEase for the Chinese library, YouTube Music for everything else. So this is one player that holds both, with your lyrics and library along for the ride.",
+    techLine:
+      "Free and open source (GPL-3.0) · built with Tauri, yt-dlp and open lyric sources.",
     betaNotice:
       "The {platform} build is in beta. If something breaks, please report it via the window menu (⋯ → Report an issue) or on",
-    poweredBy: "Powered by",
-    freeSoftware: "Free software ·",
     checkingForUpdates: "Checking for updates…",
     upToDate: "You're on the latest version",
     openSource: "Open source",
@@ -314,14 +314,6 @@ export const en = {
     github: "GitHub",
     updateCommandCopied: "Update command copied",
     couldNotCopyCommand: "Couldn't copy the command",
-    credit: {
-      appShell: "app shell",
-      routerQuery: "router + query",
-      components: "components",
-      audioStreaming: "audio streaming",
-      syncedLyrics: "synced lyrics",
-      lyrics: "lyrics",
-    },
   },
 
   channel: {

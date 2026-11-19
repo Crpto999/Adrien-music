@@ -1096,7 +1096,21 @@
       sans-serif
     );
     overscroll-behavior: none;
+    /* Gray-scale AA suits macOS compositing, but on Windows (ClearType
+       subpixel AA) it thins Latin and blurs CJK. Only macOS gets it —
+       Windows/Linux keep the platform default. */
+    -webkit-font-smoothing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  html.os-mac body,
+  html.os-mac #root {
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html.os-windows body,
+  html.os-windows #root {
+    -webkit-font-smoothing: auto;
+    text-rendering: auto;
   }
   body {
     @apply overflow-hidden select-none;

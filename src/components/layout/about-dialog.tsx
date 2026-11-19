@@ -40,43 +40,6 @@ const REPO_URL = "https://github.com/Crpto999/Adrien-music";
 // are the upstream author's personal links, not relevant to this fork.
 const DISCORD_URL = "https://discord.gg/v7JGAWWWj";
 
-// Rendered column-first into a 4-row grid, so this order reads down the
-// left column and then down the right one.
-const CREDITS: { name: string; roleKey: string; url: string }[] = [
-  { name: "Tauri", roleKey: "about.credit.appShell", url: "https://tauri.app" },
-  {
-    name: "TanStack",
-    roleKey: "about.credit.routerQuery",
-    url: "https://tanstack.com",
-  },
-  {
-    name: "shadcn/ui",
-    roleKey: "about.credit.components",
-    url: "https://ui.shadcn.com",
-  },
-  {
-    name: "yt-dlp",
-    roleKey: "about.credit.audioStreaming",
-    url: "https://github.com/yt-dlp/yt-dlp",
-  },
-  {
-    name: "LRCLIB",
-    roleKey: "about.credit.syncedLyrics",
-    url: "https://lrclib.net",
-  },
-  {
-    name: "YouTube Music",
-    roleKey: "about.credit.syncedLyrics",
-    url: "https://music.youtube.com",
-  },
-  { name: "Genius", roleKey: "about.credit.lyrics", url: "https://genius.com" },
-  {
-    name: "Musixmatch",
-    roleKey: "about.credit.lyrics",
-    url: "https://www.musixmatch.com",
-  },
-];
-
 // Footer icon button — 38px, 10px radius, on the design's `--w060` fill.
 const FOOTER_BTN =
   "grid size-9 place-items-center rounded-[10px] border border-w120 bg-w060 " +
@@ -219,11 +182,11 @@ export function AboutDialog({
               className="size-14 shrink-0 object-contain drop-shadow-[0_6px_18px_-6px_rgba(var(--acc1rgb),0.45)]"
             />
             <div className="flex min-w-0 flex-col gap-[9px]">
-              <DialogTitle className="text-[23px] font-bold leading-none tracking-[-0.02em] text-t1">
+              <DialogTitle className="text-2xl font-bold leading-none tracking-[-0.02em] text-t1">
                 adrify
               </DialogTitle>
               <div className="flex items-center gap-2">
-                <span className="text-[13px] text-t5">
+                <span className="text-sm text-t5">
                   {version ? t("about.version", { version }) : " "}
                   {version && IS_BETA_PLATFORM
                     ? ` · ${t("about.betaFor", {
@@ -235,12 +198,23 @@ export function AboutDialog({
             </div>
           </div>
 
-          <DialogDescription className="text-[13.5px] leading-[1.55] text-t4 text-pretty">
+          <DialogDescription className="text-sm leading-[1.6] text-t4 text-pretty">
             {t("about.description")}
           </DialogDescription>
 
+          <p className="text-xs leading-[1.6] text-t6 text-pretty">
+            {t("about.techLine")}{" "}
+            <button
+              type="button"
+              onClick={link(`${REPO_URL}/blob/main/LICENSE`)}
+              className="cursor-pointer underline underline-offset-2 hover:text-t2"
+            >
+              GPL-3.0
+            </button>
+          </p>
+
           {IS_BETA_PLATFORM && (
-            <p className="text-[13.5px] leading-[1.55] text-t4 text-pretty">
+            <p className="text-sm leading-[1.6] text-t4 text-pretty">
               {t("about.betaNotice", {
                 platform: IS_MAC ? "macOS" : "Linux",
               })}{" "}
@@ -254,43 +228,6 @@ export function AboutDialog({
               .
             </p>
           )}
-
-          <div className="mt-1 flex flex-col gap-3 rounded-xl border border-w075 bg-w028 px-5 py-4">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-t5">
-                {t("about.poweredBy")}
-              </span>
-              <span className="text-xs text-t6">
-                {t("about.freeSoftware")}{" "}
-                <button
-                  type="button"
-                  onClick={link(`${REPO_URL}/blob/main/LICENSE`)}
-                  className="cursor-pointer text-t4 underline underline-offset-2 hover:text-t2"
-                >
-                  GPL-3.0
-                </button>
-              </span>
-            </div>
-            {/* Column-first so the list reads down each column rather
-                than across the pair. */}
-            <ul className="grid grid-flow-col grid-cols-2 grid-rows-4 gap-x-6 gap-y-[9px]">
-              {CREDITS.map((c) => (
-                <li
-                  key={c.name}
-                  className="flex items-baseline gap-[7px] text-[12.5px] text-t6"
-                >
-                  <button
-                    type="button"
-                    onClick={link(c.url)}
-                    className="cursor-pointer font-semibold text-t2 underline-offset-2 hover:underline"
-                  >
-                    {c.name}
-                  </button>
-                  {t(c.roleKey)}
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
 
         {/* No rule above it: the credits panel already reads as a block,
@@ -301,7 +238,7 @@ export function AboutDialog({
             {checking ? (
               <>
                 <IconLoader2 className="size-3.5 animate-spin text-t6" />
-                <span className="text-[12.5px] text-t5">
+                <span className="text-xs text-t5">
                   {t("about.checkingForUpdates")}
                 </span>
               </>
@@ -313,12 +250,12 @@ export function AboutDialog({
                   aria-hidden
                   className="size-[7px] shrink-0 rounded-full bg-acc1 shadow-[0_0_0_4px_rgba(var(--acc1rgb),0.18)]"
                 />
-                <span className="text-[12.5px] text-t2">{updateLine.text}</span>
+                <span className="text-xs text-t2">{updateLine.text}</span>
                 {updateLine.action ? (
                   <button
                     type="button"
                     onClick={updateLine.onClick}
-                    className="cursor-pointer text-[12.5px] font-semibold text-acc1 underline-offset-2 hover:underline"
+                    className="cursor-pointer text-xs font-semibold text-acc1 underline-offset-2 hover:underline"
                   >
                     {updateLine.action}
                   </button>
@@ -330,7 +267,7 @@ export function AboutDialog({
                   className="size-3.5 shrink-0 text-status-success"
                   stroke={2.4}
                 />
-                <span className="text-[12.5px] text-t5">
+                <span className="text-xs text-t5">
                   {t("about.upToDate")}
                 </span>
               </>

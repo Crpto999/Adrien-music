@@ -438,7 +438,6 @@ function ManualMatchDialog({
                   {i + 1}
                 </span>
                 {c.thumbnails[0]?.url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={c.thumbnails[0].url}
                     alt=""

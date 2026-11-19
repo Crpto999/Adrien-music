@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SettingRow } from "@/components/settings/primitives";
-import { INTERFACE_FONTS, interfaceFontStack } from "@/lib/interface-font";
+import { INTERFACE_FONTS, interfaceFontStack, visibleInterfaceFonts } from "@/lib/interface-font";
 import {
   PINGFANG_TOTAL_BYTES,
   installPingfang,
@@ -74,7 +74,8 @@ export function InterfaceFontRow() {
   );
   const [busy, setBusy] = useState(false);
 
-  const current = INTERFACE_FONTS.find((f) => f.id === font);
+  const current = visibleInterfaceFonts().find((f) => f.id === font) ??
+    INTERFACE_FONTS.find((f) => f.id === font);
 
   /**
    * The state of the family the dialog is about, and the operations on
@@ -161,7 +162,7 @@ export function InterfaceFontRow() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[232px]">
-              {INTERFACE_FONTS.map((f) => (
+              {visibleInterfaceFonts().map((f) => (
                 <DropdownMenuItem
                   key={f.id}
                   onSelect={() => choose(f.id)}

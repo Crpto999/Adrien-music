@@ -12,6 +12,10 @@ const EAPI_KEY = "e82ckenh8dichen8";
 const EAPI_UID = "-36cd479b6b5-";
 const EAPI_SALT = "nobody";
 
+// Live probe against the real NetEase eapi — gated exactly like
+// live-netease.test.ts so CI stays green without network access.
+const LIVE = process.env.ADEPLOY_NETEASE_LIVE === "1";
+
 function eapiEncrypt(uri: string, data: unknown): string {
   const text = JSON.stringify(data);
   const digest = crypto
@@ -39,7 +43,7 @@ const DEVICE = {
   requestId: "1_1",
 };
 
-describe("live: 晴天 / 周杰伦", () => {
+describe.skipIf(!LIVE)("live: 晴天 / 周杰伦", () => {
   it("lists the accepted candidates in score order", async () => {
     const uri = "/api/search/get";
     const params = eapiEncrypt(uri, {

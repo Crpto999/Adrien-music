@@ -12,7 +12,8 @@ import {
   PINGFANG_WEIGHTS,
   PINGFANG_TOTAL_BYTES,
 } from "./pingfang-font";
-import { INTERFACE_FONTS, interfaceFontStack } from "./interface-font";
+import { INTERFACE_FONTS, interfaceFontStack, visibleInterfaceFonts } from "./interface-font";
+import { IS_WINDOWS } from "./platform";
 
 /**
  * The downloadable type families.
@@ -129,22 +130,39 @@ describe("the interface font list", () => {
   });
 
   it("resolves every id to a stack that names the family", () => {
-    expect(interfaceFontStack("pingfang")).toContain(PINGFANG_FAMILY);
+    // PingFang has no ClearType hinting, so on Windows it is hidden and
+    // resolves to the system stack instead of a hint-less face.
+    if (IS_WINDOWS) {
+      expect(interfaceFontStack("pingfang")).toBe(interfaceFontStack("system"));
+    } else {
+      expect(interfaceFontStack("pingfang")).toContain(PINGFANG_FAMILY);
+    }
     expect(interfaceFontStack("noto-sans-sc")).toContain(NOTO_SANS_SC_FAMILY);
-    expect(interfaceFontStack("system")).toContain("Segoe UI");
+    // The system stack is platform-split (YaHei UI / PingFang / Noto),
+    // so only assert the universal tail here.
+    expect(interfaceFontStack("system")).toContain("sans-serif");
   });
 
   it("falls back to the system stack for an unknown id", () => {
     expect(interfaceFontStack("nope" as never)).toBe(
       interfaceFontStack("system"),
     );
-    expect(interfaceFontStack("nope" as never)).toContain("Segoe UI");
+    expect(interfaceFontStack("nope" as never)).toContain("sans-serif");
   });
 
   it("keeps the CJK fallbacks on every stack", () => {
     for (const font of INTERFACE_FONTS) {
       expect(font.stack).toContain("Microsoft YaHei");
       expect(font.stack).toContain("sans-serif");
+    }
+  });
+
+  it("hides PingFang SC where it has no ClearType hinting", () => {
+    // An unavailable entry resolves to the system stack instead of a
+    // hint-less face, so every visible entry always renders in a real
+    // stack.
+    for (const f of visibleInterfaceFonts()) {
+      expect(interfaceFontStack(f.id)).toContain("sans-serif");
     }
   });
 });

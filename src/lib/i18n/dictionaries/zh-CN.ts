@@ -292,11 +292,10 @@ export const zhCN: typeof en = {
     version: "版本 {version}",
     betaFor: "{platform} 测试版",
     description:
-      "快速、响应迅速的 YouTube Music 桌面客户端。非官方应用 — 与 Google 或 YouTube 无隶属、背书或赞助关系。“YouTube”和“YouTube Music”是 Google LLC 的商标。",
+      "做 adrify 的初衷很简单：想听的歌散在两处——网易云的中文曲库，和 YouTube Music 的其他一切。所以这是一个能同时装下两者、顺手带上歌词和收藏的播放器。",
+    techLine: "自由开源（GPL-3.0）· 基于 Tauri、yt-dlp 与开放歌词源构建。",
     betaNotice:
       "{platform} 版本目前处于测试阶段。如果遇到问题，请通过窗口菜单（⋯ → 反馈问题）或在",
-    poweredBy: "技术支持",
-    freeSoftware: "自由软件 ·",
     checkingForUpdates: "正在检查更新…",
     upToDate: "你已是最新版本",
     openSource: "开源项目",
@@ -304,14 +303,6 @@ export const zhCN: typeof en = {
     github: "GitHub",
     updateCommandCopied: "更新命令已复制",
     couldNotCopyCommand: "无法复制命令",
-    credit: {
-      appShell: "应用外壳",
-      routerQuery: "路由 + 数据请求",
-      components: "界面组件",
-      audioStreaming: "音频流媒体",
-      syncedLyrics: "同步歌词",
-      lyrics: "歌词",
-    },
   },
 
   channel: {
