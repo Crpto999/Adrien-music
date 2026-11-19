@@ -1,6 +1,6 @@
 [package]
 name = "adrify"
-version = "0.15.0"
+version = "0.15.1"
 description = "adrify — fast, responsive YouTube Music desktop client"
 authors = ["George Shyshov"]
 license = "GPL-3.0-only"

@@ -1,7 +1,7 @@
 {
   "name": "adrify",
   "private": true,
-  "version": "0.15.0",
+  "version": "0.15.1",
   "license": "GPL-3.0-only",
   "description": "adrify — fast, responsive YouTube Music desktop client",
   "packageManager": "pnpm@12.18.0",

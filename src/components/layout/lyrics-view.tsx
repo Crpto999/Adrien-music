@@ -946,20 +946,21 @@ function TimedLyrics({
                 </div>
               ) : null}
               {/* The translation, under the line it belongs to. It is
-                  dimmer and smaller: it is a reading aid, not the
-                  thing the karaoke highlight is following. It seeks
-                  too — it is the same line of the same song — and it
-                  lights up on its own hover rather than the row's. */}
+                  a step smaller and more transparent than the lead: a
+                  reading aid, not the thing the karaoke highlight is
+                  following — medium weight so CJK strokes stay legible
+                  under ClearType. It seeks too and lights up on its own
+                  hover rather than the row's. */}
               {translation?.[i]?.text ? (
                 <button
                   type="button"
                   onClick={() => seek(line.start)}
                   className={cn(
-                    "mt-0.5 block w-fit max-w-full cursor-pointer text-left text-sm font-normal transition-colors duration-200",
+                    "mt-0.5 block w-fit max-w-full cursor-pointer text-left text-[15px] font-medium leading-snug transition-colors duration-200",
                     "hover:text-brand",
                     isActive
-                      ? "text-muted-foreground"
-                      : "text-muted-foreground/50",
+                      ? "text-muted-foreground/70"
+                      : "text-muted-foreground/40",
                   )}
                 >
                   {translation[i].text}
@@ -1118,7 +1119,7 @@ function PlainLyrics({
     >
       {text}
       {translation ? (
-        <p className="mt-4 text-sm font-normal text-muted-foreground/70">
+        <p className="mt-4 text-[15px] font-medium leading-relaxed text-muted-foreground/60">
           {translation}
         </p>
       ) : null}
