@@ -1,8 +1,10 @@
-# Builds Windows (x64), Linux, and a universal macOS installer,
-# then publishes a single draft GitHub Release
+# Builds the Windows (x64) installer and publishes a draft GitHub Release
 # whenever a `v*` tag is pushed. Publish flow:
 #   git tag v0.1.0 && git push origin v0.1.0
 # → wait for this workflow → review the draft on the Releases page → publish.
+#
+# Windows-only: macOS / Linux legs were dropped — the bundle targets in
+# tauri.conf.json are ["nsis"] and only Windows is maintained.
 #
 # The TAURI_SIGNING_* secrets are for tauri-plugin-updater artifact
 # signatures (latest.json + .sig). Until the updater is wired up and the
@@ -17,47 +19,18 @@ on:
 
 jobs:
   build:
-    name: Build (${{ matrix.name }})
+    name: Build (Windows)
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows
-            os: windows-latest
-            args: ""
-            rust_targets: ""
-          - name: macOS Universal
-            os: macos-latest
-            args: "--target universal-apple-darwin"
-            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
-          - name: Linux
-            os: ubuntu-22.04
-            args: ""
-            rust_targets: ""
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install Linux system dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            libdbus-1-dev \
-            patchelf \
-            libgtk-3-dev
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust_targets }}
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -76,44 +49,28 @@ jobs:
           # this variable exists. Drop the line and it waits on stdin
           # forever, which hangs the job instead of failing it.
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Ad-hoc macOS signature so Apple Silicon can run the build after
-          # the user approves it in Privacy & Security. No Developer ID cert
-          # yet; when one exists, export the APPLE_* env vars from a guarded
-          # $GITHUB_ENV step instead of `${{ secrets.* }}` here — a missing
-          # secret still SETS the env var (empty), which sends the bundler
-          # down the certificate-import path and fails the build.
-          APPLE_SIGNING_IDENTITY: "-"
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "adrify ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install this version."
           releaseDraft: true
           prerelease: false
-          # Every matrix leg would otherwise generate `latest.json` on
-          # its own, and the action's download-merge-upload cycle is not
-          # atomic: two legs reading before either writes either fail
-          # with `already_exists` or silently clobber each other's
-          # platform entries, leaving the manifest short of a platform.
-          # The `updater-manifest` job below is the only writer.
+          # The action would otherwise generate `latest.json` on its own.
+          # The `updater-manifest` job below is the only writer, so the
+          # published manifest always matches the final asset names.
           #
           # `includeUpdaterJson` is the input name on the v0 branch of
           # the action (`uploadUpdaterJson` only exists on `dev`).
           includeUpdaterJson: false
-          args: ${{ matrix.args }}
 
-  # Renames the installers to names that say which OS they are for, and
-  # builds the updater manifest (`latest.json`) from the `.sig` files.
+  # Renames the installer to a name that says which OS it is for, and
+  # builds the updater manifest (`latest.json`) from the `.sig` file.
   #
-  # Two reasons this is a separate job rather than a tauri-action input:
+  # This is a separate job rather than a tauri-action input so the
+  # installer is renamed *before* the manifest's URL is written: doing
+  # both in one pass means the release is never seen half-renamed.
   #
-  #   - The action's manifest upload races across the matrix legs (see
-  #     the `uploadUpdaterJson: false` note above). One writer, one
-  #     manifest, no contention.
-  #   - The installers have to be renamed *after* every leg uploaded,
-  #     and the manifest's URLs have to point at the final names. Doing
-  #     both in one pass means the release is never seen half-renamed.
-  #
-  # The minisign signatures cover file contents, not names, so renaming
+  # The minisign signature covers file contents, not names, so renaming
   # an installer does not invalidate its signature.
   updater-manifest:
     name: Publish the updater manifest
@@ -141,10 +98,16 @@ jobs:
         # src-tauri/tauri.conf.json. A mismatch here means every user
         # would be told the update is corrupt, so the release fails
         # before anyone can install it.
+        #
+        # `--all-platforms` checks every entry in the manifest, not just
+        # the one this runner's OS would look up: the runner is Linux,
+        # and the shipped build is Windows, so the default would check
+        # nothing at all.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 scripts/verify-published-updater.py \
             --tag "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}"
+            --repo "${{ github.repository }}" \
+            --all-platforms
 

@@ -292,7 +292,7 @@ export const zhCN: typeof en = {
     version: "版本 {version}",
     betaFor: "{platform} 测试版",
     description:
-      "做 adrify 的初衷很简单：想听的歌散在两处——网易云的中文曲库，和 YouTube Music 的其他一切。所以这是一个能同时装下两者、顺手带上歌词和收藏的播放器。",
+      "做 Adrify 的初衷：想听的歌散在两处——网易云的中文曲库，和 YouTube Music 的其他一切。所以这是一个能两者兼顾、0个广告的音乐播放器。",
     techLine: "自由开源（GPL-3.0）· 基于 Tauri、yt-dlp 与开放歌词源构建。",
     betaNotice:
       "{platform} 版本目前处于测试阶段。如果遇到问题，请通过窗口菜单（⋯ → 反馈问题）或在",
@@ -592,7 +592,8 @@ export const zhCN: typeof en = {
       packageManaged:
         "此安装由系统包管理器管理 — 请从 Releases 页面获取新版本。",
       proxy: "代理（仅 YouTube）",
-      proxyDesc: "仅 YouTube 相关流量走此代理（InnerTube、googlevideo、yt-dlp）。网易云始终直连，留空则全部直连。",
+      proxyDesc:
+        "仅 YouTube 相关流量走此代理（InnerTube、googlevideo、yt-dlp）。网易云始终直连，留空则全部直连。",
       proxyPlaceholder: "支持socks5/http/https",
       proxyInvalid: "这不是一个有效的代理地址。",
       proxyUnsupportedScheme:
