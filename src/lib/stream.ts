@@ -62,12 +62,6 @@ export async function streamUrlForProvider(
   const id = encodeURIComponent(trackId);
   if (provider === "youtube") return `${base}/stream/${id}`;
   if (provider === "netease") return `${base}/stream/netease/${id}`;
-  // The Chinese platforms share one route: Migu, Kugou and QQ Music all
-  // resolve to a direct CDN URL that the same progressive machinery
-  // serves, so they only differ by the platform segment.
-  if (provider === "migu" || provider === "kugou" || provider === "qq") {
-    return `${base}/stream/cn/${provider}/${id}`;
-  }
   // A provider without its own route yet: fall back to the generic
   // one rather than producing a URL that 404s.
   return `${base}/stream/${id}`;
@@ -111,9 +105,7 @@ export async function prefetchStreamFor(
     const path =
       provider === "netease"
         ? `/prefetch/netease/${encodeURIComponent(trackId)}`
-        : provider === "migu" || provider === "kugou" || provider === "qq"
-          ? `/prefetch/cn/${provider}/${encodeURIComponent(trackId)}`
-          : `/prefetch/${encodeURIComponent(trackId)}`;
+        : `/prefetch/${encodeURIComponent(trackId)}`;
     const res = await fetch(`${base}${path}`);
     if (!res.ok) prefetched.delete(key);
   } catch {

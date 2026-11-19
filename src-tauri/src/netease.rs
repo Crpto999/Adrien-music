@@ -40,7 +40,6 @@
 
 use serde::Serialize;
 
-use crate::proxy;
 use crate::netease_auth;
 
 /// One NetEase search result.
@@ -84,6 +83,15 @@ pub struct NeteaseSong {
 const SEARCH_URI: &str = "/api/search/get";
 const SEARCH_URL: &str = "https://interface.music.163.com/eapi/search/get";
 
+/// The cloud-search fallback, same query, compact row shape.
+///
+/// When the primary fuzzy endpoint is risk-controlled (`code -462`)
+/// the cloud endpoint sometimes still answers, and vice versa. Its
+/// rows use the short key names (`ar`/`al`/`dt`/`alia`) — `parse_song`
+/// reads both shapes so either endpoint can feed the same list.
+const CLOUDSEARCH_URI: &str = "/api/cloudsearch/pc";
+const CLOUDSEARCH_URL: &str = "https://interface.music.163.com/eapi/cloudsearch/pc";
+
 /// How many rows the fuzzy search asks for.
 ///
 /// Measured against the live platform: searching "晴天 周杰伦" puts the
@@ -107,31 +115,34 @@ const LYRIC_EAPI_URL: &str = "https://interface.music.163.com/eapi/song/lyric";
 const LYRIC_V1_URI: &str = "/api/song/lyric/v1";
 const LYRIC_V1_URL: &str = "https://interface.music.163.com/eapi/song/lyric/v1";
 
-/// The eapi playlist-detail endpoint.
+/// The playlist-detail endpoint.
 ///
 /// Asked for the account's own "我喜欢的音乐" playlist — whose id is the
 /// account's numeric id — to learn which songs the account has
-/// hearted.
-const PLAYLIST_DETAIL_URI: &str = "/api/playlist/detail";
-const PLAYLIST_DETAIL_URL: &str = "https://interface.music.163.com/eapi/playlist/detail";
+/// hearted. The reference SDK calls `/api/v6/playlist/detail` with the
+/// default (eapi) channel, payload `{id, n: 100000, s: 8}`.
+const PLAYLIST_DETAIL_URI: &str = "/api/v6/playlist/detail";
+const PLAYLIST_DETAIL_URL: &str = "https://interface.music.163.com/eapi/v6/playlist/detail";
 
 /// The eapi player-URL endpoint.
 const PLAYER_URI: &str = "/api/song/enhance/player/url/v1";
 const PLAYER_URL: &str = "https://interface3.music.163.com/eapi/song/enhance/player/url/v1";
 
-/// The eapi daily-recommendation endpoint.
-const RECOMMEND_URI: &str = "/api/v3/discovery/recommend/songs";
-const RECOMMEND_URL: &str =
-    "https://interface3.music.163.com/eapi/v3/discovery/recommend/songs";
-
-/// The eapi "add to / remove from My Music" endpoint.
+/// The daily-recommendation endpoint.
 ///
-/// This is the platform's own "heart" — the red heart on a song, which
-/// is a different thing from the radio feedback endpoint (`/like`,
-/// `weapi`) and a different thing again from adding a song to a
+/// The reference SDK reads it on the weapi (browser) channel with an
+/// empty payload — see `daily_recommend`.
+const RECOMMEND_URI: &str = "/api/v3/discovery/recommend/songs";
+
+/// The "light the red heart" endpoint.
+///
+/// The reference SDK (`song_like`) reads it on the weapi (browser)
+/// channel with `{trackId, userid, like}` — see `like_request`. This
+/// is the platform's own "heart" — the red heart on a song, which
+/// is a different thing from the radio feedback endpoint (`/api/radio/like`,
+/// weapi) and a different thing again from adding a song to a
 /// playlist. The red heart *is* the user's "我喜欢的音乐" collection.
 const LIKE_URI: &str = "/api/song/like";
-const LIKE_URL: &str = "https://interface.music.163.com/eapi/song/like";
 
 /// How long a NetEase request may take.
 pub const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -168,6 +179,101 @@ fn headers() -> reqwest::header::HeaderMap {
     h
 }
 
+/// The header set for eapi calls — the platform's own mobile client.
+///
+/// The reference SDK (`ncm-api-rs` / `api-enhanced`) sends the eapi
+/// channel with the iPhone client's UA
+/// (`NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)`), not a
+/// desktop browser UA: an eapi request wearing a plain Chrome UA with
+/// a bare device id is the shape anonymous scraping takes, which is
+/// exactly what the `-462` risk control answers. Wearing the client's
+/// own UA does not bypass anything — it just stops looking like a
+/// scraper.
+fn eapi_headers() -> reqwest::header::HeaderMap {
+    let mut h = reqwest::header::HeaderMap::new();
+    h.insert(
+        reqwest::header::USER_AGENT,
+        reqwest::header::HeaderValue::from_static(
+            "NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)",
+        ),
+    );
+    h.insert(
+        reqwest::header::REFERER,
+        reqwest::header::HeaderValue::from_static("https://music.163.com/"),
+    );
+    h
+}
+
+/// The stable device id for this process, as uppercase hex.
+///
+/// The old code sent the literal `pyncm!` on every request — every
+/// install of the app sharing one device id, which is exactly the
+/// signal the platform's risk control keys on. The official client
+/// keeps one random id per profile; this is the same idea scoped to
+/// the process: random once, stable afterwards, never shared between
+/// machines.
+fn stable_device_id() -> String {
+    use std::sync::OnceLock;
+    static ID: OnceLock<String> = OnceLock::new();
+    ID.get_or_init(|| {
+        let mut bytes = [0u8; 26];
+        let ok = getrandom::fill(&mut bytes).is_ok();
+        if !ok {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0);
+            // Still unique per process start; not a fingerprint.
+            return format!("{now:052X}");
+        }
+        let mut s = String::with_capacity(52);
+        for b in bytes {
+            s.push_str(&format!("{:02X}", b));
+        }
+        s
+    })
+    .clone()
+}
+
+/// A fresh request id per call, in the platform's own shape.
+fn new_request_id() -> String {
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let mut tail = [0u8; 2];
+    let _ = getrandom::fill(&mut tail);
+    let n = u16::from_le_bytes(tail) % 1000;
+    format!("{ms}_{n:04}")
+}
+
+/// The current unix seconds, as the `buildver` field carries it.
+///
+/// The old code sent a fixed `200000000000`; the official client sends
+/// the current timestamp truncated to 10 digits.
+fn buildver_now() -> String {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs().to_string())
+        .unwrap_or_default()
+        .chars()
+        .take(10)
+        .collect()
+}
+
+/// A random lowercase-hex string, for the fingerprint cookies.
+fn random_hex_lower(nbytes: usize) -> String {
+    let mut bytes = vec![0u8; nbytes];
+    if getrandom::fill(&mut bytes).is_err() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        return format!("{now:x}").chars().take(nbytes * 2).collect();
+    }
+    hex_encode_lower(&bytes)
+}
+
 /// The device header every NetEase request carries.
 ///
 /// This is the same set of values as `client_header`, in the shape
@@ -179,14 +285,14 @@ fn client_header() -> serde_json::Value {
         "os": "pc",
         "appver": "3.1.17.204416",
         "osver": "Microsoft-Windows-10-Professional-build-19045-64bit",
-        "deviceId": "pyncm!",
+        "deviceId": stable_device_id(),
         "channel": "netease",
         "versioncode": "140",
         "mobilename": "",
-        "buildver": "200000000000",
+        "buildver": buildver_now(),
         "resolution": "1920x1080",
         "__csrf": "",
-        "requestId": "1_1",
+        "requestId": new_request_id(),
     })
 }
 
@@ -247,8 +353,22 @@ const DEVICE_HEADER_FIELDS: &[&str] = &[
 /// unreachable must not break the page that asked it.
 #[tauri::command]
 pub async fn netease_search(
+    app: tauri::AppHandle,
     query: String,
     limit: Option<u64>,
+) -> Result<Vec<NeteaseSong>, String> {
+    let cookie = crate::netease_cookie(&app).await;
+    search_songs(&query, limit, cookie.as_deref()).await
+}
+
+/// Search NetEase for a song, with an explicit cookie.
+///
+/// Split out of the command so the live diagnostics can run without a
+/// Tauri handle: the command is just "load the cookie, then search".
+async fn search_songs(
+    query: &str,
+    limit: Option<u64>,
+    cookie: Option<&str>,
 ) -> Result<Vec<NeteaseSong>, String> {
     let query = query.trim();
     if query.is_empty() {
@@ -261,25 +381,68 @@ pub async fn netease_search(
     let take = limit.unwrap_or(SEARCH_PAGE).clamp(1, 100);
     let page = SEARCH_PAGE.max(take);
 
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
-    let payload = serde_json::json!({
-        "s": query,
-        "type": 1,
-        "limit": page,
-        "offset": 0,
-    });
-    let body = eapi_post(&client, SEARCH_URI, SEARCH_URL, payload, None)
-        .await
-        .unwrap_or(serde_json::Value::Null);
+    // The signed-in credential, when there is one. An anonymous search
+    // is what the `-462` risk control keys on first, so a logged-in
+    // user must search *as themselves* — the `MUSIC_U` rides in both
+    // the signed header and the cookie. Anonymous callers still get
+    // the full fingerprint (stable device id + cookies + desktop UA),
+    // which is what separates a real client from a script.
+    let cookie_opt = cookie;
 
-    let songs = body
-        .get("result")
-        .and_then(|r| r.get("songs"))
-        .and_then(|s| s.as_array())
-        .cloned()
-        .unwrap_or_default();
+    // Primary first, cloud-search fallback second. Either endpoint can
+    // be risk-controlled while the other still answers, so a `-462`
+    // (or an empty page) on the first is a reason to try the second,
+    // not a reason to give up.
+    let mut best: Option<serde_json::Value> = None;
+    for (uri, url, with_total) in [
+        (SEARCH_URI, SEARCH_URL, false),
+        (CLOUDSEARCH_URI, CLOUDSEARCH_URL, true),
+    ] {
+        let mut payload = serde_json::json!({
+            "s": query,
+            "type": 1,
+            "limit": page,
+            "offset": 0,
+        });
+        // The reference SDK sends `total: true` on the cloud-search
+        // endpoint only (`/api/cloudsearch/pc`); the fuzzy endpoint
+        // (`/api/search/get`) carries no `total` flag.
+        if with_total {
+            payload["total"] = serde_json::Value::Bool(true);
+        }
+        match eapi_post(&client, uri, url, payload, cookie_opt).await {
+            Ok(body) => {
+                let code = body.get("code").and_then(|c| c.as_i64()).unwrap_or(200);
+                if code == -462 || code == 460 {
+                    crate::log!(
+                        "[netease] search risk-controlled on {uri} (code {code}), trying fallback"
+                    );
+                    continue;
+                }
+                let non_empty = !song_rows(&body).is_empty();
+                if best.is_none() {
+                    best = Some(body);
+                } else if non_empty {
+                    best = Some(body);
+                }
+                // A non-empty page wins immediately; an empty one still
+                // gets the fallback a chance before settling for nothing.
+                if non_empty {
+                    break;
+                }
+            }
+            Err(e) => {
+                crate::log!("[netease] search {uri} failed: {e}");
+                continue;
+            }
+        }
+    }
+    let body = best.unwrap_or(serde_json::Value::Null);
+
+    let songs = song_rows(&body).to_vec();
 
     Ok(songs
         .iter()
@@ -288,15 +451,36 @@ pub async fn netease_search(
         .collect())
 }
 
+/// The song rows in a search response, whichever endpoint answered.
+///
+/// Both `/api/search/get` and `/api/cloudsearch/pc` put them under
+/// `result.songs`; only the *row* shape differs (see `parse_song`).
+fn song_rows(body: &serde_json::Value) -> &[serde_json::Value] {
+    body.get("result")
+        .and_then(|r| r.get("songs"))
+        .and_then(|s| s.as_array())
+        .map(|arr| arr.as_slice())
+        .unwrap_or(&[])
+}
+
 /// Turn one of NetEase's search rows into our shape.
+///
+/// Reads both row shapes: the full one from `/api/search/get`
+/// (`artists`/`album`/`duration`/`alias`) and the compact one from
+/// `/api/cloudsearch/pc` (`ar`/`al`/`dt`/`alia`). Which endpoint
+/// answered must not matter to the caller.
 fn parse_song(raw: &serde_json::Value) -> Option<NeteaseSong> {
-    let id = raw.get("id")?.as_i64()?.to_string();
+    let id = raw
+        .get("id")
+        .and_then(|v| v.as_i64().map(|n| n.to_string()).or_else(|| v.as_str().map(|s| s.trim().to_string())))
+        .filter(|s| !s.is_empty())?;
     let title = raw.get("name")?.as_str()?.trim().to_string();
     if title.is_empty() {
         return None;
     }
     let artists: Vec<String> = raw
         .get("artists")
+        .or_else(|| raw.get("ar"))
         .and_then(|a| a.as_array())
         .map(|arr| {
             arr.iter()
@@ -308,13 +492,19 @@ fn parse_song(raw: &serde_json::Value) -> Option<NeteaseSong> {
         .unwrap_or_default();
     let album = raw
         .get("album")
+        .or_else(|| raw.get("al"))
         .and_then(|a| a.get("name"))
         .and_then(|n| n.as_str())
         .map(|s| s.trim().to_string());
-    let aliases = parse_aliases(raw.get("alias"));
-    let duration_ms = raw.get("duration").and_then(|d| d.as_u64()).unwrap_or(0);
+    let aliases = parse_aliases(raw.get("alias").or_else(|| raw.get("alia")));
+    let duration_ms = raw
+        .get("duration")
+        .or_else(|| raw.get("dt"))
+        .and_then(|d| d.as_u64())
+        .unwrap_or(0);
     let cover_url = raw
         .get("album")
+        .or_else(|| raw.get("al"))
         .and_then(|a| a.get("picUrl"))
         .and_then(|p| p.as_str())
         .map(crate::cover_url::to_https);
@@ -368,7 +558,7 @@ pub async fn netease_daily_recommend(
         return Ok(None);
     };
 
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
     let songs = daily_recommend(&client, &cookie, false).await?;
 
@@ -397,36 +587,22 @@ async fn daily_recommend(
     cookie: &str,
     afresh: bool,
 ) -> Result<Vec<NeteaseSong>, String> {
-    // The account travels in the header the payload is signed with, so
-    // it has to carry the same `__csrf` the cookie does — otherwise the
-    // platform answers anonymously and the list is somebody else's.
-    let header = account_header(Some(cookie));
-
-    let payload = serde_json::json!({
-        "header": header,
-        "afresh": afresh,
-    });
-    let params = eapi_encrypt(RECOMMEND_URI, &payload.to_string());
-
-    let resp = client
-        .post(RECOMMEND_URL)
-        .headers(headers())
-        .header(reqwest::header::COOKIE, cookie_header_with_account(cookie))
-        .timeout(REQUEST_TIMEOUT)
-        .form(&[("params", params)])
-        .send()
-        .await
-        .map_err(|e| format!("netease recommend: {e}"))?;
-    if !resp.status().is_success() {
-        return Err(format!(
-            "netease recommend: HTTP {}",
-            resp.status().as_u16()
-        ));
-    }
-    let body: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| format!("netease recommend json: {e}"))?;
+    // The reference SDK calls this route on the weapi (browser) channel
+    // with an empty payload — not on the eapi channel. The eapi form was
+    // the unstable one (frequent 460/-462 on interface3); the weapi form
+    // is what the official web client uses for the daily list.
+    // `afresh` only exists for the old eapi shape (regenerate the list);
+    // the weapi route always returns the account's current daily list,
+    // so the flag is accepted for API compatibility and ignored.
+    let _ = afresh;
+    let body = weapi_post(
+        client,
+        RECOMMEND_URI,
+        serde_json::json!({}),
+        Some(cookie),
+    )
+    .await
+    .map_err(|e| format!("netease recommend: {e}"))?;
 
     // The platform reports a non-200 code for a rejected credential.
     // Treating that as an empty list would show the user an empty
@@ -544,7 +720,7 @@ pub async fn netease_lyric(song_id: String) -> Result<Option<NeteaseLyric>, Stri
     if song_id.is_empty() {
         return Ok(None);
     }
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
     // The word-by-word endpoint. `tv`/`lv`/`rv`/`kv`/`yv`/`ytv`/`yrv`
@@ -657,7 +833,7 @@ pub async fn netease_liked_ids(app: tauri::AppHandle) -> Result<Option<Vec<Strin
         return Ok(None);
     };
 
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
     let body = eapi_post(
@@ -666,23 +842,46 @@ pub async fn netease_liked_ids(app: tauri::AppHandle) -> Result<Option<Vec<Strin
         PLAYLIST_DETAIL_URL,
         serde_json::json!({
             "id": user_id_num,
-            "n": 1000,
-            "s": 0,
+            "n": 100000,
+            "s": 8,
         }),
         Some(&cookie),
     )
     .await?;
 
-    // The eapi response puts the playlist under `result`.
+    // The v6 response puts the playlist under `playlist` (with
+    // `trackIds` always and `tracks` when asked); older shapes used
+    // `result.tracks`. Read all of them so the heart survives a move.
     let ids = body
-        .pointer("/result/tracks")
+        .pointer("/playlist/trackIds")
         .and_then(|t| t.as_array())
-        .map(|tracks| {
-            tracks
-                .iter()
+        .map(|ids| {
+            ids.iter()
                 .filter_map(|t| t.get("id").and_then(|id| id.as_i64()))
                 .map(|id| id.to_string())
                 .collect()
+        })
+        .or_else(|| {
+            body.pointer("/playlist/tracks")
+                .and_then(|t| t.as_array())
+                .map(|tracks| {
+                    tracks
+                        .iter()
+                        .filter_map(|t| t.get("id").and_then(|id| id.as_i64()))
+                        .map(|id| id.to_string())
+                        .collect()
+                })
+        })
+        .or_else(|| {
+            body.pointer("/result/tracks")
+                .and_then(|t| t.as_array())
+                .map(|tracks| {
+                    tracks
+                        .iter()
+                        .filter_map(|t| t.get("id").and_then(|id| id.as_i64()))
+                        .map(|id| id.to_string())
+                        .collect()
+                })
         })
         .unwrap_or_default();
 
@@ -723,7 +922,7 @@ pub async fn netease_liked(
         return Ok(None);
     };
 
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
     let body = eapi_post(
@@ -732,24 +931,49 @@ pub async fn netease_liked(
         PLAYLIST_DETAIL_URL,
         serde_json::json!({
             "id": user_id_num,
-            "n": 1000,
-            "s": 0,
+            "n": 100000,
+            "s": 8,
         }),
         Some(&cookie),
     )
     .await?;
 
-    // The eapi response puts the playlist under `result`.
+    // Same shapes as `netease_liked_ids`: v6 answers under
+    // `playlist`, older shapes under `result`.
     let liked = body
-        .pointer("/result/tracks")
+        .pointer("/playlist/trackIds")
         .and_then(|t| t.as_array())
-        .map(|tracks| {
-            tracks.iter().any(|t| {
+        .map(|ids| {
+            ids.iter().any(|t| {
                 t.get("id")
                     .and_then(|id| id.as_i64())
                     .map(|id| id.to_string() == song_id)
                     .unwrap_or(false)
             })
+        })
+        .or_else(|| {
+            body.pointer("/playlist/tracks")
+                .and_then(|t| t.as_array())
+                .map(|tracks| {
+                    tracks.iter().any(|t| {
+                        t.get("id")
+                            .and_then(|id| id.as_i64())
+                            .map(|id| id.to_string() == song_id)
+                            .unwrap_or(false)
+                    })
+                })
+        })
+        .or_else(|| {
+            body.pointer("/result/tracks")
+                .and_then(|t| t.as_array())
+                .map(|tracks| {
+                    tracks.iter().any(|t| {
+                        t.get("id")
+                            .and_then(|id| id.as_i64())
+                            .map(|id| id.to_string() == song_id)
+                            .unwrap_or(false)
+                    })
+                })
         })
         .unwrap_or(false);
 
@@ -793,7 +1017,7 @@ pub async fn netease_privileges(
     if song_id.is_empty() {
         return Err("empty song id".into());
     }
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
     // The user's cookie, if they are signed in to NetEase in the app.
@@ -835,7 +1059,7 @@ async fn player_request(
     song_id: &str,
     level: &str,
 ) -> Result<serde_json::Value, String> {
-    let header = account_header(cookie.as_deref());
+    let (header, cookie_header) = build_eapi_context(cookie.as_deref());
 
     let payload = serde_json::json!({
         "ids": [song_id],
@@ -850,13 +1074,7 @@ async fn player_request(
         .headers(headers())
         .timeout(REQUEST_TIMEOUT)
         .form(&[("params", params)]);
-    req = req.header(
-        reqwest::header::COOKIE,
-        match cookie {
-            Some(c) => cookie_header_with_account(c),
-            None => anonymous_cookie(),
-        },
-    );
+    req = req.header(reqwest::header::COOKIE, cookie_header);
 
     let resp = req
         .send()
@@ -883,7 +1101,7 @@ pub async fn netease_stream_url(
     if song_id.is_empty() {
         return Err("empty song id".into());
     }
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
     let cookie = crate::netease_cookie(&app).await;
 
@@ -940,7 +1158,7 @@ pub async fn netease_set_like(
         .filter(|id| !id.is_empty())
         .ok_or_else(|| "the NetEase account has no user id".to_string())?;
 
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
     let cookie = format!("MUSIC_U={}", account.music_u.trim());
@@ -972,31 +1190,21 @@ async fn like_request(
     user_id: &str,
     like: bool,
 ) -> Result<serde_json::Value, String> {
-    let header = account_header(Some(cookie));
-
-    let payload = serde_json::json!({
-        "trackId": song_id,
-        "userid": user_id,
-        "like": like,
-        "header": header,
-    });
-    let params = eapi_encrypt(LIKE_URI, &payload.to_string());
-
-    let resp = client
-        .post(LIKE_URL)
-        .headers(headers())
-        .header(reqwest::header::COOKIE, cookie_header_with_account(cookie))
-        .timeout(REQUEST_TIMEOUT)
-        .form(&[("params", params)])
-        .send()
-        .await
-        .map_err(|e| format!("netease like: {e}"))?;
-    if !resp.status().is_success() {
-        return Err(format!("netease like: HTTP {}", resp.status().as_u16()));
-    }
-    resp.json()
-        .await
-        .map_err(|e| format!("netease like json: {e}"))
+    // The reference SDK likes on the weapi (browser) channel:
+    // `/api/song/like` with `{trackId, like}` — not on the eapi
+    // channel. The eapi form was the unstable one here.
+    weapi_post(
+        client,
+        LIKE_URI,
+        serde_json::json!({
+            "trackId": song_id,
+            "userid": user_id,
+            "like": like,
+        }),
+        Some(cookie),
+    )
+    .await
+    .map_err(|e| format!("netease like: {e}"))
 }
 
 /// Resolve a NetEase song id to a playable direct URL.
@@ -1049,7 +1257,7 @@ async fn resolve_direct(app: &tauri::AppHandle, song_id: &str) -> Option<Netease
     }
 
     // 2. The official endpoint, with the user's own cookie.
-    let client = proxy::build_client(reqwest::Client::builder()).ok()?;
+    let client = reqwest::Client::builder().build().ok()?;
     let cookie = crate::netease_cookie(app).await;
     for level in LEVELS {
         let Ok(body) = player_request(&client, &cookie, &song_id, level).await else {
@@ -1124,7 +1332,7 @@ pub async fn resolve_audio(
 /// total is the file size — and unlike HEAD it works on CDNs that
 /// refuse HEAD.
 async fn probe_size(url: &str) -> Option<u64> {
-    let client = proxy::build_client(reqwest::Client::builder()).ok()?;
+    let client = reqwest::Client::builder().build().ok()?;
     let resp = client
         .get(url)
         .header(reqwest::header::RANGE, "bytes=0-0")
@@ -1201,8 +1409,7 @@ fn cookie_value(cookie: &str, name: &str) -> Option<String> {
 /// with, so the two can never drift apart — a `__csrf` in one and not
 /// the other is exactly what makes the platform treat an
 /// authenticated request as anonymous.
-fn cookie_header_with_account(cookie: &str) -> String {
-    let header = account_header(Some(cookie));
+fn cookie_from_header(header: &serde_json::Value, cookie: Option<&str>) -> String {
     let mut parts: Vec<String> = DEVICE_HEADER_FIELDS
         .iter()
         .filter_map(|field| {
@@ -1210,16 +1417,85 @@ fn cookie_header_with_account(cookie: &str) -> String {
             Some(format!("{field}={value}"))
         })
         .collect();
+    // The device fingerprint cookies the official client always sends.
+    // An eapi request with *only* the signed device fields and no
+    // fingerprint cookies is the shape anonymous scraping takes, and
+    // it is what the platform's `-462` risk control keys on. These
+    // carry no identity — they just say "a real client was here".
+    for (k, v) in fingerprint_cookies() {
+        parts.push(format!("{k}={v}"));
+    }
     // The account's identity rides along beside the device cookies.
-    if let Some(u) = cookie_value(cookie, "MUSIC_U") {
-        parts.push(format!("MUSIC_U={u}"));
+    if let Some(c) = cookie {
+        if let Some(u) = cookie_value(c, "MUSIC_U") {
+            parts.push(format!("MUSIC_U={u}"));
+        }
     }
     parts.join("; ")
 }
 
-/// The `Cookie:` header for a request made with no account.
-fn anonymous_cookie() -> String {
-    cookie_header_with_account("")
+/// Build the signed header and the `Cookie:` header from ONE object.
+///
+/// `account_header` and `cookie_header_with_account` each call
+/// `client_header()` internally, and `client_header()` mints a fresh
+/// `requestId`/`buildver` on every call — so building them separately
+/// sends a payload signed with one id alongside a cookie carrying
+/// another, which the platform reads as anonymous. Every request path
+/// must go through here so the two can never drift apart.
+fn build_eapi_context(cookie: Option<&str>) -> (serde_json::Value, String) {
+    let header = account_header(cookie);
+    let cookie_header = cookie_from_header(&header, cookie);
+    (header, cookie_header)
+}
+
+/// Backwards-compatible helper: the `Cookie:` header for an account
+/// cookie, built from the same object the payload is signed with.
+#[allow(dead_code)]
+fn cookie_header_with_account(cookie: &str) -> String {
+    let opt = if cookie.is_empty() { None } else { Some(cookie) };
+    build_eapi_context(opt).1
+}
+
+/// The per-process fingerprint cookies, stable for the app's lifetime.
+///
+/// The platform ties risk signals to these: a client that sends a
+/// *different* `NMTID` on every request looks like a script rotating
+/// identities, while the official client keeps one per profile. So
+/// they are generated once and reused, exactly like `stable_device_id`.
+fn fingerprint_cookies() -> Vec<(String, String)> {
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<Vec<(String, String)>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            let nuid = random_hex_lower(16);
+            // WNMCID: 6 random lowercase letters + "." + millis + ".01.0".
+            let mut letters = [0u8; 6];
+            let _ = getrandom::fill(&mut letters);
+            let rand_str: String = letters
+                .iter()
+                .map(|b| (b'a' + (b % 26)) as char)
+                .collect();
+            vec![
+                ("__remember_me".to_string(), "true".to_string()),
+                ("ntes_kaola_ad".to_string(), "1".to_string()),
+                (
+                    "_ntes_nnid".to_string(),
+                    format!("{nuid},{now_ms}"),
+                ),
+                ("_ntes_nuid".to_string(), nuid),
+                (
+                    "WNMCID".to_string(),
+                    format!("{rand_str}.{now_ms}.01.0"),
+                ),
+                ("WEVNSM".to_string(), "1.0.0".to_string()),
+                ("NMTID".to_string(), random_hex_lower(8)),
+            ]
+        })
+        .clone()
 }
 
 // ---------------------------------------------------------------------------
@@ -1252,6 +1528,40 @@ fn eapi_encrypt(url: &str, text: &str) -> String {
     hex_encode_upper(&encrypted)
 }
 
+/// A random mainland-China IP, for the `X-Real-IP` / `X-Forwarded-For`
+/// headers.
+///
+/// The reference SDK (`ncm-api-rs` / `api-enhanced`) sends these on
+/// every request when `randomCNIP` is on: from a non-mainland network
+/// the platform answers the eapi search with `-462`/`460` ("cheating")
+/// unless the request carries a mainland address. The ranges are the
+/// same public prefixes the reference uses — they say where the
+/// *client claims to be*, not who it is.
+fn random_chinese_ip() -> String {
+    let mut b = [0u8; 4];
+    if getrandom::fill(&mut b).is_err() {
+        return "116.25.146.177".to_string();
+    }
+    const PREFIXES: &[(u8, u8, u8)] = &[
+        (116, 25, 94),
+        (112, 0, 255),
+        (114, 0, 255),
+        (119, 0, 255),
+        (121, 0, 255),
+        (123, 0, 255),
+        (182, 0, 255),
+        (183, 0, 255),
+        (220, 0, 255),
+        (222, 0, 255),
+    ];
+    let (first, min_second, max_second) = PREFIXES[(b[0] as usize) % PREFIXES.len()];
+    let span = max_second.saturating_sub(min_second).max(1);
+    let second = min_second + (b[1] % span);
+    let third = b[2].max(1);
+    let fourth = b[3].max(1).min(254);
+    format!("{first}.{second}.{third}.{fourth}")
+}
+
 /// Post an eapi request and return the parsed body.
 ///
 /// The eapi protocol is one form field, `params`, holding the AES
@@ -1265,23 +1575,24 @@ pub(crate) async fn eapi_post(
     payload: serde_json::Value,
     cookie: Option<&str>,
 ) -> Result<serde_json::Value, String> {
-    let header = account_header(cookie);
+    let (header, cookie_header) = build_eapi_context(cookie);
     let mut body = payload;
     body["header"] = header;
     let params = eapi_encrypt(uri, &body.to_string());
+    // From a non-mainland network the platform answers eapi search with
+    // `-462`/`460` unless the request carries a mainland address — the
+    // reference SDK's `randomCNIP` option. One fresh address per
+    // request, same value in both headers.
+    let real_ip = random_chinese_ip();
 
     let mut req = client
         .post(url)
-        .headers(headers())
+        .headers(eapi_headers())
+        .header("X-Real-IP", real_ip.clone())
+        .header("X-Forwarded-For", real_ip)
         .timeout(REQUEST_TIMEOUT)
         .form(&[("params", params)]);
-    req = req.header(
-        reqwest::header::COOKIE,
-        match cookie {
-            Some(c) => cookie_header_with_account(c),
-            None => anonymous_cookie(),
-        },
-    );
+    req = req.header(reqwest::header::COOKIE, cookie_header);
 
     let resp = req
         .send()
@@ -1293,6 +1604,135 @@ pub(crate) async fn eapi_post(
     resp.json()
         .await
         .map_err(|e| format!("netease eapi {uri} json: {e}"))
+}
+
+// ---------------------------------------------------------------------------
+// weapi encryption (the browser client's channel)
+// ---------------------------------------------------------------------------
+
+/// The weapi preset key and IV — published constants, same in every client.
+const WEAPI_PRESET_KEY: &[u8; 16] = b"0CoJUm6Qyw8W8jud";
+const WEAPI_IV: &[u8; 16] = b"0102030405060708";
+/// The 62 characters a weapi secret key is drawn from.
+const WEAPI_BASE62: &[u8; 62] =
+    b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+/// The platform's RSA public key (SubjectPublicKeyInfo DER, base64).
+const WEAPI_PUBKEY_DER_B64: &str = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDgtQn2JZ34ZC28NWYpAUd98iZ37BUrX/aKzmFbt7clFSs6sXqHauqKWqdtLkF2KexO40H1YTX8z2lSgBBOAxLsvaklV8k4cBFK9snQXE9/DDaFt6Rr7iVZMldczhC0JNgTz+SHXT6CBHuX3e9SdB1Ua44oncaTWz7OBGLbCiK45wIDAQAB";
+/// The weapi host: `https://music.163.com/weapi/...`.
+const WEAPI_HOST: &str = "https://music.163.com";
+
+/// AES-128-CBC encrypt, output base64.
+fn aes_cbc_encrypt_base64(plaintext: &[u8], key: &[u8]) -> String {
+    use aes::cipher::{BlockEncryptMut, KeyIvInit, block_padding::Pkcs7};
+    let cipher = cbc::Encryptor::<aes::Aes128>::new_from_slices(key, WEAPI_IV)
+        .expect("weapi key/iv are 16 bytes");
+    let ciphertext = cipher.encrypt_padded_vec_mut::<Pkcs7>(plaintext);
+    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &ciphertext)
+}
+
+/// Textbook RSA (no padding): `c = m^e mod n`, output lowercase hex padded
+/// to the modulus length. This is the platform's own weapi key exchange,
+/// not a security choice on our side.
+fn rsa_encrypt_no_padding(plaintext: &[u8]) -> String {
+    use base64::Engine;
+    use rsa::pkcs8::DecodePublicKey;
+    let der = base64::engine::general_purpose::STANDARD
+        .decode(WEAPI_PUBKEY_DER_B64)
+        .expect("weapi pubkey is valid base64");
+    let public_key =
+        rsa::RsaPublicKey::from_public_key_der(&der).expect("weapi pubkey is valid DER");
+    use rsa::traits::PublicKeyParts;
+    let n = public_key.n().clone();
+    let e = public_key.e().clone();
+    let m = rsa::BigUint::from_bytes_be(plaintext);
+    let c = m.modpow(&e, &n);
+    let n_bytes = n.bits() / 8;
+    let c_bytes = c.to_bytes_be();
+    let mut padded = vec![0u8; n_bytes.saturating_sub(c_bytes.len())];
+    padded.extend_from_slice(&c_bytes);
+    hex_encode_lower(&padded)
+}
+
+/// Encrypt a payload the weapi way: double AES-128-CBC plus an
+/// RSA-encrypted random key. Returns `(params, encSecKey)`.
+fn weapi_encrypt(text: &str) -> (String, String) {
+    let mut secret_bytes = [0u8; 16];
+    let ok = getrandom::fill(&mut secret_bytes).is_ok();
+    let secret_key: String = if ok {
+        secret_bytes
+            .iter()
+            .map(|b| WEAPI_BASE62[(b % 62) as usize] as char)
+            .collect()
+    } else {
+        // Without entropy there is no key exchange to speak of; fall
+        // back to a fixed key so the request is at least well-formed.
+        "0123456789abcdef".to_string()
+    };
+    let first = aes_cbc_encrypt_base64(text.as_bytes(), WEAPI_PRESET_KEY);
+    let params = aes_cbc_encrypt_base64(first.as_bytes(), secret_key.as_bytes());
+    let reversed: String = secret_key.chars().rev().collect();
+    let enc_sec_key = rsa_encrypt_no_padding(reversed.as_bytes());
+    (params, enc_sec_key)
+}
+
+/// The header set for weapi calls — the browser client's own UA.
+fn weapi_headers() -> reqwest::header::HeaderMap {
+    let mut h = reqwest::header::HeaderMap::new();
+    h.insert(
+        reqwest::header::USER_AGENT,
+        reqwest::header::HeaderValue::from_static(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+        ),
+    );
+    h.insert(
+        reqwest::header::REFERER,
+        reqwest::header::HeaderValue::from_static("https://music.163.com/"),
+    );
+    h
+}
+
+/// Post a weapi request and return the parsed body.
+///
+/// The weapi protocol is two form fields, `params` and `encSecKey`,
+/// posted to `https://music.163.com/weapi/...`. The `csrf_token` field
+/// rides inside the encrypted payload, paired with the `__csrf` cookie
+/// exactly like the eapi `header` field is paired with its cookie.
+pub(crate) async fn weapi_post(
+    client: &reqwest::Client,
+    uri: &str,
+    mut payload: serde_json::Value,
+    cookie: Option<&str>,
+) -> Result<serde_json::Value, String> {
+    let csrf = cookie
+        .and_then(|c| cookie_value(c, "__csrf"))
+        .unwrap_or_default();
+    payload["csrf_token"] = serde_json::Value::String(csrf);
+    let (params, enc_sec_key) = weapi_encrypt(&payload.to_string());
+    let url = format!("{WEAPI_HOST}/weapi/{}", uri.trim_start_matches("/api/"));
+
+    let mut req = client
+        .post(&url)
+        .headers(weapi_headers())
+        .timeout(REQUEST_TIMEOUT)
+        .form(&[("params", params.as_str()), ("encSecKey", enc_sec_key.as_str())]);
+    req = req.header(
+        reqwest::header::COOKIE,
+        build_eapi_context(cookie).1,
+    );
+
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("netease weapi {uri}: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!(
+            "netease weapi {uri}: HTTP {}",
+            resp.status().as_u16()
+        ));
+    }
+    resp.json()
+        .await
+        .map_err(|e| format!("netease weapi {uri} json: {e}"))
 }
 
 /// The MD5 of some bytes, lowercase hex.
@@ -1480,8 +1920,7 @@ mod tests {
     #[test]
     fn the_cookie_and_the_signed_header_agree() {
         let cookie = "MUSIC_U=abc123; __csrf=csrf456";
-        let header = account_header(Some(cookie));
-        let sent = cookie_header_with_account(cookie);
+        let (header, sent) = build_eapi_context(Some(cookie));
 
         for field in DEVICE_HEADER_FIELDS {
             let value = header.get(*field).and_then(|v| v.as_str()).unwrap();
@@ -1499,18 +1938,19 @@ mod tests {
     /// With no account, the header stays anonymous.
     #[test]
     fn an_anonymous_request_carries_no_account() {
-        let header = account_header(None);
+        let (header, cookie) = build_eapi_context(None);
         assert!(header.get("MUSIC_U").is_none());
         assert_eq!(header["__csrf"].as_str(), Some(""));
-        assert!(!anonymous_cookie().contains("MUSIC_U="));
+        assert!(!cookie.contains("MUSIC_U="));
     }
 
     /// The `Cookie:` header keeps the device cookies the platform needs
     /// alongside the account's.
     #[test]
     fn the_cookie_keeps_the_device_cookies() {
-        let sent = cookie_header_with_account("MUSIC_U=abc123; __csrf=csrf456");
-        assert!(sent.contains("deviceId=pyncm!"), "{sent}");
+        let (header, sent) = build_eapi_context(Some("MUSIC_U=abc123; __csrf=csrf456"));
+        let device = header.get("deviceId").and_then(|v| v.as_str()).unwrap();
+        assert!(sent.contains(&format!("deviceId={device}")), "{sent}");
         assert!(sent.contains("appver=3.1.17.204416"), "{sent}");
     }
 
@@ -1527,13 +1967,13 @@ mod tests {
     /// no `MUSIC_U` in it, which is what `eapi_post(.., None)` produces.
     #[test]
     fn the_lyric_request_is_anonymous() {
-        let header = account_header(None);
+        let (header, cookie) = build_eapi_context(None);
         assert!(header.get("MUSIC_U").is_none());
-        let cookie = anonymous_cookie();
         assert!(!cookie.contains("MUSIC_U="), "{cookie}");
         // The device cookies are still there — the platform's own client
         // sends them too, and a request without them is treated oddly.
-        assert!(cookie.contains("deviceId=pyncm!"), "{cookie}");
+        let device = header.get("deviceId").and_then(|v| v.as_str()).unwrap();
+        assert!(cookie.contains(&format!("deviceId={device}")), "{cookie}");
     }
 
     #[test]
@@ -1635,7 +2075,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "hits the network"]
     async fn the_live_search_returns_rows() {
-        let songs = netease_search("起风了".to_string(), Some(5))
+        let songs = search_songs("起风了", Some(5), None)
             .await
             .expect("search succeeded");
         assert!(!songs.is_empty(), "live search returned nothing");
@@ -1660,6 +2100,14 @@ mod tests {
     /// ```text
     /// cargo test --lib netease::tests::the_live_search_of_the_like_query -- --ignored --nocapture
     /// ```
+    /// The exact search the heart-sync sends for a track, run through
+    /// the backend's own search path.
+    ///
+    /// Run it with:
+    ///
+    /// ```text
+    /// cargo test --lib netease::tests::the_live_search_of_the_like_query -- --ignored --nocapture
+    /// ```
     #[tokio::test]
     #[ignore = "hits the network"]
     async fn the_live_search_of_the_like_query() {
@@ -1668,7 +2116,7 @@ mod tests {
             "True Colors Shuba",
             "True Colors Clous85",
         ] {
-            let songs = netease_search(query.to_string(), Some(10))
+            let songs = search_songs(query, Some(10), None)
                 .await
                 .expect("search succeeded");
             println!("\n--- {query} -> {} rows", songs.len());
@@ -1687,7 +2135,7 @@ mod tests {
         // by the same artist, and covers, above the one the user meant:
         // the original was found at rank 62 with a deep page, and was
         // missed entirely with a short one.
-        let songs = netease_search("晴天 周杰伦".to_string(), Some(100))
+        let songs = search_songs("晴天 周杰伦", Some(100), None)
             .await
             .expect("search succeeded");
         println!("\n--- 晴天 周杰伦 -> {} rows", songs.len());
@@ -1732,7 +2180,7 @@ mod tests {
             format!("{cookie}; __csrf={}", account.csrf.trim())
         };
 
-        let client = crate::proxy::build_client(reqwest::Client::builder())
+        let client = reqwest::Client::builder().build()
             .expect("a client");
 
         let songs = daily_recommend(&client, &cookie, false)
@@ -1796,7 +2244,7 @@ mod tests {
             format!("{cookie}; __csrf={}", account.csrf.trim())
         };
 
-        let client = crate::proxy::build_client(reqwest::Client::builder())
+        let client = reqwest::Client::builder().build()
             .expect("a client");
 
         // With the account's own id.
@@ -1913,7 +2361,7 @@ mod tests {
             format!("{cookie}; __csrf={}", account.csrf.trim())
         };
 
-        let client = proxy::build_client(reqwest::Client::builder())
+        let client = reqwest::Client::builder().build()
             .expect("a client");
 
         // The account's own list, twice. Asking twice must give the
@@ -1998,7 +2446,7 @@ mod tests {
             format!("{cookie}; __csrf={}", account.csrf.trim())
         };
 
-        let client = crate::proxy::build_client(reqwest::Client::builder())
+        let client = reqwest::Client::builder().build()
             .expect("a client");
 
         let body = eapi_post(

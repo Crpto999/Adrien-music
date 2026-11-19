@@ -48,8 +48,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
-use crate::proxy;
-
 /// How long a single unblock request may take.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
@@ -917,7 +915,8 @@ async fn probe_one(
     quality: &str,
 ) -> (&'static str, Probe) {
     let key = pool.key_for(ep.id);
-    let client = match proxy::build_client(reqwest::Client::builder()) {
+    // NetEase-adjacent traffic: never through the user proxy (WAF -462/460).
+    let client = match reqwest::Client::builder().build() {
         Ok(c) => c,
         Err(e) => {
             return (
@@ -925,7 +924,7 @@ async fn probe_one(
                 Probe {
                     health: Health::Down,
                     latency_ms: None,
-                    error: Some(e),
+                    error: Some(e.to_string()),
                     url: None,
                 },
             )
@@ -1058,7 +1057,8 @@ pub async fn resolve(app: &tauri::AppHandle, song_id: &str) -> Option<Resolved> 
             let mut set = tokio::task::JoinSet::new();
             for ep in &tier_endpoints {
                 let key = pool.key_for(ep.id);
-                let client = match proxy::build_client(reqwest::Client::builder()) {
+                // NetEase-adjacent traffic: never through the user proxy.
+                let client = match reqwest::Client::builder().build() {
                     Ok(c) => c,
                     Err(_) => continue,
                 };

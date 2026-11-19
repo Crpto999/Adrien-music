@@ -67,6 +67,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use tauri::{Emitter, Manager};
 
+use crate::netease::weapi_post;
 use crate::secure_store;
 
 /// The NetEase credential, as it is stored on disk.
@@ -263,9 +264,13 @@ pub async fn netease_session(app: tauri::AppHandle) -> Result<NeteaseSession, St
 
 /// The endpoint that hands out a one-time key for a QR sign-in.
 ///
-/// This is the platform's *web* endpoint, not the encrypted app one: it
-/// answers a plain form POST, which keeps the sign-in free of any
-/// request-signing machinery.
+/// The reference SDK (`ncm-api-rs` / `api-enhanced`) reads this on the
+/// default (eapi) channel as `/api/login/qrcode/unikey` with
+/// `{type: 3}`. This app speaks the same logical endpoint through the
+/// platform's plain web route (`https://music.163.com/api/...`), which
+/// answers the identical `{unikey}` body without request-signing
+/// machinery — the key itself is the same one either channel hands
+/// out, and the poll below accepts it either way.
 const UNKEY_URL: &str = "https://music.163.com/api/login/qrcode/unikey";
 
 /// The endpoint that reports the scan state for a key.
@@ -443,13 +448,15 @@ pub struct NeteaseQrCode {
 /// rendering of the key and never travels anywhere. Only the key does.
 #[tauri::command]
 pub async fn netease_qr_code(_app: tauri::AppHandle) -> Result<NeteaseQrCode, String> {
-    let client = crate::proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
+    let timestamp = time::OffsetDateTime::now_utc().unix_timestamp().to_string();
     let resp = client
         .post(UNKEY_URL)
         .headers(headers())
-        .form(&[("type", "1"), ("noCheckToken", "true")])
+        .query(&[("timestamp", timestamp.as_str())])
+        .form(&[("type", "3"), ("noCheckToken", "true")])
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
@@ -537,7 +544,7 @@ pub(crate) async fn poll_scan_state(
         .header("X-loginMethod", "QrCode")
         .header(reqwest::header::COOKIE, format!("sDeviceId={device}"))
         .query(&query)
-        .form(&[("type", "1"), ("noCheckToken", "true"), ("key", key)])
+        .form(&[("type", "3"), ("noCheckToken", "true"), ("key", key)])
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
@@ -677,13 +684,13 @@ pub async fn netease_start_login(app: tauri::AppHandle) -> Result<NeteaseQrCode,
 
     let poll_app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let client = match crate::proxy::build_client(reqwest::Client::builder()) {
+        let client = match reqwest::Client::builder().build() {
             Ok(c) => c,
             Err(e) => {
                 crate::log!("[netease] qr client failed: {e}");
                 let _ = poll_app.emit(
                     "netease-login-failed",
-                    NeteaseLoginFailure::with_detail(NeteaseFailureCode::Client, e),
+                    NeteaseLoginFailure::with_detail(NeteaseFailureCode::Client, e.to_string()),
                 );
                 return;
             }
@@ -843,6 +850,12 @@ struct NeteaseProfile {
 }
 
 /// Ask the platform who the signed-in account is.
+///
+/// The reference SDK reads the login state on the weapi (browser)
+/// channel as `/api/w/nuser/account/get` with `{}` — not a plain GET
+/// on `/api/nuser/account/get`. The plain form is the unstable one
+/// here (frequent anonymous-shaped answers behind proxies); the weapi
+/// form is what the official web client uses for the session check.
 async fn fetch_profile(
     _app: &tauri::AppHandle,
     account: &NeteaseAccount,
@@ -855,21 +868,15 @@ async fn fetch_profile(
         parts.join("; ")
     };
 
-    let client = crate::proxy::build_client(reqwest::Client::builder()).ok()?;
-    let resp = client
-        .get("https://music.163.com/api/nuser/account/get")
-        .header(reqwest::header::USER_AGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36")
-        .header(reqwest::header::REFERER, "https://music.163.com/")
-        .header(reqwest::header::COOKIE, header)
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await
-        .ok()?;
-
-    if !resp.status().is_success() {
-        return None;
-    }
-    let body: serde_json::Value = resp.json().await.ok()?;
+    let client = reqwest::Client::builder().build().ok()?;
+    let body = weapi_post(
+        &client,
+        "/api/w/nuser/account/get",
+        serde_json::json!({}),
+        Some(&header),
+    )
+    .await
+    .ok()?;
     let profile = body.get("profile")?;
     Some(NeteaseProfile {
         user_id: profile

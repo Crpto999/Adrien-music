@@ -2,10 +2,9 @@
  * The provider abstraction.
  *
  * A *provider* is a place a track can live: YouTube Music, NetEase
- * Cloud Music, Migu, Kugou, QQ Music, Spotify, Apple Music. Each one
- * has its own ids, its own catalogue and its own way of handing out a
- * stream URL — so the app needs a common shape for "this track, on that
- * provider".
+ * Cloud Music. Each one has its own ids, its own catalogue and its own
+ * way of handing out a stream URL — so the app needs a common shape
+ * for "this track, on that provider".
  *
  * ## Why a reference and not a flag
  *
@@ -25,20 +24,13 @@
  */
 
 /** The providers the app can source audio from. */
-export type ProviderId =
-  | "youtube"
-  | "netease"
-  | "migu"
-  | "kugou"
-  | "qq"
-  | "spotify"
-  | "apple";
+export type ProviderId = "youtube" | "netease";
 
 /**
  * A track's identity on one provider.
  *
- * `providerTrackId` is that platform's own id: a YouTube `videoId`, a
- * NetEase numeric song id, a QQ Music mid, and so on.
+ * `providerTrackId` is that platform's own id: a YouTube `videoId` or a
+ * NetEase numeric song id.
  */
 export type ProviderRef = {
   provider: ProviderId;
@@ -114,24 +106,13 @@ export type ProviderCapabilities = {
  * YouTube is first because it is the app's native source: it needs no
  * account, its catalogue is the one the app already browses, and its
  * streams are the ones the disk cache and the player already handle.
- * The Chinese platforms follow because they carry the catalogue
- * YouTube misses — most notably the paid tracks, which YouTube simply
- * does not have.
- *
- * Spotify and Apple Music are deliberately absent: both gate their
- * audio behind DRM that cannot be played outside their own clients, so
- * they can serve metadata and search results but never a stream.
+ * NetEase follows because it carries the catalogue YouTube misses —
+ * most notably the paid tracks, which YouTube simply does not have.
  */
-export const PROVIDER_PRIORITY: ProviderId[] = [
-  "youtube",
-  "netease",
-  "migu",
-  "kugou",
-  "qq",
-];
+export const PROVIDER_PRIORITY: ProviderId[] = ["youtube", "netease"];
 
 /** The providers that can serve metadata but never audio. */
-export const METADATA_ONLY_PROVIDERS: ProviderId[] = ["spotify", "apple"];
+export const METADATA_ONLY_PROVIDERS: ProviderId[] = [];
 
 /** What each provider can do. */
 export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapabilities> = {
@@ -147,47 +128,12 @@ export const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapabilities> = {
     needsAccount: false,
     canUnlockPaid: true,
   },
-  migu: {
-    playable: true,
-    lyrics: true,
-    needsAccount: false,
-    canUnlockPaid: false,
-  },
-  kugou: {
-    playable: true,
-    lyrics: true,
-    needsAccount: false,
-    canUnlockPaid: false,
-  },
-  qq: {
-    playable: true,
-    lyrics: true,
-    needsAccount: false,
-    canUnlockPaid: true,
-  },
-  spotify: {
-    playable: false,
-    lyrics: false,
-    needsAccount: true,
-    canUnlockPaid: false,
-  },
-  apple: {
-    playable: false,
-    lyrics: false,
-    needsAccount: true,
-    canUnlockPaid: false,
-  },
 };
 
 /** The provider's display name, in the app's own wording. */
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   youtube: "YouTube Music",
   netease: "NetEase Cloud Music",
-  migu: "Migu Music",
-  kugou: "Kugou Music",
-  qq: "QQ Music",
-  spotify: "Spotify",
-  apple: "Apple Music",
 };
 
 /**

@@ -49,7 +49,7 @@ const PREF_KEY = "ytm:lyrics-source";
  * They are keyed on the platform's own track id, so a YouTube track has
  * nothing for them to answer about.
  */
-const CN_SOURCES: LyricsSource[] = ["netease", "migu", "kugou", "qq"];
+const ID_SOURCES: LyricsSource[] = ["netease"];
 
 type Pref = LyricsSource | "auto";
 /** "none" means the source answered and has nothing. "error" means it never
@@ -202,24 +202,16 @@ export function useLyricsView(track: QueueTrack | undefined): LyricsViewState {
   const sources = useMemo(() => {
     const provider = track?.provider;
     const applicable: LyricsSource[] =
-      provider === "netease"
-        ? ["netease"]
-        : provider === "migu"
-          ? ["migu"]
-          : provider === "kugou"
-            ? ["kugou"]
-            : provider === "qq"
-              ? ["qq"]
-              : [];
+      provider === "netease" ? ["netease"] : [];
     if (applicable.includes("netease")) return sourceOrder;
     // A YouTube track the app knows on NetEase keeps the NetEase row.
     if (neteaseSongId) {
       return sourceOrder.filter(
-        (s) => s === "netease" || !CN_SOURCES.includes(s),
+        (s) => s === "netease" || !ID_SOURCES.includes(s),
       );
     }
     return sourceOrder.filter(
-      (s) => applicable.includes(s) || !CN_SOURCES.includes(s),
+      (s) => applicable.includes(s) || !ID_SOURCES.includes(s),
     );
   }, [sourceOrder, track?.provider, neteaseSongId]);
 

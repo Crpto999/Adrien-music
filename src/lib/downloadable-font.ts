@@ -2,8 +2,6 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { create } from "zustand";
 import { createStore, del, get, set } from "idb-keyval";
 
-import { proxyOptions } from "@/lib/proxy";
-
 /**
  * The machinery behind a downloadable type family.
  *
@@ -342,7 +340,6 @@ export function createFontDownload(font: DownloadableFont) {
     const res = await tauriFetch(`${font.cdnBase}${file}`, {
       method: "GET",
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-      ...proxyOptions(),
     });
     if (!res.ok) {
       throw new Error(`${file}: HTTP ${res.status}`);

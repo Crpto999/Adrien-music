@@ -20,9 +20,8 @@ describe("the provider registry", () => {
     }
   });
 
-  it("has adapters for the Chinese platforms", () => {
-    expect(hasProvider("migu")).toBe(true);
-    expect(hasProvider("kugou")).toBe(true);
-    expect(hasProvider("qq")).toBe(true);
+  it("only registers the youtube + netease adapters", () => {
+    expect(hasProvider("youtube")).toBe(true);
+    expect(hasProvider("netease")).toBe(true);
   });
 });

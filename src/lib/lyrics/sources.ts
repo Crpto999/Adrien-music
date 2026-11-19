@@ -4,7 +4,6 @@ import { fetchLrclibLyrics } from "@/lib/lyrics/lrclib";
 import { fetchMusixmatchLyrics } from "@/lib/lyrics/musixmatch";
 import { fetchGeniusLyrics } from "@/lib/lyrics/genius";
 import { fetchYtMusicLyrics } from "@/lib/lyrics/ytmusic";
-import { fetchCnLyrics } from "@/lib/lyrics/cn";
 import { fetchNeteaseLyrics } from "@/lib/lyrics/netease";
 import { shouldRetryLyricsQuery } from "@/lib/lyrics/http";
 import { normalizeLyrics } from "@/lib/lyrics/normalize";
@@ -19,9 +18,6 @@ import { usePlaybackStore, type QueueTrack } from "@/lib/store/playback";
 export type LyricsSource =
   | "ytmusic"
   | "netease"
-  | "migu"
-  | "kugou"
-  | "qq"
   | "lrclib"
   | "musixmatch"
   | "genius";
@@ -29,18 +25,14 @@ export type LyricsSource =
 /**
  * Preference order. YouTube Music leads because it is the only source
  * matched by videoId rather than by text, so it cannot return a different
- * song. The Chinese platforms follow for the same reason — they are
- * keyed on the platform's own track id — and they are asked first among
- * the id-keyed sources because a Chinese track's words are far more
- * likely to be right on a Chinese platform than on a text-matching one.
+ * song. NetEase follows for the same reason — keyed on the platform's own
+ * track id — and a Chinese track's words are far more likely to be right
+ * on NetEase than on a text-matching one.
  * The rest follow as fallbacks for the tracks they have nothing for.
  */
 export const SOURCE_ORDER: LyricsSource[] = [
   "ytmusic",
   "netease",
-  "migu",
-  "kugou",
-  "qq",
   "lrclib",
   "musixmatch",
   "genius",
@@ -49,9 +41,6 @@ export const SOURCE_ORDER: LyricsSource[] = [
 export const SOURCE_LABELS: Record<LyricsSource, string> = {
   ytmusic: "YouTube Music",
   netease: "NetEase Cloud Music",
-  migu: "Migu Music",
-  kugou: "Kugou Music",
-  qq: "QQ Music",
   lrclib: "LRCLIB",
   musixmatch: "Musixmatch",
   genius: "Genius",
@@ -80,18 +69,10 @@ export const SOURCE_LABELS: Record<LyricsSource, string> = {
 const PROVIDER_LYRICS_SOURCE: Record<ProviderId, LyricsSource | null> = {
   youtube: "ytmusic",
   netease: "netease",
-  migu: "migu",
-  kugou: "kugou",
-  qq: "qq",
-  spotify: null,
-  apple: null,
 };
 
 /**
  * The lyrics source that matches a track's audio provider.
- *
- * `null` for a provider with no lyrics of its own — Spotify and Apple
- * Music, which never serve audio either.
  */
 export function lyricsSourceForProvider(
   provider: ProviderId | undefined,
@@ -273,17 +254,6 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
     retry: shouldRetryLyricsQuery,
   });
 
-  // The Chinese platforms answer about *their own* track id, so a query
-  // only makes sense for a track that actually came from one of them.
-  // A track playing from YouTube has no Migu id to ask about.
-  const cnProvider = track?.provider;
-  const cnTrackId = track?.providerTrackId;
-  const cnEnabled =
-    !!track &&
-    enabled &&
-    (cnProvider === "migu" || cnProvider === "kugou" || cnProvider === "qq") &&
-    !!cnTrackId;
-
   // NetEase's own lyrics, keyed on the platform's song id. This is the
   // source that matters for the daily recommendation: those picks are
   // NetEase records, so the platform has exactly the right words for
@@ -388,39 +358,9 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
     retry: shouldRetryLyricsQuery,
   });
 
-  // The Chinese platforms answer about *their own* track id, so a query
-  // only makes sense for a track that actually came from one of them.
-  // A track playing from YouTube has no Migu id to ask about.
-  const migu = useQuery({
-    queryKey: ["lyrics", "migu", LOOKUP_VERSION, cnTrackId],
-    queryFn: ({ signal }) => fetchCnLyrics("migu", cnTrackId, signal),
-    enabled: cnEnabled && cnProvider === "migu",
-    staleTime: ONE_HOUR,
-    retry: shouldRetryLyricsQuery,
-  });
-
-  const kugou = useQuery({
-    queryKey: ["lyrics", "kugou", LOOKUP_VERSION, cnTrackId],
-    queryFn: ({ signal }) => fetchCnLyrics("kugou", cnTrackId, signal),
-    enabled: cnEnabled && cnProvider === "kugou",
-    staleTime: ONE_HOUR,
-    retry: shouldRetryLyricsQuery,
-  });
-
-  const qq = useQuery({
-    queryKey: ["lyrics", "qq", LOOKUP_VERSION, cnTrackId],
-    queryFn: ({ signal }) => fetchCnLyrics("qq", cnTrackId, signal),
-    enabled: cnEnabled && cnProvider === "qq",
-    staleTime: ONE_HOUR,
-    retry: shouldRetryLyricsQuery,
-  });
-
   const queries: Record<LyricsSource, UseQueryResult<Lyrics | null>> = {
     ytmusic,
     netease,
-    migu,
-    kugou,
-    qq,
     lrclib,
     musixmatch,
     genius,
@@ -443,9 +383,6 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
     const out = {} as Record<LyricsSource, Lyrics | null>;
     out.ytmusic = toSimplifiedLyrics(ytmusic.data ?? null);
     out.netease = toSimplifiedLyrics(netease.data ?? null);
-    out.migu = toSimplifiedLyrics(migu.data ?? null);
-    out.kugou = toSimplifiedLyrics(kugou.data ?? null);
-    out.qq = toSimplifiedLyrics(qq.data ?? null);
     out.lrclib = toSimplifiedLyrics(lrclib.data ?? null);
     out.musixmatch = toSimplifiedLyrics(musixmatch.data ?? null);
     out.genius = toSimplifiedLyrics(genius.data ?? null);
@@ -453,9 +390,6 @@ export function useLyricsSources(track: QueueTrack | undefined, enabled: boolean
   }, [
     ytmusic.data,
     netease.data,
-    migu.data,
-    kugou.data,
-    qq.data,
     lrclib.data,
     musixmatch.data,
     genius.data,

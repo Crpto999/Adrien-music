@@ -1,7 +1,6 @@
-//! Cover-art URL normalisation for the Chinese music platforms.
+//! Cover-art URL normalisation for the NetEase API.
 //!
-//! The NetEase / Kugou / QQ Music APIs hand out artwork URLs on plain
-//! `http://`, pointing at CDNs that serve `https://` perfectly well.
+//! NetEase hands out artwork URLs on plain `http://`, pointing at a CDN that serve `https://` perfectly well.
 //!
 //! Two things break if those URLs are passed through unchanged:
 //!
@@ -64,8 +63,8 @@ mod tests {
     #[test]
     fn a_query_string_survives() {
         assert_eq!(
-            to_https("http://imge.kugou.com/stdmusic/400/x.jpg?param=y"),
-            "https://imge.kugou.com/stdmusic/400/x.jpg?param=y"
+            to_https("http://p1.music.126.net/stdmusic/400/x.jpg?param=y"),
+            "https://p1.music.126.net/stdmusic/400/x.jpg?param=y"
         );
     }
 

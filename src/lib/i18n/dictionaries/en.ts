@@ -395,6 +395,8 @@ export const en = {
     scopeLibrary: "My library",
     libraryMatches: "{count} songs in your library{suffix}",
     libraryMatchesOne: "1 song in your library{suffix}",
+    neteaseMatches: "{count} NetEase songs",
+    neteaseMatchesOne: "1 NetEase song",
     mostRecent: " (most recent)",
     noLibraryMatches: 'No songs in your library match "{query}".',
     signInToSearch: "Sign in to search your library",
@@ -621,9 +623,9 @@ export const en = {
         "This install is managed by pacman (AUR) — refresh it with {command}.",
       packageManaged:
         "This install is managed by your system package manager — fetch new releases from the Releases page.",
-      proxy: "Proxy",
+      proxy: "Proxy (YouTube only)",
       proxyDesc:
-        "Route network traffic through an HTTP/HTTPS or SOCKS proxy. Leave empty to connect directly.",
+        "Only YouTube traffic uses this proxy (InnerTube, googlevideo, yt-dlp). NetEase always connects directly. Leave empty to connect directly.",
       proxyPlaceholder: "Support socks5/http/https",
       proxyInvalid: "That doesn't look like a valid proxy URL.",
       proxyUnsupportedScheme:
@@ -775,6 +777,11 @@ export const en = {
       searchingSources: "Looking for other sources…",
       noOtherSource: "No other source has this track.",
       sourceUnavailable: "Not playable",
+      playingNow: "Playing",
+      switchToHere: "Switch here",
+      manualMatch: "Manually match on {source}",
+      manualTitle: "Pick the right match on {source}",
+      manualDesc: "Top 10 results for “{query}”. Your pick is saved and locked to this track.",
       switchedTo: "Now playing from {source}.",
       switchFailed: "{source} could not play this track.",
     },

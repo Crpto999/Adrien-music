@@ -89,7 +89,7 @@ describe("the match diagnostics", () => {
       lines.push(args.map(String).join(" "));
     };
     try {
-      rankCandidates([], source, { provider: "qq", query: "晴天 周杰伦" });
+      rankCandidates([], source, { provider: "youtube", query: "晴天 周杰伦" });
     } finally {
       console.debug = original;
     }
@@ -108,7 +108,7 @@ describe("the match diagnostics", () => {
     setMatchDebugEnabled(false);
     try {
       rankCandidates(candidates, source, {
-        provider: "migu",
+        provider: "netease",
         query: "晴天 周杰伦",
       });
     } finally {

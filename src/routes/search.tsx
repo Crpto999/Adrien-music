@@ -43,6 +43,8 @@ import {
 } from "@/components/ui/menu-chrome";
 import { useSearchHistory } from "@/lib/store/search-history";
 import { usePlaybackStore } from "@/lib/store/playback";
+import { neteaseSearch } from "@/lib/providers/adapters/netease";
+import { PROVIDER_LABELS, type ProviderId } from "@/lib/providers/types";
 import { openSettings } from "@/lib/store/settings-dialog";
 import { cn } from "@/lib/utils";
 import type {
@@ -98,14 +100,42 @@ function SearchPage() {
   const t = useT();
   const { q = "", filter = "all" } = Route.useSearch();
   const [scope, setScope] = useState<Scope>("catalog");
+  const [catalogProvider, setCatalogProvider] =
+    useState<ProviderId>("youtube");
 
   const query = q.trim();
+  const isNeteaseCatalog =
+    scope === "catalog" && catalogProvider === "netease";
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["search", query, filter],
     queryFn: () => fetchSearch(query, filter),
-    enabled: query.length > 0 && scope === "catalog",
+    enabled: query.length > 0 && scope === "catalog" && !isNeteaseCatalog,
     staleTime: 30_000,
   });
+  const netease = useQuery({
+    queryKey: ["netease-search", query],
+    queryFn: () => neteaseSearch(query, 30),
+    enabled: query.length > 0 && isNeteaseCatalog,
+    staleTime: 30_000,
+  });
+  const neteaseItems = useMemo<ShelfItem[]>(
+    () =>
+      (netease.data ?? []).map((song) => ({
+        kind: "song" as const,
+        id: song.id,
+        title: song.title,
+        subtitle: song.artists.join(", "),
+        artists: song.artists.map((name) => ({ name })),
+        album: song.album ?? undefined,
+        duration: song.duration,
+        thumbnails: song.coverUrl
+          ? [{ url: song.coverUrl, width: 544, height: 544 }]
+          : [],
+        provider: "netease" as const,
+        providerTrackId: song.id,
+      })),
+    [netease.data],
+  );
 
   // Lifted here (not inside LibraryResults) so the result count can sit up in
   // the controls row — where the catalog filter chips live — instead of above
@@ -150,18 +180,53 @@ function SearchPage() {
         <SearchField filter={filter} urlQ={q} className="w-full" />
         <div className="flex items-center gap-3">
           {scope === "catalog" ? (
-            <FilterBar filter={filter} />
+            isNeteaseCatalog ? (
+            <h2 className="min-w-0 flex-1 truncate text-xl font-semibold tracking-tight">
+                {neteaseItems.length > 0
+                  ? t(
+                      neteaseItems.length === 1
+                        ? "search.neteaseMatchesOne"
+                        : "search.neteaseMatches",
+                      { count: neteaseItems.length },
+                    )
+                  : null}
+              </h2>
+            ) : (
+              <FilterBar filter={filter} />
+            )
           ) : (
             <h2 className="min-w-0 flex-1 truncate text-xl font-semibold tracking-tight">
               {libraryCount}
             </h2>
           )}
-          <ScopeToggle scope={scope} onChange={setScope} className="ml-auto" />
+          {scope === "catalog" ? (
+            <CatalogProviderToggle
+              provider={catalogProvider}
+              onChange={setCatalogProvider}
+            />
+          ) : null}
+          <ScopeToggle scope={scope} onChange={setScope} />
         </div>
       </div>
 
       {!query ? null : scope === "library" ? (
         <LibraryResults state={library} query={query} />
+      ) : isNeteaseCatalog ? (
+        netease.error ? (
+          <ErrorCard
+            title={t("search.failed")}
+            message={(netease.error as Error).message}
+            onRetry={() => netease.refetch()}
+          />
+        ) : netease.isLoading ? (
+          <TrackRowSkeletonList count={10} />
+        ) : neteaseItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t("search.noResultsFor", { query })}
+          </p>
+        ) : (
+          <TrackList tracks={neteaseItems} />
+        )
       ) : error ? (
         <ErrorCard
           title={t("search.failed")}
@@ -260,6 +325,35 @@ function FilterBar({ filter }: { filter: SearchFilter }) {
           <FilterChip key={f} filter={f} active={filter === f} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function CatalogProviderToggle({
+  provider,
+  onChange,
+}: {
+  provider: ProviderId;
+  onChange: (p: ProviderId) => void;
+}) {
+  return (
+    <div className="inline-flex shrink-0 rounded-lg border border-input p-0.5">
+      {(["youtube", "netease"] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={provider === value}
+          onClick={() => onChange(value)}
+          className={cn(
+            "cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+            provider === value
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {PROVIDER_LABELS[value]}
+        </button>
+      ))}
     </div>
   );
 }

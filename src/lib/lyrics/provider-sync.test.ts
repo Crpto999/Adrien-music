@@ -19,16 +19,6 @@ describe("lyricsSourceForProvider", () => {
   it("pairs each provider with the platform that serves the same ids", () => {
     expect(lyricsSourceForProvider("youtube")).toBe("ytmusic");
     expect(lyricsSourceForProvider("netease")).toBe("netease");
-    expect(lyricsSourceForProvider("migu")).toBe("migu");
-    expect(lyricsSourceForProvider("kugou")).toBe("kugou");
-    expect(lyricsSourceForProvider("qq")).toBe("qq");
-  });
-
-  it("has no lyrics for the metadata-only providers", () => {
-    // Spotify and Apple Music never serve audio, so a track never plays
-    // from them and there is nothing for their lyrics to pair with.
-    expect(lyricsSourceForProvider("spotify")).toBeNull();
-    expect(lyricsSourceForProvider("apple")).toBeNull();
   });
 
   it("has no lyrics for a track with no provider", () => {
@@ -53,13 +43,7 @@ describe("orderedSourcesForProvider", () => {
   });
 
   it("still lists every source exactly once", () => {
-    for (const provider of [
-      "youtube",
-      "netease",
-      "migu",
-      "kugou",
-      "qq",
-    ] as const) {
+    for (const provider of ["youtube", "netease"] as const) {
       const order = orderedSourcesForProvider(provider);
       expect(new Set(order).size).toBe(order.length);
       expect(order.sort()).toEqual([...SOURCE_ORDER].sort());
@@ -67,7 +51,6 @@ describe("orderedSourcesForProvider", () => {
   });
 
   it("leaves the order alone for a provider with no lyrics", () => {
-    expect(orderedSourcesForProvider("spotify")).toEqual(SOURCE_ORDER);
     expect(orderedSourcesForProvider(undefined)).toEqual(SOURCE_ORDER);
   });
 });

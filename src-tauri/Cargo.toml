@@ -75,6 +75,12 @@ ecb = { version = "0.1", features = ["alloc"] }
 # MD5 for the eapi payload digest — the platform's own signing scheme,
 # not a security choice on our side.
 md-5 = "0.10"
+# weapi is the browser client's channel: double AES-128-CBC plus a
+# textbook-RSA-encrypted random key. Same published constants as eapi —
+# implemented here from the protocol's specification, matching the
+# reference SDK's channel choice per endpoint.
+cbc = { version = "0.1", features = ["alloc"] }
+rsa = { version = "0.9", features = ["pem"] }
 urlencoding = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "io-util", "process", "sync", "net"] }
 axum = "0.7"

@@ -1,5 +1,4 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
-import { proxyOptions } from "@/lib/proxy";
 import { md5Hex } from "./md5";
 
 /**
@@ -68,12 +67,10 @@ async function request<T>(
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
-      ...proxyOptions(),
     });
   } else {
     res = await tauriFetch(`${API_ROOT}?${body}`, {
       method: "GET",
-      ...proxyOptions(),
     });
   }
 

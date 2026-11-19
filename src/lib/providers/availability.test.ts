@@ -43,17 +43,12 @@ describe("ranking the available sources", () => {
       matches([
         ["youtube", "yt123"],
         ["netease", "185709"],
-        ["migu", "600929"],
       ]),
       ytTrack,
-      ["netease", "youtube", "migu"],
+      ["netease", "youtube"],
     );
 
-    expect(ranked.map((r) => r.provider)).toEqual([
-      "netease",
-      "youtube",
-      "migu",
-    ]);
+    expect(ranked.map((r) => r.provider)).toEqual(["netease", "youtube"]);
   });
 
   it("uses the origin's own id, not the matched one", () => {
@@ -93,7 +88,7 @@ describe("ranking the available sources", () => {
     const ranked = rankAvailability(
       matches([["youtube", "yt123"]]),
       ytTrack,
-      ["netease", "youtube", "migu"],
+      ["netease", "youtube"],
     );
 
     expect(ranked.map((r) => r.provider)).toEqual(["youtube"]);
@@ -105,22 +100,10 @@ describe("ranking the available sources", () => {
     const ranked = rankAvailability(
       matches([
         ["youtube", "yt123"],
-        ["migu", "600929"],
+        ["netease", "185709"],
       ]),
       ytTrack,
       ["youtube"],
-    );
-
-    expect(ranked.map((r) => r.provider)).toEqual(["youtube"]);
-  });
-
-  it("never lists a metadata-only source", () => {
-    // Spotify and Apple Music gate their audio behind DRM; they can
-    // never serve a stream, so they are not playable sources at all.
-    const ranked = rankAvailability(
-      matches([["spotify", "sp1"]]),
-      ytTrack,
-      ["spotify", "youtube"],
     );
 
     expect(ranked.map((r) => r.provider)).toEqual(["youtube"]);
@@ -137,23 +120,18 @@ describe("ranking the available sources", () => {
       origin: "netease",
       originId: "185709",
     };
-    const order = effectiveOrder(["youtube", "migu", "netease"], ["netease"]);
+    const order = effectiveOrder(["youtube", "netease"], ["netease"]);
 
     const ranked = rankAvailability(
       matches([
         ["netease", "185709"],
         ["youtube", "yt123"],
-        ["migu", "600929"],
       ]),
       pick,
       order,
     );
 
-    expect(ranked.map((r) => r.provider)).toEqual([
-      "netease",
-      "youtube",
-      "migu",
-    ]);
+    expect(ranked.map((r) => r.provider)).toEqual(["netease", "youtube"]);
   });
 });
 
@@ -166,13 +144,14 @@ describe("ranking the available sources", () => {
  */
 describe("the daily picks' preference", () => {
   it("moves the preferred source to the front", () => {
-    expect(
-      effectiveOrder(["youtube", "netease", "migu"], ["netease"]),
-    ).toEqual(["netease", "youtube", "migu"]);
+    expect(effectiveOrder(["youtube", "netease"], ["netease"])).toEqual([
+      "netease",
+      "youtube",
+    ]);
   });
 
   it("leaves the order alone when there is no preference", () => {
-    const order: ProviderId[] = ["youtube", "netease", "migu"];
+    const order: ProviderId[] = ["youtube", "netease"];
     expect(effectiveOrder(order, [])).toEqual(order);
     expect(effectiveOrder(order)).toEqual(order);
   });
@@ -180,15 +159,13 @@ describe("the daily picks' preference", () => {
   it("does not disturb the order of the other sources", () => {
     // The preference moves *one* source ahead of the others. It does
     // not reverse them.
-    expect(
-      effectiveOrder(["youtube", "migu", "kugou", "qq"], ["kugou"]),
-    ).toEqual(["kugou", "youtube", "migu", "qq"]);
+    expect(effectiveOrder(["youtube", "netease"], ["youtube"])).toEqual([
+      "youtube",
+      "netease",
+    ]);
   });
 
   it("ignores a preferred source that is not in the chain", () => {
-    expect(effectiveOrder(["youtube", "migu"], ["netease"])).toEqual([
-      "youtube",
-      "migu",
-    ]);
+    expect(effectiveOrder(["youtube"], ["netease"])).toEqual(["youtube"]);
   });
 });

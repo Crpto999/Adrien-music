@@ -6,8 +6,7 @@ import type { ProviderId, ProviderRef } from "@/lib/providers/types";
  *
  * A provider that *has* a track is not the same as a provider that will
  * *serve* it. NetEase in particular carries plenty of tracks it will not
- * hand over without a membership, and the same is true of the paid tiers
- * on the Chinese platforms. Those are exactly the tracks the
+ * hand over without a membership, and those are exactly the tracks the
  * third-party unblock pool exists for.
  *
  * So "can this be played here?" is a separate question from "does this
@@ -43,32 +42,6 @@ export type PlayabilityProbe = (
 ) => Promise<boolean>;
 
 /**
- * Whether the backend could resolve a track on one of the Chinese
- * platforms to a playable URL.
- *
- * `cn_resolve` is the same resolution the stream server performs, so
- * a `true` here means the track will actually play — not merely that
- * the platform lists it.
- */
-async function probeCn(
-  platform: "migu" | "kugou" | "qq",
-  ref: ProviderRef,
-  signal?: AbortSignal,
-): Promise<boolean> {
-  if (signal?.aborted) return false;
-  try {
-    const resolved = await invoke<NeteaseResolved | null>("cn_resolve", {
-      platform,
-      songId: ref.providerTrackId,
-    });
-    if (signal?.aborted) return false;
-    return !!resolved?.url;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * The default probes.
  *
  * YouTube needs no probe: its extractor can answer for essentially
@@ -77,10 +50,6 @@ async function probeCn(
  * because its catalogue contains tracks the platform refuses to serve
  * without a membership — and those are exactly the tracks the
  * third-party unblock pool exists for.
- *
- * The Chinese platforms need one for the same reason: their free tiers
- * are large but their VIP tiers are not served to an anonymous client,
- * and the third-party resolver pool is what covers those.
  */
 const PROBES: Partial<Record<ProviderId, PlayabilityProbe>> = {
   netease: async (ref, signal) => {
@@ -96,9 +65,6 @@ const PROBES: Partial<Record<ProviderId, PlayabilityProbe>> = {
       return false;
     }
   },
-  migu: (ref, signal) => probeCn("migu", ref, signal),
-  kugou: (ref, signal) => probeCn("kugou", ref, signal),
-  qq: (ref, signal) => probeCn("qq", ref, signal),
 };
 
 /** The cached probe answers, keyed by `provider:trackId`. */

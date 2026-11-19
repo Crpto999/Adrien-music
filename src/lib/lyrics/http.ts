@@ -132,6 +132,8 @@ export async function lyricsFetch(
   headers: Record<string, string>,
   /** JSON body. Its presence switches the request to POST. */
   body?: unknown,
+  /** Only YouTube requests go through the user proxy (NetEase WAF blocks overseas IPs). */
+  useProxy = false,
 ): Promise<Response> {
   try {
     return await tauriFetch(url, {
@@ -139,7 +141,7 @@ export async function lyricsFetch(
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: deadline.signal,
-      ...proxyOptions(),
+      ...(useProxy ? proxyOptions() : {}),
     });
   } catch (e) {
     if (deadline.timedOut()) throw new LyricsTimeoutError(PROVIDER_TIMEOUT_MS);

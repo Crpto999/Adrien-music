@@ -1,19 +1,24 @@
-//! User-configurable network proxy.
+//! User-configurable network proxy (YouTube-only).
 //!
 //! The proxy is a single URL the user types into Settings → General. It
-//! covers three separate network paths, each of which needs its own
-//! plumbing:
+//! covers YouTube-related traffic only:
 //!
 //!  1. The webview's own requests, which go through `tauri-plugin-http`
 //!     (Rust-side `reqwest`). The plugin accepts a `proxy` client option,
 //!     so the frontend passes the URL with every request — see
 //!     `src/lib/proxy.ts`.
-//!  2. Our own `reqwest` clients: the media stream server (ranged reads
-//!     from googlevideo), the cover fetch, the session probe and the
-//!     yt-dlp self-update download. They are built through [`apply`] so
-//!     they pick the proxy up automatically.
+//!  2. Our own YouTube `reqwest` clients: the media stream server (ranged
+//!     reads from googlevideo), the cover fetch for YouTube hosts, the
+//!     YouTube session probe and the yt-dlp self-update download. They
+//!     are built through [`apply`] so they pick the proxy up
+//!     automatically.
 //!  3. The `yt-dlp` child processes, which know nothing about our
 //!     clients — they take a `--proxy <url>` argument instead.
+//!
+//! NetEase traffic (official API + CDN + third-party unblock pool) must
+//! NEVER go through this proxy: NetEase's WAF blocks overseas IPs with
+//! -462/460. NetEase call sites use [`direct_media_client`] or a plain
+//! `reqwest::Client::builder().build()` instead.
 //!
 //! An empty setting means "no proxy": [`normalize`] maps an empty (or
 //! whitespace-only) string to `None`, and every consumer treats `None`
@@ -80,11 +85,26 @@ pub fn url() -> Option<String> {
 }
 
 /// The shared media client, honouring the current proxy.
+///
+/// YouTube-only: googlevideo ranged reads go through here.
 pub fn media_client() -> reqwest::Client {
     state()
         .media_client
         .read()
         .map(|c| c.clone())
+        .unwrap_or_default()
+}
+
+/// A direct client with no proxy, for all NetEase traffic (official API,
+/// CDN reads, third-party unblock pool).
+///
+/// Same timeouts as [`media_client`] but never proxied: NetEase's WAF
+/// treats overseas proxy IPs as risk (-462/460).
+pub fn direct_media_client() -> reqwest::Client {
+    ClientBuilder::new()
+        .connect_timeout(MEDIA_CONNECT_TIMEOUT)
+        .read_timeout(MEDIA_READ_TIMEOUT)
+        .build()
         .unwrap_or_default()
 }
 

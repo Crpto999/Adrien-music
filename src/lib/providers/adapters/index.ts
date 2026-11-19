@@ -1,11 +1,6 @@
 import { registerProvider } from "@/lib/providers/registry";
 import { searchNetEase } from "@/lib/providers/adapters/netease";
 import { searchYouTube } from "@/lib/providers/adapters/youtube";
-import {
-  searchKugou,
-  searchMigu,
-  searchQQ,
-} from "@/lib/providers/adapters/cn";
 
 /**
  * Register the built-in provider adapters.
@@ -22,9 +17,6 @@ export function registerBuiltinProviders(): void {
   registered = true;
   registerProvider("youtube", searchYouTube);
   registerProvider("netease", searchNetEase);
-  registerProvider("migu", searchMigu);
-  registerProvider("kugou", searchKugou);
-  registerProvider("qq", searchQQ);
 }
 
 // Register on import. The resolver is imported by the playback engine

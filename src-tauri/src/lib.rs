@@ -63,7 +63,6 @@ mod netease_auth;
 mod netease_social;
 #[cfg(test)]
 mod netease_qr_test;
-mod cnproviders;
 mod unblock;
 mod update_source;
 mod ytdlp;
@@ -2782,11 +2781,8 @@ fn check_cover_url(url: &str) -> Result<(), String> {
         "ytimg.com",
         "ggpht.com",
         "googleusercontent.com",
-        // The Chinese platforms' artwork CDNs: NetEase (p1.music.126.net
-        // and friends), Kugou (imge.kugou.com) and QQ Music (y.gtimg.cn).
+        // NetEase artwork CDN (p1.music.126.net and friends).
         "music.126.net",
-        "kugou.com",
-        "gtimg.cn",
     ];
     let host = parsed.host_str().unwrap_or("");
     let host_ok = ALLOWED_HOST_SUFFIXES
@@ -2800,16 +2796,34 @@ fn check_cover_url(url: &str) -> Result<(), String> {
 
 /// Fetch cover bytes from an allowlisted CDN. Shared by the disk cache
 /// and the user-facing "Download cover" action.
+///
+/// Routing: only YouTube artwork hosts go through the user proxy;
+/// everything else (NetEase `music.126.net`, iTunes `mzstatic.com`)
+/// connects directly — NetEase's WAF blocks overseas proxy IPs
+/// (-462/460), and non-YouTube hosts must not inherit the YouTube proxy.
 async fn fetch_cover_bytes(url: &str) -> Result<Vec<u8>, String> {
     check_cover_url(url)?;
-    let resp = proxy::build_client(
-        reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .redirect(reqwest::redirect::Policy::none()),
-    )
-    .map_err(|e| format!("client: {e}"))?
-    .get(url)
-    .send()
+    let host = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h.to_ascii_lowercase()))
+        .unwrap_or_default();
+    let is_youtube = host == "ytimg.com"
+        || host.ends_with(".ytimg.com")
+        || host == "ggpht.com"
+        || host.ends_with(".ggpht.com")
+        || host == "googleusercontent.com"
+        || host.ends_with(".googleusercontent.com");
+    let builder = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .redirect(reqwest::redirect::Policy::none());
+    let client = if is_youtube {
+        proxy::build_client(builder).map_err(|e| format!("client: {e}"))?
+    } else {
+        builder.build().map_err(|e| format!("client: {e}"))?
+    };
+    let resp = client
+        .get(url)
+        .send()
         .await
         .map_err(|e| format!("fetch: {e}"))?;
     if !resp.status().is_success() {
@@ -3723,7 +3737,7 @@ async fn netease_stream_handler(
         &resolved,
         state.clone(),
         part,
-        proxy::media_client(),
+        proxy::direct_media_client(),
     );
     log!(
         "[stream] netease {song_id}: responding {} ({:.2}s)",
@@ -3762,7 +3776,8 @@ fn spawn_netease_filler(
         let success = if let Some(file) = part_file {
             let _ = state.resolved.set(resolved.clone());
             state.notify.notify_waiters();
-            let http = proxy::media_client();
+            // NetEase CDN: direct, never through the user proxy.
+            let http = proxy::direct_media_client();
             progressive::fill(&http, &resolved, file, &state).await
                 && state.downloaded.load(Ordering::Acquire) == resolved.size
         } else {
@@ -3788,196 +3803,6 @@ fn spawn_netease_filler(
 
         // Evict from the in-memory map after a grace period so a brief
         // re-play stays in RAM, then falls back to the on-disk copy.
-        let downloads_evict = downloads.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(60)).await;
-            downloads_evict.lock().await.remove(&map_key);
-        });
-    });
-}
-
-/// GET /stream/cn/:platform/:track_id — serve a track from Migu, Kugou
-/// or QQ Music.
-///
-/// The three platforms share one handler because they share one shape:
-/// a platform id, a track id, and a direct CDN URL that the resolution
-/// produces. The bytes are then served through the same progressive
-/// path YouTube and NetEase use, so the `<audio>` element sees the same
-/// kind of response whichever provider is behind it.
-///
-/// The cache file is named `<platform>_<id>`, so a Kugou hash and a
-/// QQ mid can never collide on disk.
-async fn cn_stream_handler(
-    AxumState(srv): AxumState<StreamServer>,
-    Path((platform, track_id)): Path<(String, String)>,
-    req: Request,
-) -> Response {
-    if !matches!(platform.as_str(), "migu" | "kugou" | "qq") {
-        return (StatusCode::BAD_REQUEST, "unknown platform").into_response();
-    }
-    if track_id.is_empty() || track_id.len() > 64 {
-        return (StatusCode::BAD_REQUEST, "invalid track id").into_response();
-    }
-    // The ids are alphanumeric (a QQ mid, a Kugou hash) or digits (a
-    // Migu content id). Nothing else is accepted, which keeps the
-    // cache key safe as a filename.
-    if !track_id
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
-        return (StatusCode::BAD_REQUEST, "invalid track id").into_response();
-    }
-
-    let cache_key = format!("{platform}_{track_id}");
-    let t0 = std::time::Instant::now();
-    let final_path = srv.cache_dir.join(format!("{cache_key}.webm"));
-
-    let range_hdr = req
-        .headers()
-        .get(axum::http::header::RANGE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-
-    if final_path.exists() {
-        let mut resp = ServeFile::new(&final_path)
-            .oneshot(req)
-            .await
-            .map(|r| r.into_response())
-            .unwrap_or_else(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("serve: {e}"),
-                )
-                    .into_response()
-            });
-        if resp.status().is_success() || resp.status() == StatusCode::PARTIAL_CONTENT {
-            resp.headers_mut().insert(
-                axum::http::header::CONTENT_TYPE,
-                axum::http::header::HeaderValue::from_static("audio/mpeg"),
-            );
-        }
-        return resp;
-    }
-
-    // Resolve first: without a direct URL and a known size there is
-    // nothing to serve, and the element should get a clear error
-    // rather than a hang.
-    let Some(resolved) = cnproviders::resolve(&platform, &track_id).await else {
-        log!("[stream] {platform} {track_id}: no playable URL");
-        return (StatusCode::BAD_GATEWAY, "no playable url").into_response();
-    };
-    log!(
-        "[stream] {platform} {track_id}: resolved {} bytes ({})",
-        resolved.size,
-        resolved.mime
-    );
-
-    let state = {
-        let mut map = srv.downloads.lock().await;
-        let key = format!("c:{cache_key}");
-        if let Some(s) = map.get(&key) {
-            s.clone()
-        } else {
-            let s = Arc::new(DownloadState::new());
-            map.insert(key.clone(), s.clone());
-            drop(map);
-            spawn_cn_filler(
-                resolved.clone(),
-                cache_key.clone(),
-                srv.cache_dir.clone(),
-                key.clone(),
-                srv.clone(),
-                s.clone(),
-            );
-            s
-        }
-    };
-
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
-    loop {
-        let notified = state.notify.notified();
-        tokio::pin!(notified);
-        notified.as_mut().enable();
-        if state.resolved.get().is_some() || state.complete.load(Ordering::Acquire) {
-            break;
-        }
-        if tokio::time::Instant::now() >= deadline {
-            return (StatusCode::GATEWAY_TIMEOUT, "download timeout").into_response();
-        }
-        let _ = tokio::time::timeout(Duration::from_secs(5), notified).await;
-    }
-
-    let part_path = srv.cache_dir.join(format!("{cache_key}.part"));
-    let part = tokio::fs::File::open(&part_path).await.ok();
-    let range = (!range_hdr.is_empty()).then_some(range_hdr.as_str());
-    let resp = progressive::respond(
-        range,
-        &resolved,
-        state.clone(),
-        part,
-        proxy::media_client(),
-    );
-    log!(
-        "[stream] {platform} {track_id}: responding {} ({:.2}s)",
-        resp.status(),
-        t0.elapsed().as_secs_f32()
-    );
-    resp
-}
-
-/// Fill the cache file for a track from one of the Chinese platforms.
-///
-/// The CDNs answer `Range` requests and report the exact length, so the
-/// same filler the YouTube and NetEase paths use works unchanged.
-///
-/// `cache_key` is `<platform>_<track id>` — it is derived from the
-/// track id rather than the CDN URL, because the URL carries a signed
-/// token that changes on every resolve, so keying the cache on it would
-/// never hit.
-fn spawn_cn_filler(
-    resolved: progressive::ResolvedAudio,
-    cache_key: String,
-    target_dir: PathBuf,
-    map_key: String,
-    srv: StreamServer,
-    state: Arc<DownloadState>,
-) {
-    let downloads = srv.downloads.clone();
-    tokio::spawn(async move {
-        let _ = tokio::fs::create_dir_all(&target_dir).await;
-        let part_path = target_dir.join(format!("{cache_key}.part"));
-        let final_path = target_dir.join(format!("{cache_key}.webm"));
-        let _ = tokio::fs::remove_file(&part_path).await; // clean stale
-
-        let part_file = tokio::fs::File::create(&part_path).await.ok();
-
-        let success = if let Some(file) = part_file {
-            let _ = state.resolved.set(resolved.clone());
-            state.notify.notify_waiters();
-            let http = proxy::media_client();
-            progressive::fill(&http, &resolved, file, &state).await
-                && state.downloaded.load(Ordering::Acquire) == resolved.size
-        } else {
-            false
-        };
-
-        if success {
-            if let Err(e) = tokio::fs::rename(&part_path, &final_path).await {
-                log!("[stream] {cache_key} rename: {e}");
-                let _ = tokio::fs::remove_file(&part_path).await;
-            }
-        } else {
-            let _ = tokio::fs::remove_file(&part_path).await;
-        }
-        state.complete.store(true, Ordering::Release);
-        state.notify.notify_waiters();
-
-        if success {
-            let limit = srv.cache_limit.load(Ordering::Relaxed);
-            enforce_cache_limit(srv.cache_dir.clone(), limit, AUDIO_CACHE_EXTENSIONS).await;
-        }
-
         let downloads_evict = downloads.clone();
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_secs(60)).await;
@@ -4136,78 +3961,6 @@ async fn netease_prefetch_handler(
     StatusCode::ACCEPTED
 }
 
-/// GET /prefetch/cn/:platform/:track_id — fire-and-forget cache warmer
-/// for a Migu, Kugou or QQ Music track.
-///
-/// Same shape as the NetEase prefetcher: resolve the track to a direct
-/// CDN URL, then let the progressive filler cache it in the background.
-/// A track the platform will not serve is simply not prefetched — the
-/// caller learns nothing from a 502 here, because it never waits for
-/// this response.
-async fn cn_prefetch_handler(
-    AxumState(srv): AxumState<StreamServer>,
-    Path((platform, track_id)): Path<(String, String)>,
-) -> StatusCode {
-    if !matches!(platform.as_str(), "migu" | "kugou" | "qq") {
-        return StatusCode::BAD_REQUEST;
-    }
-    if track_id.is_empty()
-        || track_id.len() > 64
-        || !track_id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
-        return StatusCode::BAD_REQUEST;
-    }
-
-    let cache_key = format!("{platform}_{track_id}");
-    let final_path = srv.cache_dir.join(format!("{cache_key}.webm"));
-    if final_path.exists() {
-        return StatusCode::OK;
-    }
-
-    let Some(resolved) = cnproviders::resolve(&platform, &track_id).await else {
-        return StatusCode::BAD_GATEWAY;
-    };
-
-    let map_key = format!("cn:{cache_key}");
-    let state = {
-        let mut map = srv.downloads.lock().await;
-        if map.contains_key(&map_key) {
-            return StatusCode::ACCEPTED;
-        }
-        let state = Arc::new(DownloadState::new());
-        map.insert(map_key.clone(), state.clone());
-        drop(map);
-        spawn_cn_filler(
-            resolved,
-            cache_key,
-            srv.cache_dir.clone(),
-            map_key,
-            srv.clone(),
-            state.clone(),
-        );
-        state
-    };
-
-    // The filler publishes the resolved URL as soon as it starts; wait
-    // briefly so the download is genuinely under way before answering.
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
-    loop {
-        let notified = state.notify.notified();
-        tokio::pin!(notified);
-        notified.as_mut().enable();
-        if state.resolved.get().is_some() {
-            break;
-        }
-        if tokio::time::Instant::now() >= deadline {
-            break;
-        }
-        let _ = tokio::time::timeout(Duration::from_millis(200), notified).await;
-    }
-    StatusCode::ACCEPTED
-}
-
 /// Generate an unguessable per-launch token used as a URL path prefix on
 /// the local stream server. Uses OS-seeded RandomState (SipHash keys)
 /// instead of pulling in an RNG crate — 128 bits is ample for a localhost
@@ -4321,10 +4074,8 @@ async fn start_stream_server(
     let routes = Router::new()
         .route("/stream/:video_id", get(stream_handler))
         .route("/stream/netease/:song_id", get(netease_stream_handler))
-        .route("/stream/cn/:platform/:track_id", get(cn_stream_handler))
         .route("/prefetch/:video_id", get(prefetch_handler))
         .route("/prefetch/netease/:song_id", get(netease_prefetch_handler))
-        .route("/prefetch/cn/:platform/:track_id", get(cn_prefetch_handler))
         .route("/cover/:filename", get(cover_serve_handler))
         .with_state(server);
     let app = Router::new()
@@ -4666,11 +4417,6 @@ pub fn run() {
             netease_auth::netease_cancel_login,
             netease_auth::netease_logout,
             netease_auth::netease_session,
-            cnproviders::migu_search_cmd,
-            cnproviders::kugou_search_cmd,
-            cnproviders::qq_search_cmd,
-            cnproviders::cn_resolve,
-            cnproviders::cn_lyric,
             update_source::update_source,
         ])
         .on_window_event(|window, event| {

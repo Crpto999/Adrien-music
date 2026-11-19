@@ -27,7 +27,7 @@ describe("the provider priority order", () => {
   });
 
   it("takes the order it is given", () => {
-    const next: ProviderId[] = ["netease", "youtube", "migu", "kugou", "qq"];
+    const next: ProviderId[] = ["netease", "youtube"];
     setProviderOrder(next);
     expect(getProviderOrder()).toEqual(next);
     setProviderOrder(base());
@@ -80,9 +80,9 @@ describe("the provider priority order", () => {
 
   it("drops a provider the app no longer has", () => {
     const before = base();
-    setProviderOrder([...before, "spotify" as ProviderId]);
-    // Spotify is metadata-only, so it is not in the playable order.
-    expect(getProviderOrder()).not.toContain("spotify");
+    setProviderOrder([...before, "unknown_provider" as ProviderId]);
+    // An unknown provider is not a known provider, so it is not in the playable order.
+    expect(getProviderOrder()).not.toContain("unknown_provider" as ProviderId);
     setProviderOrder(before);
   });
 });

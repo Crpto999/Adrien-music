@@ -44,32 +44,40 @@
 
 use serde::Serialize;
 
-use crate::netease::eapi_post;
-use crate::proxy;
+use crate::netease::{eapi_post, weapi_post};
 
 // ---------------------------------------------------------------------------
 // Endpoints
 // ---------------------------------------------------------------------------
 
 /// The comment list. One route, two orderings.
+///
+/// The reference SDK reads this on the default (eapi) channel:
+/// `/api/v2/resource/comments` — this one stays on eapi.
 const COMMENTS_URI: &str = "/api/v2/resource/comments";
 const COMMENTS_URL: &str = "https://interface.music.163.com/eapi/v2/resource/comments";
 
 /// The replies under one comment.
+///
+/// The reference SDK reads this on the weapi (browser) channel:
+/// `/api/resource/comment/floor/get`.
 const FLOOR_URI: &str = "/api/resource/comment/floor/get";
-const FLOOR_URL: &str = "https://interface.music.163.com/eapi/resource/comment/floor/get";
 
 /// The 百科 page of a recording.
 const ABOUT_URI: &str = "/api/song/play/about/block/page";
 const ABOUT_URL: &str = "https://interface.music.163.com/eapi/song/play/about/block/page";
 
 /// The recording's own entry: its album, its release date, its artist.
-const DETAIL_URI: &str = "/api/song/detail";
-const DETAIL_URL: &str = "https://interface.music.163.com/eapi/song/detail";
+///
+/// The reference SDK reads this on the weapi (browser) channel:
+/// `/api/v3/song/detail` with `{c: "[{\"id\":…}]"}`.
+const DETAIL_URI: &str = "/api/v3/song/detail";
 
 /// The artist's own page: their picture, their aliases, their biography.
+///
+/// The reference SDK reads this on the weapi (browser) channel:
+/// `/api/v1/artist/{id}` with `{}`.
 const ARTIST_URI_PREFIX: &str = "/api/v1/artist/";
-const ARTIST_URL_PREFIX: &str = "https://interface.music.163.com/eapi/v1/artist/";
 
 /// The catalogue's search, used to find an artist by their name.
 const SEARCH_URI: &str = "/api/search/get";
@@ -312,7 +320,7 @@ pub async fn netease_comments(
     }
     let page_no = page_no.unwrap_or(1).max(1);
 
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
     let cookie = crate::netease_cookie(&app).await;
 
@@ -343,6 +351,7 @@ pub async fn netease_comments(
         COMMENTS_URI,
         COMMENTS_URL,
         serde_json::json!({
+            "rid": song_id,
             "threadId": format!("{SONG_THREAD_PREFIX}{song_id}"),
             "pageNo": page_no,
             "showInner": true,
@@ -423,7 +432,7 @@ pub async fn netease_comment_replies(
         });
     }
 
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
     let cookie = crate::netease_cookie(&app).await;
 
@@ -433,10 +442,9 @@ pub async fn netease_comment_replies(
     // nobody has replied to.
     let time = time_cursor.unwrap_or(-1);
 
-    let body = eapi_post(
+    let body = weapi_post(
         &client,
         FLOOR_URI,
-        FLOOR_URL,
         serde_json::json!({
             "parentCommentId": parent_comment_id,
             "threadId": format!("{SONG_THREAD_PREFIX}{song_id}"),
@@ -505,7 +513,7 @@ pub async fn netease_song_wiki(
         return Ok(None);
     }
 
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
     let body = eapi_post(
@@ -579,11 +587,15 @@ async fn fill_similar_details(
         return;
     }
     let ids: Vec<String> = songs.iter().map(|s| s.id.clone()).collect();
-    let body = eapi_post(
+    // weapi `/api/v3/song/detail` takes `c` — a JSON string of `[{id}]`.
+    let c_entries: Vec<String> = ids
+        .iter()
+        .map(|id| format!("{{\"id\":{}}}", id.trim()))
+        .collect();
+    let body = weapi_post(
         client,
         DETAIL_URI,
-        DETAIL_URL,
-        serde_json::json!({ "ids": format!("[{}]", ids.join(",")) }),
+        serde_json::json!({ "c": format!("[{}]", c_entries.join(",")) }),
         None,
     )
     .await
@@ -667,13 +679,12 @@ pub async fn netease_artist_wiki(
     if artist_id.is_empty() {
         return Ok(None);
     }
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
-    let body = eapi_post(
+    let body = weapi_post(
         &client,
         &format!("{ARTIST_URI_PREFIX}{artist_id}"),
-        &format!("{ARTIST_URL_PREFIX}{artist_id}"),
         serde_json::json!({}),
         None,
     )
@@ -704,7 +715,7 @@ pub async fn netease_artist_by_name(
     if wanted.is_empty() {
         return Ok(None);
     }
-    let client = proxy::build_client(reqwest::Client::builder())
+    let client = reqwest::Client::builder().build()
         .map_err(|e| format!("netease client: {e}"))?;
 
     let body = eapi_post(
@@ -774,10 +785,9 @@ pub async fn netease_artist_by_name(
     // A page that cannot be read is not a reason to lose the card: the
     // search's own entry already names the artist and carries their
     // picture, so it can stand in for the biography that is missing.
-    let page = eapi_post(
+    let page = weapi_post(
         &client,
         &format!("{ARTIST_URI_PREFIX}{id}"),
-        &format!("{ARTIST_URL_PREFIX}{id}"),
         serde_json::json!({}),
         None,
     )
@@ -943,11 +953,10 @@ async fn song_detail(client: &reqwest::Client, song_id: &str) -> SongDetail {
         artist_id: None,
         artist_name: None,
     };
-    let body = eapi_post(
+    let body = weapi_post(
         client,
         DETAIL_URI,
-        DETAIL_URL,
-        serde_json::json!({ "ids": format!("[{song_id}]") }),
+        serde_json::json!({ "c": format!("[{{\"id\":{}}}]", song_id.trim()) }),
         None,
     )
     .await
@@ -1023,7 +1032,8 @@ async fn song_credits(client: &reqwest::Client, song_id: &str) -> Credits {
         "https://interface.music.163.com/eapi/song/lyric",
         serde_json::json!({
             "id": song_id,
-            "lv": -1, "kv": -1, "tv": -1,
+            "tv": -1, "lv": -1, "rv": -1, "kv": -1,
+            "_nmclfl": 1,
         }),
         None,
     )

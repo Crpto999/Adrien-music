@@ -3,20 +3,29 @@ import { invoke } from "@tauri-apps/api/core";
 import { useProxyStore } from "@/lib/store/proxy";
 
 /**
- * The user's proxy setting, and the plumbing that carries it to every
- * network path.
+ * The user's proxy setting, and the plumbing that carries it to
+ * YouTube-related traffic only.
  *
  * Three paths need the proxy, and each needs a different mechanism:
  *
- *  1. The webview's own requests, which go through
+ *  1. The webview's YouTube requests, which go through
  *     `tauri-plugin-http` (Rust-side `reqwest`). The plugin takes a
- *     `proxy` client option, so [`proxyOptions`] is spread into every
- *     `tauriFetch` call.
- *  2. Our Rust-side clients (media stream server, cover fetch,
- *     session probe) — those read the proxy from the Rust state, which
- *     [`useProxySync`] keeps in sync with this store.
+ *     `proxy` client option, so [`proxyOptions`] is spread into YouTube
+ *     `tauriFetch` calls only (InnerTube, oEmbed, YTM lyrics).
+ *  2. Our Rust-side YouTube clients (googlevideo ranged reads, the
+ *     YouTube session probe, yt-dlp's GitHub self-update) — those read
+ *     the proxy from the Rust state, which [`useProxySync`] keeps in
+ *     sync with this store.
  *  3. The `yt-dlp` child processes — they take a `--proxy` argument,
  *     added on the Rust side.
+ *
+ * NetEase traffic (official API, CDN, unblock pool) never touches this
+ * setting and always connects directly: NetEase's WAF blocks overseas
+ * proxy IPs (-462/460).
+ *
+ * An empty setting disables the proxy everywhere: no `proxy` option is
+ * passed to YouTube requests, the Rust YouTube clients connect directly,
+ * and `yt-dlp` gets no `--proxy` flag.
  *
  * An empty setting disables the proxy everywhere: no `proxy` option is
  * passed to the HTTP plugin, the Rust clients connect directly, and

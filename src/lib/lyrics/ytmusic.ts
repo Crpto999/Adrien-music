@@ -167,7 +167,7 @@ async function innertube(
   const r = await lyricsFetch(url, deadline, client.headers, {
     ...body,
     context: { client: client.context },
-  });
+  }, true);
   if (!r.ok) throwForStatus(r.status, `YouTube Music ${endpoint}`);
   return (await r.json()) as YtNode;
 }
